@@ -1,0 +1,7 @@
+Van version 1.0
+
+Van is a lightweight key-value database. It has the access method based on
+B+Tree, LSM-Tree and Hash. It is thread-safe.
+
+Currently, we do not support logging, locking and transactions, so no
+checkpoints and snapshots. But we plan to add them.
