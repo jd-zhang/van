@@ -1,0 +1,18 @@
+
+VANPRIVATE
+PREFIX _inmemtree
+
+INCLUDE #include "van_int.h"
+INCLUDE #include "van_inmem_tree.h"
+
+BEGIN	put	1
+TABLE	tabid	uint32		lu
+DATUM	key	VAN_DATUM	s
+DATUM	data	VAN_DATUM	s
+END
+
+BEGIN	del	2
+TABLE	tabid	uint32		lu
+DATUM	key	VAN_DATUM	s
+END
+

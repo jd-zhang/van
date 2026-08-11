@@ -1,0 +1,17 @@
+
+VANPRIVATE
+PREFIX _store
+
+INCLUDE #include "van_int.h"
+INCLUDE #include "van_store.h"
+INCLUDE #include "van_table.h"
+
+BEGIN	tabopen	21
+TABLE	id	uint32		lu
+DATUM	name	VAN_DATUM	s
+END
+
+BEGIN	tabids	22
+ARG	size	uint32		lu
+DATUM	idmap	VAN_DATUM	p
+END

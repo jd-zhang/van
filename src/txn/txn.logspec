@@ -1,0 +1,23 @@
+
+VANPRIVATE
+PREFIX _txn
+
+INCLUDE #include "van_int.h"
+INCLUDE #include "van_txn.h"
+
+BEGIN	ckpt	41
+LSN	ckplsn		VAN_LSN		lu
+LSN	lastckp		VAN_LSN		lu
+TIME	timestamp	uint32		lu
+END
+
+BEGIN	begin	42
+TXN	parent_id	uint32		lu
+TIME	timestamp	uint32		lu
+END
+
+BEGIN	end	43
+OP	op		uint32		lu
+TIME	timestamp	uint32		lu
+END
+

@@ -1,0 +1,243 @@
+#include "van_int.h"
+#include "van.h"
+
+#include "van_inmem_tree.h"
+#include "van_ondisk_tree.h"
+
+/* TODO: Check if this function will run concurrently ? */
+int _van_table_freeze(VAN_TABLE *table) {
+	int ret;
+	INMEM_TREE *im_tree, *active;
+
+	ret = 0;
+	active = NULL;
+	/* There is no active tree */
+	if (table->active == NULL) {
+		ret = _van_inmemtree_create(table, &active);
+		table->active = active;
+		return (ret);
+	}
+
+	/* There are no records in the tree. */
+	im_tree = table->active;
+	if (im_tree->records == 0)
+		return (ret);
+	else {
+		VAN_ASSERT((F_ISSET(im_tree, INMEM_TREE_FROZEN)));
+	}
+
+	/* There is a dump running, just waiting. */
+	while (table->frozen != NULL) {
+		/* Sleep for 1 seconds currently. */
+		_van_sleep(1, 0);
+	}
+
+	ret = _van_inmemtree_create(table, &active);
+	CHK_ERR(ret);
+	table->frozen = im_tree;
+	table->active = active;
+
+	ret = _van_table_dump_frozen_init(table);
+err:
+	return (ret);
+}
+
+int _van_table_dump_frozen_init(VAN_TABLE *table) {
+	int ret;
+	VAN_TABLE_DUMP_JOB *dumpjob;
+
+	dumpjob = NULL;
+	ret = _van_calloc(NULL, 1, sizeof(VAN_TABLE_DUMP_JOB), &dumpjob);
+	if (ret != 0)
+		return (ret);
+	dumpjob->table = table;
+	dumpjob->finished = VAN_FALSE;
+
+	VAN_MUTEX_LOCK(table, dump_mutex, ret);
+	TAILQ_INSERT_TAIL(&table->dump_jobs, dumpjob, links);
+	VAN_MUTEX_UNLOCK(table, dump_mutex, ret);
+
+	ret = pthread_create(&dumpjob->thread_id, NULL,
+	    _van_table_frozen_dump_thread, dumpjob);
+
+	return (ret);
+}
+
+void *_van_table_frozen_dump_thread(void *arg) {
+	VAN_TABLE_DUMP_JOB *dumpjob;
+	VAN_TABLE *table;
+	int ret, ret1;
+	VAN_TABLE_ODT_ITEM *item;
+	ONDISK_TREE *odtree;
+	INMEM_TREE *frozen;
+	size_t indx;
+
+	item = NULL;
+	odtree = NULL;
+	dumpjob = (VAN_TABLE_DUMP_JOB *)arg;
+	table = dumpjob->table;
+	frozen = table->frozen;
+
+	ret = _van_table_new_dumpfile(table, &item, &odtree);
+	CHK_ERR(ret);
+	ret = _van_ondisktree_store_inmem(odtree, frozen);
+	CHK_ERR(ret);
+	ret = _van_table_add_odtpath(table, odtree);
+	CHK_ERR(ret);
+	ret = _van_table_write_odt_paths(table);
+	CHK_ERR(ret);
+
+	VAN_MUTEX_LOCK(table, odt_mtx, ret);
+	indx = table->odt_top - 1;
+	item = &table->odt_items[indx];
+	item->trees[0] = odtree;
+	_van_table_curticks(table, &item->ticks);
+	F_SET(item, VAN_ITEM_INUSE);
+	F_CLR(item, VAN_ITEM_DUMPING);
+	VAN_MUTEX_UNLOCK(table, odt_mtx, ret);
+	
+	table->frozen = NULL;
+	F_SET(frozen, INMEM_TREE_DUMPED);
+	ret = _van_table_curticks(table, &frozen->dumped_ticks);
+
+	/* 
+	 * Insert to the tail and later we will 
+	 * check from head.
+	 */
+	VAN_MUTEX_LOCK(table, im_dump_mtx, ret);
+	TAILQ_INSERT_TAIL(&table->im_dump_trees, frozen, links);
+	VAN_MUTEX_UNLOCK(table, im_dump_mtx, ret);
+
+err:
+	dumpjob->finished = VAN_TRUE;
+	VAN_COND_SIGNAL(table, dump_join_cond, ret1);
+	SET_RET(ret1, ret);
+	return (void *)(uintmax_t)ret;
+}
+
+int _van_table_dump_join_init(VAN_TABLE *table) {
+	int ret;
+	VAN_TABLE_DUMP_JOIN_JOB *joinjob;
+
+	ret = _van_calloc(NULL, 1, sizeof(VAN_TABLE_DUMP_JOIN_JOB), &joinjob);
+	if (ret != 0)
+		return (ret);
+	joinjob->table = table;
+	joinjob->finished = VAN_FALSE;
+
+	ret = pthread_create(&joinjob->thread_id, NULL,
+	    _van_table_dump_join_thread, joinjob);
+	
+	if (ret == 0)
+		table->dump_join_job = joinjob;
+
+	return (ret);
+}
+
+/* 
+ * This function supports multiple dump trees,
+ * but we only have one dumping job currently.
+ *
+ * To support multiple, we need to change the
+ * read logic.
+ */
+void *_van_table_dump_join_thread(void *arg) {
+	int ret, ret1;
+	VAN_TABLE_DUMP_JOIN_JOB *joinjob;
+	VAN_TABLE *table;
+	VAN_TABLE_DUMP_JOB *dumpjob, *prejob;
+	void *rptr;
+
+	joinjob = (VAN_TABLE_DUMP_JOIN_JOB *)arg;
+	table = joinjob->table;
+
+	while (!table->closed) {
+		VAN_MUTEX_LOCK(table, dump_mutex, ret);
+		/* fprintf(stderr, "VAN_COND_WAIT(table, dump_join_cond, &table->dump_mutex, ret)\n"); */
+		VAN_COND_WAIT(table, dump_join_cond, &table->dump_mutex, ret);
+		prejob = NULL;
+		for (dumpjob = TAILQ_FIRST(&table->dump_jobs); dumpjob != NULL;
+		    dumpjob = TAILQ_NEXT(dumpjob, links)) {
+			if (prejob != NULL) {
+				TAILQ_REMOVE(&table->dump_jobs, prejob, links);
+				_van_free(NULL, prejob);
+				prejob = NULL;
+			}
+			if (dumpjob->finished) {
+				ret = pthread_join(dumpjob->thread_id, &rptr);
+				ret1 = (int)(uintmax_t)rptr;
+				SET_RET(ret1, ret);
+				prejob = dumpjob;
+			}
+		}
+		if (prejob != NULL) {
+			TAILQ_REMOVE(&table->dump_jobs, prejob, links);
+			_van_free(NULL, prejob);
+			prejob = NULL;
+		}
+		VAN_MUTEX_UNLOCK(table, dump_mutex, ret);
+
+		/* Temporarily sleeping here. */
+		_van_sleep(2, 0);
+	}
+
+	joinjob->finished = VAN_TRUE;
+
+	return (void *)(uintmax_t)ret;
+}
+
+
+int _van_table_frozen_free_init(VAN_TABLE *table) {
+	int ret;
+	VAN_TABLE_FROZEN_FREE_JOB *freejob;
+
+	ret = _van_calloc(NULL, 1, sizeof(VAN_TABLE_FROZEN_FREE_JOB), &freejob);
+	if (ret != 0)
+		return (ret);
+	freejob->table = table;
+	freejob->finished = VAN_FALSE;
+
+	ret = pthread_create(&freejob->thread_id, NULL,
+	    _van_table_frozen_free_thread, freejob);
+	
+	if (ret == 0)
+		table->frozen_free_job = freejob;
+
+	return (ret);
+}
+
+void *_van_table_frozen_free_thread(void *arg) {
+	int ret;
+	VAN_TABLE_FROZEN_FREE_JOB *freejob;
+	INMEM_TREE *frozen, *tofree;
+	ticks_t ticks;
+	VAN_TABLE *table;
+
+	freejob = (VAN_TABLE_FROZEN_FREE_JOB *)arg;
+	table = freejob->table;
+
+	while (!table->closed) {
+		/* TODO: whether we need to lock here ? */
+		ticks = table->min_op_ticks;
+		
+		VAN_MUTEX_LOCK(table, im_dump_mtx, ret);
+		frozen = TAILQ_FIRST(&table->im_dump_trees);
+		VAN_MUTEX_UNLOCK(table, im_dump_mtx, ret);
+
+		while (frozen != NULL && ticks > frozen->dumped_ticks) {
+			tofree = frozen;
+			VAN_MUTEX_LOCK(table, im_dump_mtx, ret);
+			TAILQ_REMOVE(&table->im_dump_trees, frozen, links);
+			frozen = TAILQ_FIRST(&table->im_dump_trees);
+			VAN_MUTEX_UNLOCK(table, im_dump_mtx, ret);
+			ret = _van_inmemtree_destory(tofree);
+		}
+
+		/* Temporarily sleeping here. */
+		_van_sleep(2, 0);
+	}
+
+	freejob->finished = VAN_TRUE;
+
+	return (void *)(uintmax_t)ret;
+}

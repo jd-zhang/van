@@ -1,0 +1,165 @@
+# ============================================
+# Java 编译文件
+# ============================================
+*.class
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# ============================================
+# Ant 构建目录
+# ============================================
+build/
+dist/
+target/
+bin/
+out/
+
+# ============================================
+# IDE 相关文件
+# ============================================
+# Vim
+*.swp
+*.swo
+*.swn
+*.un~
+*~
+.*.swp
+.*.swo
+.*.swn
+.*.un~
+.*~
+Session.vim
+.vim/
+.vimrc
+.gvimrc
+
+# Eclipse
+.project
+.classpath
+.settings/
+.metadata/
+*.launch
+.idea/
+*.iml
+*.ipr
+*.iws
+*.orig
+*.rej
+*.log
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+.idea_modules/
+.atom/
+.buildpath
+.project
+.classpath
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# ============================================
+# 测试运行时生成的文件
+# ============================================
+record.txt
+transfer_test.log
+transfer_test.log.bak
+*.log
+*.out
+*.tmp
+temp/
+tmp/
+
+# ============================================
+# 系统文件
+# ============================================
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# Mac
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Linux
+*~
+.directory
+*.pid
+*.lock
+
+# ============================================
+# 数据库相关
+# ============================================
+*.db
+*.sqlite
+*.sqlite3
+*.ldb
+*.mdb
+*.accdb
+
+# ============================================
+# 配置文件（包含敏感信息）
+# ============================================
+# 如果你把 app.properties 提交到仓库，但里面包含密码
+# 建议提交 app.properties.example，让其他人自己复制
+app.properties
+*.properties
+*.conf
+*.config
+*.cfg
+
+# 但如果想提交配置文件模板，可以允许
+!app.properties.example
+
+# ============================================
+# Maven / Gradle
+# ============================================
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+.gradle/
+gradle-app.setting
+!gradle-wrapper.jar
+
+# ============================================
+# 其他
+# ============================================
+*.hprof
+*.heapdump
+*.dump
+*.nfs*
+*.lock
+*.bak
+*.backup
+*.old
+*.orig
+*.patch
+*.diff
+*.rej
+*.tmp
+*.temp
+*.test
