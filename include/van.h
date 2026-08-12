@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef _WAN_H
-#define _WAN_H
+#ifndef _VAN_H
+#define _VAN_H
 
 #include "van_types.h"
 #include "van_datum.h"
