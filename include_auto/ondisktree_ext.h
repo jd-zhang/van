@@ -16,6 +16,10 @@
 #ifndef _ONDISKTREE_EXT_H
 #define _ONDISKTREE_EXT_H
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 /* src/ondisktree/ondisktree.c */
 extern int _van_ondisktree_create(VAN_TABLE *table,
     ONDISK_TREE **treep);
@@ -128,5 +132,9 @@ extern int _van_ondisktree_ret(ONDISK_TREECURSOR *cursor,
 /* src/ondisktree/ondisktree_search.c */
 extern int _van_ondisktree_search(ONDISK_TREECURSOR *cursor,
     VAN_DATUM *key, flags_t flags);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

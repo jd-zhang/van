@@ -16,6 +16,10 @@
 #ifndef _VAN_ONDISK_CACHE_H
 #define _VAN_ONDISK_CACHE_H
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 #define NCACHE_PER_HEADER 10	/* TODO: Use it later */
 #define DEF_CACHE_HEADER_SIZE 64	/* default hash table size. */
 #define DEF_CACHE_NBLOCK 128  /* Default 128 blocks as cache size */
@@ -37,5 +41,8 @@ struct _ondisk_cache_header {
 	TAILQ_HEAD(_odch, _ondisk_cache_block) head;
 };
 
+#ifdef __cplusplus
+}
+#endif
 
 #endif

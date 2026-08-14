@@ -16,6 +16,10 @@
 #ifndef _STORE_EXT_H
 #define _STORE_EXT_H
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 /* src/store/van_store.c */
 extern int _van_store_create(VAN_STORE **storep);
 extern int _van_store_open(VAN_STORE *store,
@@ -52,5 +56,9 @@ extern int _store_tabopen_recover(VAN_STORE *, VAN_DATUM *,
     VAN_LSN *, van_recops, void *);
 extern int _store_tabids_recover(VAN_STORE *, VAN_DATUM *,
     VAN_LSN *, van_recops, void *);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

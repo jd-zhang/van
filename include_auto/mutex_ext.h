@@ -16,6 +16,10 @@
 #ifndef _MUTEX_EXT_H
 #define _MUTEX_EXT_H
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 /* src/mutex/van_mutex.c */
 
 /* src/mutex/van_mutex_debug.c */
@@ -28,5 +32,9 @@ extern int _van_mutex_stat_print(FILE *f, const char *prefix);
 extern int _van_cond_stat_reset();
 extern VAN_COND_STAT _van_cond_stat_ret();
 extern int _van_cond_stat_print(FILE *f, const char *prefix);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

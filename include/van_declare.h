@@ -16,6 +16,10 @@
 #ifndef _VAN_DECLARE_H
 #define _VAN_DECLARE_H
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 /* From van_common.h */
 typedef struct _van_string_array VAN_STRING_ARRAY;
 
@@ -94,5 +98,9 @@ typedef struct _van_table_frozen_free_job	VAN_TABLE_FROZEN_FREE_JOB;
 
 /* From van_txn.h */
 typedef struct _van_txn			VAN_TXN;
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

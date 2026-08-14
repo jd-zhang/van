@@ -16,6 +16,10 @@
 #ifndef _VAN_DATUM_H
 #define _VAN_DATUM_H
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 struct _van_datum {
 	void *data;
 	size_t size;
@@ -26,5 +30,9 @@ struct _van_datum {
 typedef int (*VAN_DATUM_CMPFUNC)(const VAN_DATUM *dt1, const VAN_DATUM *dt2);
 typedef int (*VAN_TABLE_CMPFUNC)(const VAN_TABLE *table,
     const VAN_DATUM *dt1, const VAN_DATUM *dt2);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

@@ -16,6 +16,10 @@
 #ifndef _VAN_CURSOR_H
 #define _VAN_CURSOR_H
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 struct _van_operation {
 	VAN_TABLE *table;
 	TAILQ_ENTRY(_van_operation) links;
@@ -34,5 +38,8 @@ struct _van_operation {
 	flags_t flags;
 };
 
+#ifdef __cplusplus
+}
+#endif
 
 #endif

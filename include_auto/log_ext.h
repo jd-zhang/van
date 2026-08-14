@@ -16,6 +16,10 @@
 #ifndef _LOG_EXT_H
 #define _LOG_EXT_H
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 /* src/log/van_log_cursor.c */
 extern int _van_logrec_cget(VAN_LOG_CURSOR *lgc, VAN_LSN *lsn,
     VAN_DATUM *datum, flags_t flags);
@@ -46,5 +50,9 @@ extern int _van_logrec_init(VAN_STORE *store, uint32 orig_len,
     char **bufp, uint32 *bufsizep, int *typep, VAN_LSN *lsnp);
 extern int _van_logrec_write(VAN_STORE *store, const char *buf,
     uint32 bufsize, int type);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

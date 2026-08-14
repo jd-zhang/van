@@ -16,6 +16,10 @@
 #ifndef _VAN_TABLE_H
 #define _VAN_TABLE_H
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 #define MAX_ONDISK_CNT	1000
 #define DEFAULT_SCAN_INTERVAL	10
 
@@ -194,5 +198,9 @@ struct _van_table_frozen_free_job {
 	flags_t flags;
 	int finished;
 };
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

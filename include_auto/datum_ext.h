@@ -16,6 +16,10 @@
 #ifndef _DATUM_EXT_H
 #define _DATUM_EXT_H
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 /* src/datum/datum.c */
 extern size_t _van_datum_size(const VAN_DATUM *ptr);
 extern int _van_datum_clone(const VAN_DATUM *src, VAN_DATUM **dstp);
@@ -30,5 +34,9 @@ extern int _van_datum_uercopy(void *d, size_t len, VAN_DATUM **vdp);
 extern int _van_datum_defcmp(const VAN_DATUM *dt1, const VAN_DATUM *dt2);
 extern int _van_table_datum_defcmp(const VAN_TABLE *table,
     const VAN_DATUM *dt1, const VAN_DATUM *dt2);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

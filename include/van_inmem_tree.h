@@ -16,6 +16,10 @@
 #ifndef _VAN_INMEM_TREE_H
 #define _VAN_INMEM_TREE_H
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 #define NT_IM_INVALID	0	/* Invalid Node Type */
 #define NT_IM_BINTERNAL	1	/* Btree Internal Node */
 #define NT_IM_BLEAF	2	/* Btree Leaf Node. */
@@ -53,7 +57,7 @@ struct _inmem_stat {
  * The default threshold is 100MB, should be set larger 
  * when there is more memory and just a few tables.
  */
-#define IM_DEF_THRESHOLD	(10 * 1024 * 1024)
+#define IM_DEF_THRESHOLD	(100 * 1024 * 1024)
 struct _inmem_tree {
 	TAILQ_ENTRY(_inmem_tree)	links;
 	VAN_TABLE	*table;
@@ -301,5 +305,9 @@ struct _inmem_child {
 	size_t gen;
 	INMEM_BNODE *pointer;
 };
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

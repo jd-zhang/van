@@ -18,6 +18,10 @@
 #ifndef _VAN_COMMON_H
 #define _VAN_COMMON_H
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 struct _van_string_array {
 #define	DEF_STRARR_INITCNT	20
 	size_t capacity;
@@ -27,4 +31,7 @@ struct _van_string_array {
 
 typedef int (*qsortcmpfunc)(const void *, const void *);
 
+#if defined(__cplusplus)
+}
+#endif
 #endif

@@ -16,6 +16,10 @@
 #ifndef _VAN_MUTEX_H
 #define _VAN_MUTEX_H
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 struct _van_rwlock_stat {
 	size_t ninit;
 	size_t ndestroy;
@@ -142,5 +146,8 @@ extern VAN_COND_STAT van_cond_stats;
 #define RWLOCK_TRYWRLOCK 6
 #define RWLOCK_UNLOCK 7
 
+#ifdef __cplusplus
+}
+#endif
 
 #endif

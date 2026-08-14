@@ -17,6 +17,10 @@
 #ifndef _VAN_H
 #define _VAN_H
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 #include "van_types.h"
 #include "van_datum.h"
 
@@ -100,4 +104,9 @@ struct _van_distab {
 #define VAN_OVERFLOW		(-30981)
 #define	VAN_FROZEN		(-30980)
 #define VAN_INMEM_FULL		(-30979)
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif

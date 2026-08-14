@@ -16,6 +16,10 @@
 #ifndef _VAN_STORE_H
 #define _VAN_STORE_H
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 #include "van.h"
 
 struct _van_store_idmap {
@@ -78,5 +82,9 @@ struct _van_store {
 	/* ************** */
 	int (*printinfo)(VAN_STORE *store, FILE* outf, flags_t flags);
 };
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

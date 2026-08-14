@@ -16,6 +16,10 @@
 #ifndef _VAN_ONDISK_TREE_H
 #define _VAN_ONDISK_TREE_H
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 #define NT_OD_INVALID 0
 #define NT_OD_BINTERNAL 1
 #define NT_OD_BLEAF 2
@@ -201,5 +205,9 @@ struct _ondisk_treecursor {
 	    VAN_DATUM *, VAN_DATUM *, flags_t);
 
 };
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

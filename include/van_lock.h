@@ -16,6 +16,10 @@
 #ifndef _VAN_LOCK_H
 #define _VAN_LOCK_H
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 /* Lock Mode */
 #define VAN_LOCK_S 1
 #define VAN_LOCK_X 2
@@ -47,5 +51,9 @@ struct _van_locker {
 struct _van_lock {
 	uint32	lckid;
 };
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

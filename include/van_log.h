@@ -16,6 +16,10 @@
 #ifndef _VAN_LOG_H
 #define _VAN_LOG_H
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 #define VAN_LOG_VERSION	 1
 #define VAN_LOG_MAGIC	0x1
 #define VAN_DEF_LOGSIZE	(10 * 1048576)
@@ -135,5 +139,9 @@ struct _van_log_cursor {
 	VAN_LOGREC_HEADER rechdr;	/* Last lsn's record header */
 	VAN_LOGREC_HEADER tailhdr;	/* The file's last record header */
 };
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

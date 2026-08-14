@@ -16,4 +16,12 @@
 #ifndef _LOCK_EXT_H
 #define _LOCK_EXT_H
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif

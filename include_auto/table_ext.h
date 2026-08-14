@@ -16,6 +16,10 @@
 #ifndef _TABLE_EXT_H
 #define _TABLE_EXT_H
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 /* src/table/van_table.c */
 extern int _van_table_create(VAN_STORE *store, VAN_TABLE **tablep);
 extern int _van_table_init(VAN_TABLE *table);
@@ -96,5 +100,9 @@ extern int _van_table_op_get(VAN_OPERATION *tbop, VAN_DATUM *key,
 extern int _van_table_path(VAN_TABLE *table, const char *file, char **tp);
 extern int _van_table_path_noalloc(VAN_TABLE *table,
     char *buf, size_t buflen, const char *file);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

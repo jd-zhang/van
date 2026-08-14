@@ -16,6 +16,10 @@
 #ifndef _VAN_INT_H
 #define _VAN_INT_H
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 #include <unistd.h>
 #include <assert.h>
 #include <ctype.h>
@@ -235,5 +239,9 @@
 #include "store_ext.h"
 #include "table_ext.h"
 #include "txn_ext.h"
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

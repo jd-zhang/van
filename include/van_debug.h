@@ -16,6 +16,10 @@
 #ifndef _VAN_DEBUG_H
 #define _VAN_DEBUG_H
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 extern ALLOC_STAT alloc_stats;
 struct _alloc_stat {
 	size_t nmalloc;
@@ -23,5 +27,9 @@ struct _alloc_stat {
 	size_t nrealloc;
 	size_t nfree;
 };
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

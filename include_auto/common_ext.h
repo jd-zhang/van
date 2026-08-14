@@ -16,6 +16,10 @@
 #ifndef _COMMON_EXT_H
 #define _COMMON_EXT_H
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 /* src/common/van_alloc.c */
 extern int _van_calloc(void *arg, size_t nelem, size_t elsize, void *storep);
 extern int _van_malloc(void *arg, size_t size, void *storep);
@@ -92,5 +96,9 @@ extern int _van_strarray_sort(VAN_STRING_ARRAY *arr, qsortcmpfunc func);
 extern int _van_getsys_error();
 extern int _van_error_path(const char *str);
 extern void _van_abort();
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

@@ -16,6 +16,10 @@
 #ifndef _VAN_TXN_H
 #define _VAN_TXN_H
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 struct _van_txn {
 	uint32	txnid;
 	VAN_LSN	first_lsn;
@@ -23,5 +27,9 @@ struct _van_txn {
 
 	INMEM_TREE *tree;
 };
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

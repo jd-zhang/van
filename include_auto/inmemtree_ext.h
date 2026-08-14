@@ -16,6 +16,10 @@
 #ifndef _INMEMTREE_EXT_H
 #define _INMEMTREE_EXT_H
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 /* src/inmemtree/inmemtree.c */
 extern int _van_inmemtree_create(VAN_TABLE *table,
     INMEM_TREE **treep);
@@ -166,5 +170,9 @@ extern int _van_inmemtree_traverse_forard(INMEM_TREE *tree,
     INMEM_TRAVERSE_FUNC func, void *firstarg);
 extern int _van_inmemtree_traverse_backward(INMEM_TREE *tree,
     INMEM_TRAVERSE_FUNC func, void *firstarg);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

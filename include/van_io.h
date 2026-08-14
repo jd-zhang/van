@@ -16,6 +16,10 @@
 #ifndef _VAN_IO_H
 #define _VAN_IO_H
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 #define ABS_ROOT '/'
 
 struct _van_iofile {
@@ -26,5 +30,9 @@ struct _van_iofile {
 	off_t woff;	/* Write offset: When to use? */
 	off_t roff;	/* Read offset: Whento use? */
 };
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

@@ -16,6 +16,10 @@
 #ifndef _VAN_TYPES_H
 #define _VAN_TYPES_H
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 #ifdef __CYGWIN__
 typedef unsigned char uint8;
 typedef char int8;
@@ -27,7 +31,7 @@ typedef unsigned long long uint64;
 typedef long long int64;
 #endif
 
-#if defined(__linux) || defined(__linux__)
+#if defined(__linux) || defined(__linux__) || defined(__MINGW32__) || defined(__MINGW64__)
 typedef unsigned char uint8;
 typedef char int8;
 typedef unsigned short uint16;
@@ -41,5 +45,9 @@ typedef long long int64;
 typedef uint32 flags_t;
 typedef int64 ticks_t;
 #define MAX_TICKS LONG_LONG_MAX
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
