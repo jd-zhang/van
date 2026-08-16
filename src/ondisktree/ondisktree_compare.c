@@ -44,7 +44,7 @@ int _van_ondisktree_key_docmp(ONDISK_TREECURSOR *cursor,
 			isfile = 1;
 			break;
 		default:
-			ret = _van_error_path(
+			ret = _van_error_print(
 			    "Invalid type of data item!");
 			break;
 
@@ -74,4 +74,5 @@ int _van_ondisktree_compare(ONDISK_TREECURSOR *cursor,
 	return _van_ondisktree_key_docmp(cursor,
 	    key, kc->len == 0 ? NULL : kc, cmpp);
 }
+
 

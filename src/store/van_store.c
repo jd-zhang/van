@@ -18,6 +18,8 @@
 
 #include "van_inmem_tree.h"
 
+int _van_store_init(VAN_STORE *store);
+
 int _van_store_create(VAN_STORE **storep) {
 	int ret;
 	VAN_STORE *store;

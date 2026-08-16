@@ -80,6 +80,7 @@ extern int _van_iofile_read(VAN_IOFILE *iofile, off_t off,
     uint8 *buf, uint32 size);
 extern int _van_iofile_write(VAN_IOFILE *iofile, off_t off,
     uint8 *buf, uint32 size);
+extern int _van_iofile_stat(VAN_IOFILE *iofile, struct stat *st);
 extern int _van_iofile_set(VAN_IOFILE *iofile, off_t off,
     uint32 size, char c);
 /* src/common/van_sleep.c */
@@ -94,7 +95,7 @@ extern int _van_strarray_sort(VAN_STRING_ARRAY *arr, qsortcmpfunc func);
 
 /* src/common/van_syserr.c */
 extern int _van_getsys_error();
-extern int _van_error_path(const char *str);
+extern int _van_error_print(const char *str);
 extern void _van_abort();
 
 #ifdef __cplusplus
@@ -102,3 +103,4 @@ extern void _van_abort();
 #endif
 
 #endif
+

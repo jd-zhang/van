@@ -41,7 +41,7 @@ int _van_inmemtree_ret(INMEM_TREECURSOR *cursor, const VAN_DATUM *datum,
 			break;
 		default:
 			handled = 1;
-			ret = _van_error_path(
+			ret = _van_error_print(
 			    "Invalid flag to _van_inmemtree_ret!");
 			break;
 	}
@@ -65,7 +65,7 @@ int _van_inmemtree_ret(INMEM_TREECURSOR *cursor, const VAN_DATUM *datum,
 				dat = cursor->defretdata;
 			break;
 		default:
-			ret = _van_error_path(
+			ret = _van_error_print(
 			    "Invalid retype to _van_inmemtree_ret!");
 			break;
 	}
@@ -92,3 +92,4 @@ int _van_inmemtree_ret(INMEM_TREECURSOR *cursor, const VAN_DATUM *datum,
 
 	return (ret);
 }
+

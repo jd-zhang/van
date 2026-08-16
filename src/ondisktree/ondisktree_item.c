@@ -149,7 +149,7 @@ int _van_datum_from_ondiskitem(const VAN_TABLE *table,
 			/* TODO: implement this */
 			break;
 		default:
-			ret = _van_error_path("Bad item->type");
+			ret = _van_error_print("Bad item->type");
 			break;
 
 	}
@@ -174,4 +174,5 @@ int _van_ondiskitem_cmp(const VAN_TABLE *table,
 
 	return (ret);
 }
+
 

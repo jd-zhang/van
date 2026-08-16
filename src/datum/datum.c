@@ -97,7 +97,7 @@ int _van_datum_copy(const VAN_DATUM *src, VAN_DATUM *dst) {
 				ret = VAN_BUFFER_SMALL;
 			break;
 		default:
-			ret = _van_error_path(
+			ret = _van_error_print(
 			    "Invalid flag to _van_datum_copy!");
 			break;
 	}
@@ -278,3 +278,4 @@ int _van_table_datum_defcmp(const VAN_TABLE *table,
 	table = NULL;
 	return _van_datum_defcmp(dt1, dt2);
 }
+

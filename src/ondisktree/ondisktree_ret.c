@@ -45,7 +45,7 @@ int _van_ondisktree_ret(ONDISK_TREECURSOR *cursor, const ONDISK_ITEM *k2,
 			isfile = 1;
 			break;
 		default:
-			ret = _van_error_path(
+			ret = _van_error_print(
 			    "Invalid type of data item!");
 			break;
 	}
@@ -72,7 +72,7 @@ int _van_ondisktree_ret(ONDISK_TREECURSOR *cursor, const ONDISK_ITEM *k2,
 			break;
 		default:
 			handled = 1;
-			ret = _van_error_path(
+			ret = _van_error_print(
 			    "Invalid flag to _van_ondisktree_ret!");
 			break;
 	}
@@ -95,7 +95,7 @@ int _van_ondisktree_ret(ONDISK_TREECURSOR *cursor, const ONDISK_ITEM *k2,
 				dat = cursor->defretdata;
 			break;
 		default:
-			ret = _van_error_path(
+			ret = _van_error_print(
 			    "Invalid retype to _van_ondisktree_ret!");
 			break;
 	}
@@ -121,4 +121,5 @@ clean:
 
 	return (ret);
 }
+
 

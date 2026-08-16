@@ -240,7 +240,7 @@ int _van_inmemtree_cursor_locate(INMEM_TREECURSOR *cursor, VAN_DATUM *key,
 			ret = 0; /* do not change current cursor */
 			break;
 		default:
-			ret = _van_error_path(
+			ret = _van_error_print(
 		"unknown flags passed to _van_inmemtree_cursor_locate!");
 			break;
 	}
@@ -1024,3 +1024,4 @@ err:		if (ik != NULL)
 
 	return (ret);
 }
+

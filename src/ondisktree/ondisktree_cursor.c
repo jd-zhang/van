@@ -217,7 +217,7 @@ int _van_ondisktree_cursor_locate(ONDISK_TREECURSOR *cursor,
 			ret = 0; /* do not change current cursor */
 			break;
 		default:
-			ret = _van_error_path(
+			ret = _van_error_print(
 		"unknown flags passed to _van_ondisktree_cursor_locate!");
 			break;
 	}
@@ -537,3 +537,4 @@ int _van_ondisktree_cursor_getmerged(ONDISK_TREECURSOR *cursor,
 
 	return (ret);
 }
+

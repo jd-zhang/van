@@ -144,7 +144,7 @@ static int check_duplicate(void *obj, size_t maxksz, size_t *totalp,
 			table = table;
 			break;
 		default:
-			ret = _van_error_path("BAD OP_TYPE");
+			ret = _van_error_print("BAD OP_TYPE");
 			break;
 	}
 	if (ret != 0)
@@ -262,7 +262,7 @@ static int populate_data(void *obj, char **keys, size_t *ksizes,
 				break;
 			default:
 				info = "Unknown op_type";
-				ret = _van_error_path("BAD OP_TYPE");
+				ret = _van_error_print("BAD OP_TYPE");
 				break;
 		}
 		CHK_RET(ret, info);
@@ -323,7 +323,7 @@ static int verify_data(void *obj, char **keys, size_t *ksizes,
 			default:
 				/* ERROR */
 				info = "bad otype";
-				ret = _van_error_path("BAD OP_TYPE");
+				ret = _van_error_print("BAD OP_TYPE");
 		}
 		CHK_RET(ret, info);
 		VAN_ASSERT(value.size == vsizes[i]);
@@ -386,7 +386,7 @@ static int verify_data_withcursor(void *obj, char **keys, size_t *ksizes,
 			table = table;
 			break;
 		default:
-			ret = _van_error_path("BAD OP_TYPE");
+			ret = _van_error_print("BAD OP_TYPE");
 			break;
 	}
 	if (ret != 0)
@@ -416,7 +416,7 @@ static int verify_data_withcursor(void *obj, char **keys, size_t *ksizes,
 			default:
 				/* ERROR */
 				info = "bad otype";
-				ret = _van_error_path("BAD OP_TYPE");
+				ret = _van_error_print("BAD OP_TYPE");
 		}
 		CHK_RET(ret, info);
 		VAN_ASSERT(value.size == vsizes[i]);
@@ -562,7 +562,7 @@ static int verify_cursor_direction(void *obj, flags_t direction,
 			table = table;
 			break;
 		default:
-			ret = _van_error_path("BAD OP_TYPE");
+			ret = _van_error_print("BAD OP_TYPE");
 			break;
 	}
 	if (ret != 0)
@@ -679,7 +679,7 @@ static int verify_cursor_border(void *obj, flags_t direction,
 			direction2 = VAN_NEXT;
 			break;
 		default:
-			ret = _van_error_path("BAD direction");
+			ret = _van_error_print("BAD direction");
 			break;
 	}
 	if (ret != 0)
@@ -758,7 +758,7 @@ static int verify_cursor_border(void *obj, flags_t direction,
 			table = table;
 			break;
 		default:
-			ret = _van_error_path("BAD OP_TYPE");
+			ret = _van_error_print("BAD OP_TYPE");
 			break;
 	}
 	if (ret != 0 && ret != VAN_NOTFOUND)
@@ -850,3 +850,4 @@ int free_string_testdata(char **keys, size_t *ksizes,
 
 	return (0);
 }
+

@@ -96,7 +96,7 @@ int _van_inmemtree_dump_node(INMEM_TREE *im_tree,
 		ret = _van_inmemtree_dump_leaf(im_tree, leaf, f);
 
 	} else {
-		ret = _van_error_path("unknown node type!");
+		ret = _van_error_print("unknown node type!");
 	}
 
 	return (ret);
@@ -181,3 +181,4 @@ int _van_inmemtree_mutex_stat_print(FILE *f, const char *prefix) {
 
 	return(0);
 }
+

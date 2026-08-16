@@ -23,7 +23,7 @@ int _van_getsys_error() {
 	return (ret);
 }
 
-int _van_error_path(const char *str) {
+int _van_error_print(const char *str) {
 	fprintf(stderr, "%s\n", str);
 
 	return VAN_INVALID;
@@ -32,3 +32,4 @@ int _van_error_path(const char *str) {
 void _van_abort() {
 	abort();
 }
+

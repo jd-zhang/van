@@ -103,7 +103,7 @@ int _van_put_logrecord(VAN_STORE *store, VAN_TABLE *table, VAN_TXN *txnp,
 				wp += sizeof(lsnv);
 				break;
 			default:
-				ret = _van_error_path("Invalid sp->type!");
+				ret = _van_error_print("Invalid sp->type!");
 
 		}
 	}
@@ -296,9 +296,10 @@ int _van_logrec_write(VAN_STORE *store, const char *buf,
 			ret = _van_log_newfile(logp);
 			break;
 		default: 
-			ret = _van_error_path(
+			ret = _van_error_print(
 			    "_van_logrec_write: Invalid type !");
 	}
 
 	return (ret);
 }
+

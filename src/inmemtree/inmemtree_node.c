@@ -231,7 +231,7 @@ int _van_inmemtree_free_node(INMEM_TREE *tree, INMEM_BNODE *node,
 		ret = _van_inmemtree_free_leaf(tree,
 		    (INMEM_BLEAF *)node);
 	else {
-		ret = _van_error_path("Invalid Node type!");
+		ret = _van_error_print("Invalid Node type!");
 	}
 	
 	return (ret);
@@ -348,10 +348,11 @@ int _van_inmemtree_node_rwlock_action(INMEM_BNODE *node, int action) {
 			INMEM_RWLOCK_UNLOCK(node, rwlock, ret);
 			break;
 		default:
-			ret = _van_error_path(
+			ret = _van_error_print(
 		"Invalid action to _van_inmemtree_node_rwlock_action!");
 			break;
 	}
 
 	return (ret);
 }
+
