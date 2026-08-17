@@ -34,11 +34,10 @@ int _van_inmemtree_dump_leaf(INMEM_TREE *im_tree,
 	values = leaf->values;
 	for (i = 0; i < leaf->size; i++) {
 		fprintf(f, "(key)%s:(value)%s\n",
-		    (keys[i] == NULL || keys[i]->v == NULL ||
-		    keys[i]->v->data == NULL) ? "(null)" :
-		    (char *)keys[i]->v->data, (values[i] == NULL ||
-		    values[i]->v == NULL || values[i]->v->data == NULL) ?
-		    "(null)" : (char *)values[i]->v->data);
+		    (keys[i] == NULL || keys[i]->v.data == NULL) ? "(null)" :
+		    (char *)keys[i]->v.data, (values[i] == NULL ||
+		    values[i]->v.data == NULL) ? "(null)" :
+		    (char *)values[i]->v.data);
 	}
 
 	return (ret);
@@ -60,11 +59,10 @@ int _van_inmemtree_dump_internal(INMEM_TREE *im_tree,
 	childs = internal->childs;
 	for (i = 0; i < internal->size; i++) {
 		fprintf(f, "(key)%s:(value)0x%lx\n",
-		    (keys[i] == NULL || keys[i]->v == NULL ||
-		    keys[i]->v->data == NULL) ? "(null)" :
-		    (char *)keys[i]->v->data, (childs[i] == NULL ||
-		    childs[i]->pointer == NULL) ?
-		    0 : (unsigned long)childs[i]->pointer);
+		    (keys[i] == NULL || keys[i]->v.data == NULL) ? "(null)" :
+		    (char *)keys[i]->v.data, (childs[i] == NULL ||
+		    childs[i]->pointer == NULL) ? 0 :
+		    (unsigned long)childs[i]->pointer);
 		if (recursive && (childs[i] != NULL) && childs[i]->pointer != NULL) {
 			ret = _van_inmemtree_dump_node(im_tree,
 			    childs[i]->pointer, recursive, f);

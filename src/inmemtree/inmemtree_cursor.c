@@ -810,9 +810,6 @@ int _van_inmemtree_cursor_justdel(INMEM_TREECURSOR *cursor, flags_t flags) {
 	if (leaf->values[indx] != NULL) {
 		id = leaf->values[indx];
 		dsize = _van_inmemtree_data_size(id);
-		if (id->v != NULL) {
-			dsize += sizeof(VAN_DATUM) + id->v->size;
-		}
 		_van_inmemtree_free_data(id);
 		leaf->values[indx] = NULL;
 		INMEM_MUTEX_LOCK(im_tree, size_mutex, ret);
@@ -872,12 +869,12 @@ int _van_inmemtree_cursor_getraw(INMEM_TREECURSOR *cursor,
 	 * key as well.
 	 */
 	if (flags != VAN_SET) {
-		ret1 = _van_inmemtree_ret(cursor, ik->v, key, RET_KEY, 0);
+		ret1 = _van_inmemtree_ret(cursor, &ik->v, key, RET_KEY, 0);
 		if (ret1 == 0)
 			key_set = 1;
 	}
 	if (ret1 == 0 && !F_ISSET(ik, IM_DEL))
-		ret2 = _van_inmemtree_ret(cursor, id->v, data, RET_VALUE, 0);
+		ret2 = _van_inmemtree_ret(cursor, &id->v, data, RET_VALUE, 0);
 
 	if (ret1 != 0 || ret2 != 0) {
 		ret = (ret1 == 0 ? ret2 : ret1);

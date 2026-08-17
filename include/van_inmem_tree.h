@@ -330,12 +330,12 @@ struct _inmem_bleaf {
 #define IM_DEL	0x01
 struct _inmem_key {
 	flags_t flags;
-	VAN_DATUM *v;
+	VAN_DATUM v;
 };
 
 struct _inmem_data {
 	flags_t flags;
-	VAN_DATUM *v;
+	VAN_DATUM v;
 };
 
 struct _inmem_child {

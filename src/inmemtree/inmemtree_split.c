@@ -58,7 +58,7 @@ int _van_inmemtree_split_bleaf(INMEM_TREE *im_tree, INMEM_BLEAF *leaf,
 	 * Current, we just move it up,
 	 * but later we should support the prefix compression
 	 */
-	ret = _van_datum_clone(leaf->keys[halfsize]->v, &split);
+	ret = _van_datum_clone(&leaf->keys[halfsize]->v, &split);
 	if (ret != 0) {
 		_van_free(NULL, thenew);
 		return (ret);
@@ -139,8 +139,12 @@ int _van_inmemtree_split_binternal(INMEM_TREE *im_tree,
 	 * not copy it up, otherwise a free is also needed.
 	 * ret = _van_datum_clone(internal->keys[newsize]->v, &split);
 	 */
-	split = internal->keys[newsize]->v;
-	internal->keys[newsize]->v = NULL;
+	ret = _van_datum_clone(&internal->keys[newsize]->v, &split);
+	if (ret != 0) {
+		_van_free(NULL, thenew);
+		return (ret);
+	}
+	memset(&internal->keys[newsize]->v, 0, sizeof(VAN_DATUM));
 	_van_free(NULL, internal->keys[newsize]);
 	internal->keys[newsize] = NULL;
 

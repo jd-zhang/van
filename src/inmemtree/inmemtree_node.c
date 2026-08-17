@@ -18,6 +18,42 @@
 
 #include "van_inmem_tree.h"
 
+static int _van_inmemtree_copy_datum(VAN_DATUM *dst, const VAN_DATUM *src) {
+	int ret;
+
+	ret = 0;
+	if (dst == NULL)
+		return (ret);
+	memset(dst, 0, sizeof(*dst));
+	if (src == NULL)
+		return (ret);
+
+	dst->flags = src->flags;
+	dst->ulen = src->ulen;
+	dst->size = src->size;
+	if (src->data == NULL || src->size == 0)
+		return (ret);
+
+	ret = _van_malloc(NULL, src->size, &dst->data);
+	if (ret != 0)
+		return (ret);
+	memcpy(dst->data, src->data, src->size);
+
+	return (ret);
+}
+
+static void _van_inmemtree_free_datum(VAN_DATUM *datum) {
+	if (datum == NULL)
+		return;
+	if (datum->data != NULL) {
+		_van_free(NULL, datum->data);
+		datum->data = NULL;
+	}
+	datum->size = 0;
+	datum->ulen = 0;
+	datum->flags = 0;
+}
+
 int _van_inmemtree_gen_key(VAN_DATUM *v, INMEM_KEY **keyp) {
 	int ret;
 	INMEM_KEY *key;
@@ -26,7 +62,7 @@ int _van_inmemtree_gen_key(VAN_DATUM *v, INMEM_KEY **keyp) {
 	ret = _van_calloc(NULL, 1, sizeof(INMEM_KEY), &key);
 	if (ret != 0)
 		return (ret);
-	ret = _van_datum_clone(v, &key->v);
+	ret = _van_inmemtree_copy_datum(&key->v, v);
 	if (ret == 0)
 		*keyp = key;
 	else	/* Free the allocated resource when failure */
@@ -41,8 +77,8 @@ size_t _van_inmemtree_key_size(INMEM_KEY *key) {
 	sz = 0;
 	if (key != NULL) {
 		sz += sizeof(INMEM_KEY);
-		if (key->v != NULL)
-			sz += _van_datum_size(key->v);
+		if (key->v.data != NULL)
+			sz += key->v.size;
 	}
 	
 	return sz;
@@ -56,7 +92,14 @@ int _van_inmemtree_gen_key_nocopydatum(VAN_DATUM *v, INMEM_KEY **keyp) {
 	ret = _van_calloc(NULL, 1, sizeof(INMEM_KEY), &key);
 	if (ret != 0)
 		return (ret);
-	key->v = v;
+	if (v != NULL) {
+		key->v = *v;
+		v->data = NULL;
+		v->size = 0;
+		v->ulen = 0;
+		v->flags = 0;
+		_van_free(NULL, v);
+	}
 	*keyp = key;
 
 	return (ret);
@@ -69,10 +112,7 @@ int _van_inmemtree_free_key(INMEM_KEY *key) {
 	if (key == NULL)
 		return (ret);
 
-	if (key->v != NULL) {
-		_van_datum_free(key->v);
-		key->v = NULL;
-	}
+	_van_inmemtree_free_datum(&key->v);
 	_van_free(NULL, key);
 	
 	return (ret);
@@ -86,7 +126,7 @@ int _van_inmemtree_gen_data(VAN_DATUM *v, INMEM_DATA **datap) {
 	ret = _van_calloc(NULL, 1, sizeof(INMEM_DATA), &data);
 	if (ret != 0)
 		return (ret);
-	ret = _van_datum_clone(v, &data->v);
+	ret = _van_inmemtree_copy_datum(&data->v, v);
 	if (ret == 0)
 		*datap = data;
 	else /* Free the allocated resource when failure */
@@ -101,8 +141,8 @@ size_t _van_inmemtree_data_size(INMEM_DATA *data) {
 	sz = 0;
 	if (data != NULL) {
 		sz += sizeof(INMEM_DATA);
-		if (data->v != NULL)
-			sz += _van_datum_size(data->v);
+		if (data->v.data != NULL)
+			sz += data->v.size;
 	}
 	
 	return sz;
@@ -115,10 +155,7 @@ int _van_inmemtree_free_data(INMEM_DATA *data) {
 	if (data == NULL)
 		return (ret);
 
-	if (data->v != NULL) {
-		_van_datum_free(data->v);
-		data->v = NULL;
-	}
+	_van_inmemtree_free_datum(&data->v);
 	_van_free(NULL, data);
 
 	return (ret);

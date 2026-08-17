@@ -24,7 +24,7 @@ int _van_inmemtree_key_docmp(INMEM_TREECURSOR *cursor,
 	int cmp;
 
 	datum_cmp = cursor->im_tree->config->cmp_func;
-	cmp = datum_cmp(key, k2->v);
+	cmp = datum_cmp(key, &k2->v);
 	return (cmp);
 }
 

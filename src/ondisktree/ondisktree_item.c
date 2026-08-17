@@ -33,12 +33,12 @@ int _van_ondiskitem_from_inmemkey(ONDISK_TREE *tree, const INMEM_KEY *key,
 
 	if (key == NULL) {
 		/* Just use the empty datum */
-	} else if (key->v->size >= tree->blob_threshold) {
+	} else if (key->v.size >= tree->blob_threshold) {
 		isfile = 1;
 		/* TODO: Save the data to a file */
 		/* Should set the datum. */
 	} else {
-		datum = *(key->v);
+		datum = key->v;
 	}
 	size = P_ITEMSIZE(datum.size);
 	
@@ -81,12 +81,12 @@ int _van_ondiskitem_from_inmemdata(ONDISK_TREE *tree, const INMEM_DATA *data,
 
 	if (data == NULL) {
 		/* Just use the empty datum. */
-	} else if (data->v->size >= tree->blob_threshold) {
+	} else if (data->v.size >= tree->blob_threshold) {
 		isfile = 1;
 		/* TODO: Save the data to a file */
 		/* Should set the datum */
 	} else {
-		datum = *(data->v);
+		datum = data->v;
 	}
 	size = P_ITEMSIZE(datum.size);
 	
