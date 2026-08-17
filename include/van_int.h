@@ -39,6 +39,7 @@ extern "C" {
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <time.h>
+#include <stdatomic.h>
 
 /* IPC */
 #include <mqueue.h>

@@ -43,6 +43,8 @@ int imt_t1_1() {
 	ret = _van_inmemtree_destory(tree);
 	CHK_RET(ret, "_van_inmemtree_destory");
 
+	fprintf(stderr, "**** Malloc Statistics ****\n");
+	_van_alloc_stat_print(stderr, " ");
 	
 	return (ret);
 }
@@ -60,6 +62,7 @@ int imt_t1_2(int verbose) {
 	ret = _van_inmemtree_create(&table, &table.active);
 	CHK_RET(ret, "_van_inmemtree_create");
 	tree = table.active;
+	tree->threshold = 1*GIGABYTE;
 
 	if (verbose)
 		outf = fopen("imt_t1_2.out", "w");
@@ -70,7 +73,7 @@ int imt_t1_2(int verbose) {
 	 * we haven't made good use of
 	 * the memory.
 	 */
-	cnt = 1000000;
+	cnt = 100000;
 	STRING_TESTDATA_INIT;
 	(void)generate_string_testdata2(keys, ksizes, "KEY", 
 	    values, vsizes, "DATA", cnt, 1);
@@ -98,8 +101,10 @@ int imt_t1_2(int verbose) {
 	_van_alloc_stat_print(stderr, " ");
 
 	fprintf(stderr, "========== 2 Dump leaves after putting ========\n");
-	if (verbose)
+	if (verbose) {
 		(void)_van_inmemtree_dump_all_leaves(tree, outf);
+		_van_alloc_stat_print(stderr, " ");
+	}
 
 	fprintf(stderr, "========== 3 Get using tree->get() ============\n");
 	_van_alloc_stat_reset();
@@ -174,11 +179,15 @@ int imt_t1_2(int verbose) {
 	fprintf(stderr, "========== 9 Get using VAN_LAST ============\n");
 	ret = verify_inmemtree_cursor_border(tree, VAN_LAST, 0);
 	CHK_RET(ret, "verify_inmemtree_cursor_border(VAN_LAST)");
+	fprintf(stderr, "**** Malloc Statistics ****\n");
+	_van_alloc_stat_print(stderr, " ");
 
 
 	fprintf(stderr, "========== 10 Get using VAN_FIRST(VAN_WRITECURSOR) ============\n");
 	ret = verify_inmemtree_cursor_border(tree, VAN_FIRST, VAN_WRITECURSOR);
 	CHK_RET(ret, "verify_inmemtree_cursor_border(VAN_FIRST, VAN_WRITECURSOR)");
+	fprintf(stderr, "**** Malloc Statistics ****\n");
+	_van_alloc_stat_print(stderr, " ");
 
 	fprintf(stderr, "========== 11 Destroy the tree ============\n");
 	time(&t1);

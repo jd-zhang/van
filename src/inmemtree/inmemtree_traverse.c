@@ -65,6 +65,14 @@ int _van_inmemtree_process_leaf_backward(INMEM_BLEAF *leaf,
 	return (ret);
 }
 
+/*
+ * Traverse the tree forward, from the first leaf to the last leaf.
+ * The function will be called for each key-value pair in the tree.
+ * If the function returns a non-zero value, the traversal will stop.
+ *
+ * This function is run without locks, because it is running on a
+ * frozen tree, which is not modified by any other thread.
+*/
 int _van_inmemtree_traverse_forard(INMEM_TREE *tree,
     INMEM_TRAVERSE_FUNC func, void *firstarg) {
 
@@ -88,6 +96,14 @@ int _van_inmemtree_traverse_forard(INMEM_TREE *tree,
 
 }
 
+/*
+ * Traverse the tree backward, from the last leaf to the first leaf.
+ * The function will be called for each key-value pair in the tree.
+ * If the function returns a non-zero value, the traversal will stop.
+ *
+ * This function is run without locks, because it is running on a
+ * frozen tree, which is not modified by any other thread.
+*/
 int _van_inmemtree_traverse_backward(INMEM_TREE *tree,
     INMEM_TRAVERSE_FUNC func, void *firstarg) {
 

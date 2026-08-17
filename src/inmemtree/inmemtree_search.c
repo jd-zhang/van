@@ -54,10 +54,9 @@ int _van_inmemtree_search(INMEM_TREECURSOR *imc, VAN_DATUM *key,
 	INMEM_BLEAF *leaf;
 	size_t sz, sp, ep, findx, mid;
 	size_t expgen, curgen;
-	int cmp, clevel, wlock, use_old, to_retry;
+	int cmp, clevel, wlock, use_old;
 
 	use_old = 0;
-	to_retry = 0;
 	if (imc->node != NULL) {
 		current = imc->node;
 		VAN_ASSERT(current->type == NT_IM_BLEAF);
@@ -86,6 +85,7 @@ again:
 			 */
 			if (prev != NULL) {
 				INMEM_RWLOCK_UNLOCK(prev, rwlock, ret1);
+				VAN_ASSERT(ret1 == 0);
 				prev = NULL;
 			}
 			ret = VAN_FROZEN;
@@ -115,6 +115,7 @@ again:
 		 */
 		if (prev != NULL) {
 			INMEM_RWLOCK_UNLOCK(prev, rwlock, ret1);
+			VAN_ASSERT(ret1 == 0);
 			prev = NULL;
 		}
 		if (ret == EAGAIN || ret == EBUSY || ret == EDEADLK) {
@@ -141,6 +142,7 @@ again:
 			 *       of the root node.
 			 */
 			INMEM_RWLOCK_UNLOCK(current, rwlock, ret1);
+			VAN_ASSERT(ret1 == 0);
 			goto again;
 		}
 		
@@ -164,11 +166,13 @@ again:
 			 */
 			if (wlock == 0) {
 				INMEM_RWLOCK_UNLOCK(current, rwlock, ret1);
+				VAN_ASSERT(ret1 == 0);
 				INMEM_RWLOCK_WRLOCK(current, rwlock, ret);
 				/* It may be splitted by other thread */
 				if (current->gen != expgen) {
 					INMEM_RWLOCK_UNLOCK(current,
 					    rwlock, ret1);
+					VAN_ASSERT(ret1 == 0);
 					goto again;
 				}
 			}
@@ -308,10 +312,6 @@ have_node:
 			ret = VAN_INVALID;
 	}
 
-	/* We only retry if we get the expected error */
-	if (ret == VAN_NOTFOUND)
-		to_retry = 1;
-
 	if (ret != 0) {
 err:
 		if (use_old && imc->node != NULL) {
@@ -319,7 +319,8 @@ err:
 			INMEM_RWLOCK_UNLOCK(imc->node, rwlock, ret1);
 			imc->node = NULL;
 		}
-		if (use_old && to_retry) {
+		/* We only retry if we get the expected error */
+		if (use_old && (ret == VAN_NOTFOUND)) {
 			use_old = 0;
 			goto again;
 		}

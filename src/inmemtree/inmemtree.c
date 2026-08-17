@@ -162,13 +162,14 @@ int _van_inmemtree_destory(INMEM_TREE *tree) {
 	while ((node = TAILQ_FIRST(&tree->nodelist)) != NULL) {
 		_van_inmemtree_free_node(tree, node, 0, 0);
 		ccnt++;	
+		/* Print the progress */
 		/*
 		if (ccnt >= now * tcnt / top) {
 			fprintf(stderr, "%lu/%lu nodes has been destroyed\n",
 			    (unsigned long)now, (unsigned long)top);
 			now++;
-		}
-		*/
+		} */
+		
 	}
 
 	/* Free the config */
@@ -217,13 +218,11 @@ int _van_inmemtree_freeze(INMEM_TREE *tree) {
 
 static int _van_inmemtree_put_frozen(INMEM_TREE *tree,
     VAN_DATUM *k, VAN_DATUM *v, flags_t flags) {
-
 	return (VAN_FROZEN);
 }
 
 static int _van_inmemtree_del_frozen(INMEM_TREE *tree,
     VAN_DATUM *k, flags_t flags) {
-
 	return (VAN_FROZEN);
 }
 
@@ -236,6 +235,7 @@ static int _van_inmemtree_get(INMEM_TREE *tree,
 
 	ret = _van_inmemtree_cursor_init(tree, &cursor, VAN_TEMPCURSOR);
 	CHK_ERR(ret);
+
 	ret = _van_inmemtree_cursor_get(cursor, k, v, VAN_SET);
 
 err:
@@ -255,6 +255,7 @@ static int _van_inmemtree_getraw(INMEM_TREE *tree,
 
 	ret = _van_inmemtree_cursor_init(tree, &cursor, VAN_TEMPCURSOR);
 	CHK_ERR(ret);
+
 	ret = _van_inmemtree_cursor_getraw(cursor, k, v, VAN_SET);
 
 err:
@@ -272,13 +273,14 @@ static int _van_inmemtree_put(INMEM_TREE *tree,
 
 	cursor = NULL;
 
-	ret = _van_inmemtree_cursor_init(tree, &cursor,
-	    VAN_TEMPCURSOR | VAN_WRITECURSOR);
-	CHK_ERR(ret);
 	if (F_ISSET(tree, INMEM_TREE_FROZEN)) {
 		ret = VAN_FROZEN;
 		goto err;
 	}
+
+	ret = _van_inmemtree_cursor_init(tree, &cursor,
+	    VAN_TEMPCURSOR | VAN_WRITECURSOR);
+	CHK_ERR(ret);
 
 	ret = _van_inmemtree_cursor_put(cursor, k, v, 0);
 err:
@@ -296,13 +298,14 @@ static int _van_inmemtree_del(INMEM_TREE *tree,
 
 	cursor = NULL;
 
-	ret = _van_inmemtree_cursor_init(tree, &cursor,
-	    VAN_TEMPCURSOR | VAN_WRITECURSOR);
-	CHK_ERR(ret);
 	if (F_ISSET(tree, INMEM_TREE_FROZEN)) {
 		ret = VAN_FROZEN;
 		goto err;
 	}
+
+	ret = _van_inmemtree_cursor_init(tree, &cursor,
+	    VAN_TEMPCURSOR | VAN_WRITECURSOR);
+	CHK_ERR(ret);
 
 	ret = _van_inmemtree_cursor_del(cursor, k, 0);
 err:
