@@ -99,6 +99,7 @@ int imt_t1_2(int verbose) {
 	_van_inmemtree_rwlock_stat_print(stderr, " ");
 	fprintf(stderr, "**** Malloc Statistics ****\n");
 	_van_alloc_stat_print(stderr, " ");
+	tree->statprint(tree, stderr, "inemtree stat: ");
 
 	fprintf(stderr, "========== 2 Dump leaves after putting ========\n");
 	if (verbose) {

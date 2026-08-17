@@ -160,6 +160,7 @@ extern int _van_inmemtree_split_node(INMEM_TREE *im_tree,
     INMEM_BNODE *node);
 
 /* src/inmemtree/inmemtree_stat.c */
+extern void _inmemtree_statprint(INMEM_TREE *imtree, FILE *f, const char *prefix) ;
 
 /* src/inmemtree/inmemtree_traverse.c */
 extern int _van_inmemtree_process_leaf_forward(INMEM_BLEAF *leaf,

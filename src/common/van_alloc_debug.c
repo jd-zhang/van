@@ -16,24 +16,40 @@
 #include "van_int.h"
 #include "van.h"
 
-ALLOC_STAT alloc_stats;
+#include "van_debug.h"
+
+ALLOC_STAT alloc_stats = {
+    .nmalloc = ATOMIC_VAR_INIT(0),
+    .ncalloc = ATOMIC_VAR_INIT(0),
+    .nrealloc = ATOMIC_VAR_INIT(0),
+    .nfree = ATOMIC_VAR_INIT(0)
+};
 
 int _van_alloc_stat_reset() {
-	memset(&alloc_stats, 0, sizeof(ALLOC_STAT));
-	return (0);
+    atomic_store(&alloc_stats.nmalloc, 0);
+    atomic_store(&alloc_stats.ncalloc, 0);
+    atomic_store(&alloc_stats.nrealloc, 0);
+    atomic_store(&alloc_stats.nfree, 0);
+    return (0);
 }
 
 ALLOC_STAT _van_alloc_stat_ret() {
-	return (alloc_stats);
+    ALLOC_STAT tmp;
+    tmp.nmalloc = atomic_load(&alloc_stats.nmalloc);
+    tmp.ncalloc = atomic_load(&alloc_stats.ncalloc);
+    tmp.nrealloc = atomic_load(&alloc_stats.nrealloc);
+    tmp.nfree = atomic_load(&alloc_stats.nfree);
+    return (tmp);
 }
 
 int _van_alloc_stat_print(FILE *f, const char *prefix) {
-	fprintf(f, "%s nmalloc:%lu, ncalloc:%lu, "
-	    "nrealloc:%lu, nfree:%lu\n",
-	    prefix, (unsigned long)alloc_stats.nmalloc,
-	    (unsigned long)alloc_stats.ncalloc,
-	    (unsigned long)alloc_stats.nrealloc,
-	    (unsigned long)alloc_stats.nfree);
+    fprintf(f, "%s nmalloc:%lu, ncalloc:%lu, "
+        "nrealloc:%lu, nfree:%lu\n",
+        prefix,
+        (unsigned long)atomic_load(&alloc_stats.nmalloc),
+        (unsigned long)atomic_load(&alloc_stats.ncalloc),
+        (unsigned long)atomic_load(&alloc_stats.nrealloc),
+        (unsigned long)atomic_load(&alloc_stats.nfree));
 
-	return(0);
+    return(0);
 }

@@ -33,82 +33,82 @@
 #endif
 
 int _van_calloc(void *arg, size_t nelem, size_t elsize, void *storep) {
-	void *p;
-	int ret;
+    void *p;
+    int ret;
 
-	VAN_ASSERT(storep != NULL);
+    VAN_ASSERT(storep != NULL);
 
-	p = g_calloc(nelem, elsize);
-	if (p == NULL) {
-		ret = _van_getsys_error();
-	} else {
-		ret = 0;
-		*(void **)storep = p;
-	}
-	alloc_stats.ncalloc++;
+    p = g_calloc(nelem, elsize);
+    if (p == NULL) {
+        ret = _van_getsys_error();
+    } else {
+        ret = 0;
+        *(void **)storep = p;
+    }
+    VAN_ALLOC_STAT_INC_CALLOC();
 
-	return (ret);
+    return (ret);
 }
 
 int _van_malloc(void *arg, size_t size, void *storep) {
-	void *p;
-	int ret;
+    void *p;
+    int ret;
 
-	VAN_ASSERT(storep != NULL);
+    VAN_ASSERT(storep != NULL);
 
-	p = g_malloc(size);
-	if (p == NULL) {
-		ret = _van_getsys_error();
-	} else {
-		ret = 0;
-		*(void **)storep = p;
-	}
-	alloc_stats.nmalloc++;
+    p = g_malloc(size);
+    if (p == NULL) {
+        ret = _van_getsys_error();
+    } else {
+        ret = 0;
+        *(void **)storep = p;
+    }
+    VAN_ALLOC_STAT_INC_MALLOC();
 
-	return (ret);
+    return (ret);
 }
 
 int _van_realloc(void *arg, void *ptr, size_t size, void *storep) {
-	int ret;
-	void *p;
+    int ret;
+    void *p;
 
-	VAN_ASSERT(storep != NULL);
+    VAN_ASSERT(storep != NULL);
 
-	p = g_realloc(ptr, size);
-	if (p == NULL) {
-		ret = _van_getsys_error();
-	} else {
-		ret = 0;
-		*(void **)storep = p;
-	}
-	alloc_stats.nrealloc++;
+    p = g_realloc(ptr, size);
+    if (p == NULL) {
+        ret = _van_getsys_error();
+    } else {
+        ret = 0;
+        *(void **)storep = p;
+    }
+    VAN_ALLOC_STAT_INC_REALLOC();
 
-	return (ret);
+    return (ret);
 }
 
 int _van_strdup(void *arg, const char *str, char **destp) {
-	int ret;
-	size_t sz;
-	void *buf;
-	
-	ret = 0;
-	if (str == NULL) {
-		*destp = NULL;
-		return (ret);
-	}
+    int ret;
+    size_t sz;
+    void *buf;
 
-	sz = strlen(str) + 1;
-	ret = _van_malloc(arg, sz, &buf);
-	if (ret != 0)
-		return (ret);
-	memcpy(buf, str, sz);
-	*destp = buf;
+    ret = 0;
+    if (str == NULL) {
+        *destp = NULL;
+        return (ret);
+    }
 
-	return (ret);
+    sz = strlen(str) + 1;
+    ret = _van_malloc(arg, sz, &buf);
+    if (ret != 0)
+        return (ret);
+    memcpy(buf, str, sz);
+    *destp = buf;
+
+    return (ret);
 }
 
 void _van_free(void *arg, void *ptr) {
-	if (ptr != NULL)
-		g_free(ptr);
-	alloc_stats.nfree++;
+    if (ptr != NULL)
+        g_free(ptr);
+    VAN_ALLOC_STAT_INC_FREE();
 }

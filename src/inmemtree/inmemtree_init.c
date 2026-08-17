@@ -56,7 +56,7 @@ int _van_inmemtree_alloc_bnode(INMEM_TREE *im_tree,
 	TAILQ_INSERT_TAIL(&im_tree->nodelist, node, links);
 	INMEM_MUTEX_UNLOCK(im_tree, mtx_nodelist, ret);
 	CHK_ERR(ret);
-
+	_inmemtree_inc_nodes_cnt(im_tree);
 	*nodep = node;
 
 	if (0) {
@@ -83,7 +83,7 @@ int _van_inmemtree_alloc_binternal(INMEM_TREE *im_tree,
 
 	node->type = NT_IM_BINTERNAL;
 	*nodep = (INMEM_BINTERNAL *)node;
-
+	_inmemtree_inc_internals_cnt(im_tree);
 	return (ret);
 }
 
@@ -101,6 +101,6 @@ int _van_inmemtree_alloc_bleaf(INMEM_TREE *im_tree,
 	node->type = NT_IM_BLEAF;
 	node->level = im_tree->config->base_level;
 	*nodep = (INMEM_BLEAF *)node;
-
+	_inmemtree_inc_leaves_cnt(im_tree);
 	return (ret);
 }

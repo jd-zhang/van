@@ -19,3 +19,20 @@
 #include "van_inmem_tree.h"
 
 
+void _inmemtree_statprint(INMEM_TREE *imtree, FILE *f, const char *prefix) {
+    if (!imtree || !f) {
+        return;
+    }
+    
+    size_t nodes = atomic_load(&imtree->stat.n_nodes);
+    size_t leaves = atomic_load(&imtree->stat.n_leaves);
+    size_t internals = atomic_load(&imtree->stat.n_internals);
+    
+    if (prefix && strlen(prefix) > 0) {
+        fprintf(f, "%s nodes=%zu leaves=%zu internals=%zu\n", 
+                prefix, nodes, leaves, internals);
+    } else {
+        fprintf(f, "nodes=%zu leaves=%zu internals=%zu\n", 
+                nodes, leaves, internals);
+    }
+}

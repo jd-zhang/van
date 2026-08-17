@@ -44,9 +44,9 @@ struct _inmem_config {
 };
 
 struct _inmem_stat {
-	size_t		n_nodes;
-	size_t		n_leaves;
-	size_t		n_internals;
+	atomic_size_t		n_nodes;
+	atomic_size_t		n_leaves;
+	atomic_size_t		n_internals;
 };
 
 #define DEF_KEY_ULEN 4096
@@ -118,8 +118,45 @@ struct _inmem_tree {
 	int (*getraw)(INMEM_TREE *, VAN_DATUM *, VAN_DATUM *, flags_t);
 	int (*put)(INMEM_TREE *, VAN_DATUM *, VAN_DATUM *, flags_t);
 	int (*del)(INMEM_TREE *, VAN_DATUM *, flags_t);
+	void (*statprint)(INMEM_TREE *imtree, FILE *f, const char *prefix);
 };
 
+
+static inline void _inmemtree_inc_nodes_cnt(INMEM_TREE *imtree) {
+    if (imtree) {
+        atomic_fetch_add(&imtree->stat.n_nodes, 1);
+    }
+}
+
+static inline void _inmemtree_inc_leaves_cnt(INMEM_TREE *imtree) {
+    if (imtree) {
+        atomic_fetch_add(&imtree->stat.n_leaves, 1);
+    }
+}
+
+static inline void _inmemtree_inc_internals_cnt(INMEM_TREE *imtree) {
+    if (imtree) {
+        atomic_fetch_add(&imtree->stat.n_internals, 1);
+    }
+}
+
+static inline void _inmemtree_add_nodes_cnt(INMEM_TREE *imtree, size_t n) {
+    if (imtree) {
+        atomic_fetch_add(&imtree->stat.n_nodes, n);
+    }
+}
+
+static inline void _inmemtree_add_leaves_cnt(INMEM_TREE *imtree, size_t n) {
+    if (imtree) {
+        atomic_fetch_add(&imtree->stat.n_leaves, n);
+    }
+}
+
+static inline void _inmemtree_add_internals_cnt(INMEM_TREE *imtree, size_t n) {
+    if (imtree) {
+        atomic_fetch_add(&imtree->stat.n_internals, n);
+    }
+}
 
 
 struct _inmem_treecursor {

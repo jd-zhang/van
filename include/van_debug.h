@@ -16,17 +16,44 @@
 #ifndef _VAN_DEBUG_H
 #define _VAN_DEBUG_H
 
+#include <stdatomic.h>
+
 #if defined(__cplusplus)
 extern "C" {
 #endif
 
-extern ALLOC_STAT alloc_stats;
 struct _alloc_stat {
-	size_t nmalloc;
-	size_t ncalloc;
-	size_t nrealloc;
-	size_t nfree;
+    atomic_size_t nmalloc;
+    atomic_size_t ncalloc;
+    atomic_size_t nrealloc;
+    atomic_size_t nfree;
 };
+
+extern ALLOC_STAT alloc_stats;
+
+#define VAN_ALLOC_STAT_INC_MALLOC() \
+    atomic_fetch_add(&alloc_stats.nmalloc, 1)
+
+#define VAN_ALLOC_STAT_INC_CALLOC() \
+    atomic_fetch_add(&alloc_stats.ncalloc, 1)
+
+#define VAN_ALLOC_STAT_INC_REALLOC() \
+    atomic_fetch_add(&alloc_stats.nrealloc, 1)
+
+#define VAN_ALLOC_STAT_INC_FREE() \
+    atomic_fetch_add(&alloc_stats.nfree, 1)
+
+#define VAN_ALLOC_STAT_GET_MALLOC() \
+    atomic_load(&alloc_stats.nmalloc)
+
+#define VAN_ALLOC_STAT_GET_CALLOC() \
+    atomic_load(&alloc_stats.ncalloc)
+
+#define VAN_ALLOC_STAT_GET_REALLOC() \
+    atomic_load(&alloc_stats.nrealloc)
+
+#define VAN_ALLOC_STAT_GET_FREE() \
+    atomic_load(&alloc_stats.nfree)
 
 #ifdef __cplusplus
 }
