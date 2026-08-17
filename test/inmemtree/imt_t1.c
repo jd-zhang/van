@@ -223,6 +223,9 @@ int imt_t1_3() {
 	ret = _van_inmemtree_create(&table, &table.active);
 	CHK_RET(ret, "_van_inmemtree_create");
 	tree = table.active;
+	/* we set this to avoid inmemtree to dump leaves,
+	 since we don't want to test that here */
+	tree->threshold = 1*GIGABYTE;
 
 	cnt = 1000000;
 	STRING_TESTDATA_INIT;
@@ -239,6 +242,7 @@ int imt_t1_3() {
 	_van_inmemtree_rwlock_stat_print(stderr, " ");
 	fprintf(stderr, "**** Malloc Statistics ****\n");
 	_van_alloc_stat_print(stderr, " ");
+	tree->statprint(tree, stderr, "inemtree stat: ");
 
 	fprintf(stderr, "========== 2 Dump leaves after putting ========\n");
 
