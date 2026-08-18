@@ -30,7 +30,7 @@ static int LETTERS_SIZE = sizeof(LETTERS)/sizeof(LETTERS[0]);
 
 static int check_duplicate(void *obj, size_t maxksz, size_t *totalp,
     size_t *dupcountp, int otype);
-static int populate_data(void *obj, char **keys, size_t *ksizes, 
+static int populate_data(void *obj, char **keys, size_t *ksizes,
     char **values, size_t *vsizes, size_t cnt, int otype);
 static int verify_data(void *obj, char **keys, size_t *ksizes,
     char **values, size_t *vsizes, size_t cnt, int otype);
@@ -165,7 +165,7 @@ static int check_duplicate(void *obj, size_t maxksz, size_t *totalp,
 				break;
 			case OP_TABLE:
 				ret = 0;  /* TODO: table */
-				break; 
+				break;
 			/* No other types */
 		}
 		if (ret == VAN_NOTFOUND)
@@ -230,7 +230,7 @@ int check_table_duplicate(VAN_TABLE *table,
 	    dupcountp, OP_TABLE);
 }
 
-static int populate_data(void *obj, char **keys, size_t *ksizes, 
+static int populate_data(void *obj, char **keys, size_t *ksizes,
     char **values, size_t *vsizes, size_t cnt, int otype) {
 	size_t i;
 	int ret;
@@ -273,18 +273,22 @@ static int populate_data(void *obj, char **keys, size_t *ksizes,
 	return (ret);
 }
 
-int populate_table(VAN_TABLE *table, char **keys, size_t *ksizes, 
+int populate_table(VAN_TABLE *table, char **keys, size_t *ksizes,
     char **values, size_t *vsizes, size_t cnt) {
 	return populate_data(table,
 	    keys, ksizes, values, vsizes, cnt, OP_TABLE);
 }
 
-int populate_inmemtree(INMEM_TREE *tree, char **keys, size_t *ksizes, 
+int populate_inmemtree(INMEM_TREE *tree, char **keys, size_t *ksizes,
     char **values, size_t *vsizes, size_t cnt) {
 	return populate_data(tree,
 	    keys, ksizes, values, vsizes, cnt, OP_INMEMTREE);
 }
 
+/*
+verify the records using the inmemtree/odisktree/table get function,
+and verify the records are the same as the input data.
+*/
 static int verify_data(void *obj, char **keys, size_t *ksizes,
     char **values, size_t *vsizes, size_t cnt, int otype) {
 	INMEM_TREE *imtree;
@@ -462,6 +466,14 @@ int verify_table_data_withcursor(VAN_TABLE *table, char **keys,
 	    values, vsizes, cnt, OP_TABLE);
 }
 
+/*
+verify the records in the in-memory tree and on-disk tree are the same,
+and the order is the same, and the number of records is the same.
+
+do the verification using specific direction,
+the caller should specify the direction,
+and the function will traverse the tree in that direction.
+*/
 int verify_ondisktreecursor_with_inmemtreecursor(INMEM_TREE *imtree,
     ONDISK_TREE *odtree, flags_t direction, size_t *rcntp) {
 	INMEM_TREECURSOR *imc;
@@ -474,7 +486,7 @@ int verify_ondisktreecursor_with_inmemtreecursor(INMEM_TREE *imtree,
 
 	ret = 0;
 	
-	sprintf(infobuf, "cursor->get(%s)", 
+	sprintf(infobuf, "cursor->get(%s)",
 	    get_van_cursor_get_flag_string(direction & VAN_MASKMODE));
 
 	time(&t1);
@@ -525,6 +537,14 @@ int verify_ondisktreecursor_with_inmemtreecursor(INMEM_TREE *imtree,
 
 	return (ret);
 }
+
+/*
+ * Verify that the cursor can traverse the tree in the specified direction.
+ * If rcntp is not NULL, it will return the number of records traversed.
+ *
+ * it verifies that the cursor can traverse the tree in the specified direction,
+ * and that the records are in the correct order.
+ */
 
 static int verify_cursor_direction(void *obj, flags_t direction,
     flags_t cflags, size_t *rcntp, int otype) {
@@ -652,6 +672,10 @@ int verify_table_cursor_direction(VAN_TABLE *table,
 	    cflags, rcntp, OP_TABLE);
 }
 
+/*
+verify that, for unitialized cursor,
+VAN_FIRST equals VAN_NEXT, and VAN_LAST equals VAN_PREV.
+*/
 static int verify_cursor_border(void *obj, flags_t direction,
     flags_t cflags, int otype) {
 	int ret, ret1, ret2, cmp;

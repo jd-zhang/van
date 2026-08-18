@@ -15,6 +15,7 @@
  */
 #include "test_common.h"
 
+
 int get_string_indx(FLAGINFO *flags, const char *str) {
 	int i;
 	for (i = 0; flags[i].flagname != NULL; i++) {
@@ -47,7 +48,10 @@ char *get_unique_flag_string(FLAGINFO *flags, flags_t inFlag) {
 	return "";
 }
 
-/* Get the Inclusive Flags String reprensentation */
+/*
+Get the Inclusive Flags String reprensentation
+it is the combination of the inclusive flags
+ */
 char *get_flags_string(FLAGINFO *flags, flags_t inFlag, char *buff) {
 	int i = 0;
 	int start = 0;
@@ -85,6 +89,10 @@ char *get_flags_string(FLAGINFO *flags, flags_t inFlag, char *buff) {
 	return buff;
 }
 
+/*
+it is the combination of the unique flags and the inclusive flags
+return the string reprensentation of inFlag.
+*/
 char *get_comb_flags_string(FLAGINFO *uniqflags, FLAGINFO *orflags,
     flags_t inFlag, char *buff) {
 	char *str = NULL;
@@ -108,6 +116,9 @@ char *get_comb_flags_string(FLAGINFO *uniqflags, FLAGINFO *orflags,
 	return buff;
 }
 
+/*
+sprintf the flaginfos to buf, separated by delim, prefixed by prefix
+*/
 void sprintf_flaginfos(FLAGINFO *flags, char *buf, const char *prefix,
     const char *delim) {
 	int i = 0;
@@ -128,6 +139,10 @@ void sprintf_flaginfos(FLAGINFO *flags, char *buf, const char *prefix,
 	}
 }
 
+/*
+sprintf the flags1 and flags2 to buf(if flags1 and flags2 not empty),
+separated by delim, prefixed by prefix
+*/
 void sprintf_flaginfos2(FLAGINFO *flags1, FLAGINFO *flags2, char *buf,
     const char *prefix, const char *delim) {
 	if (flags1[0].flagname == NULL)
@@ -167,7 +182,7 @@ flags_t set_unique_flag(FLAGINFO *flags, char *str, flags_t *valp) {
 		return 0;
 	if ((i = get_string_indx(flags, str)) < 0) {
 		sprintf_flaginfos(flags, buff, NULL, ", ");
-		fprintf(stderr, 
+		fprintf(stderr,
 "ERROR: The value must be 0 or one of the following:\n\t %s\n\t got:%s\n",
 		    buff, str);
 		exit(1);
@@ -182,12 +197,17 @@ flags_t set_or_flags(FLAGINFO *flags, char *str, flags_t *valp) {
 	if (strcmp(str, "0") == 0 || strlen(str) == 0)
 		return *valp;
 
+	/*
+	process the flags in str before '|'
+	*/
 	for(p1 = str; (p2 = strchr(p1, '|')) != NULL; p1 = p2+1) {
 		memset(flag_buf, 0, sizeof(flag_buf));
 		strncpy(flag_buf, p1, (p2 - p1));
 		set_flag_value(flags, flag_buf, valp, 1);
 	}
-
+	/*
+	process the flags in str after '|' , which is the last one
+	*/
 	str = p1;
 	if ((i = get_string_indx(flags, str)) < 0) {
 		sprintf_flaginfos(flags, buff, NULL, ", ");
@@ -198,6 +218,7 @@ flags_t set_or_flags(FLAGINFO *flags, char *str, flags_t *valp) {
 	}
 	return set_flag_value(flags, str, valp, 1);
 }
+
 
 flags_t set_comb_flags(FLAGINFO *uniqflags, FLAGINFO *orflags,
     char *str, flags_t *valp) {
@@ -222,7 +243,7 @@ flags_t set_comb_flags(FLAGINFO *uniqflags, FLAGINFO *orflags,
 		    (get_string_indx(orflags, str) < 0)) {
 			sprintf_flaginfos2(uniqflags,
 			    orflags, buff, NULL, ", ");
-			fprintf(stderr, 
+			fprintf(stderr,
 "ERROR: The value must be 0 or one of the followin:\n\t %s\n\t got:%s\n",
 			    buff, str);
 			exit(1);
@@ -231,6 +252,9 @@ flags_t set_comb_flags(FLAGINFO *uniqflags, FLAGINFO *orflags,
 	tmpval = *valp;
 	save_flag = 0;
 
+	/*
+	clear the ones that have been processed
+	*/
 	for (i = 0; orflags[i].flagname != NULL; i++) {
 		if (orflags[i].flagval & tmpval) {
 			save_flag |= orflags[i].flagval;

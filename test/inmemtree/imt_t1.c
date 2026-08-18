@@ -75,7 +75,7 @@ int imt_t1_2(int verbose) {
 	 */
 	cnt = 100000;
 	STRING_TESTDATA_INIT;
-	(void)generate_string_testdata2(keys, ksizes, "KEY", 
+	(void)generate_string_testdata2(keys, ksizes, "KEY",
 	    values, vsizes, "DATA", cnt, 1);
 
 	/*
@@ -229,7 +229,7 @@ int imt_t1_3() {
 
 	cnt = 1000000;
 	STRING_TESTDATA_INIT;
-	(void)generate_string_testdata(keys, ksizes, 20, 30, 
+	(void)generate_string_testdata(keys, ksizes, 20, 30,
 	    values, vsizes, 50, 120, cnt);
 
 
