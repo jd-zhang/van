@@ -75,7 +75,7 @@ static int _ondisk_merge_items_compact(VAN_TABLE *table,
 	ret = 0;
 	if (array->size == 0)
 		return (ret);
-	
+
 	fitem = &array->items[0];
 	array->indexes[fitem->idx] = 1;
 	total = 1;
@@ -158,7 +158,7 @@ err:
 static int _ondisk_merge_item_insert(VAN_TABLE *table, ONDISK_MERGE_ITEM *items,
     size_t size, ONDISK_MERGE_ITEM *citem) {
 	int i, cmp, ret;
-	
+
 	ret = 0;
 	if (size == 0) {
 		items[0] = *citem;
@@ -180,7 +180,7 @@ static int _ondisk_merge_item_insert(VAN_TABLE *table, ONDISK_MERGE_ITEM *items,
 			}
 		}
 	}
-	
+
 	return (ret);
 }
 
@@ -247,12 +247,12 @@ int _van_ondisktree_merge(VAN_TABLE *table, ONDISK_TREE **trees, size_t srccnt,
 	VAN_ASSERT(ret == 0);
 
 	ret = _van_table_new_odfilename(table, merge_path, VAN_MAXPATHLEN);
-	/* TODO: Check ret */	
+	/* TODO: Check ret */
 	VAN_ASSERT(ret == 0);
 
 	ret = _van_ondisktree_open(retree, merge_path,
 	    VAN_OPEN_CREAT | VAN_OPEN_TRUNC);
-	/* TODO: Check ret */	
+	/* TODO: Check ret */
 	VAN_ASSERT(ret == 0);
 
 	ret = _van_ondisktree_store_init(retree);
@@ -273,7 +273,7 @@ int _van_ondisktree_merge(VAN_TABLE *table, ONDISK_TREE **trees, size_t srccnt,
 			    item->kitem, item->ditem);
 			/* TODO: check error */
 			VAN_ASSERT(ret == 0);
-	
+
 			ret = _ondisk_merge_items_compact(table, &array);
 			/* TODO: check error */
 			VAN_ASSERT(ret == 0);

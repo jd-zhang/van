@@ -83,8 +83,10 @@ extern int _van_iofile_write(VAN_IOFILE *iofile, off_t off,
 extern int _van_iofile_stat(VAN_IOFILE *iofile, struct stat *st);
 extern int _van_iofile_set(VAN_IOFILE *iofile, off_t off,
     uint32 size, char c);
+
 /* src/common/van_sleep.c */
 extern void _van_sleep(int32 seconds, int32 useconds);
+extern void _van_yield(void);
 
 /* src/common/van_string.c */
 extern int _van_strarray_alloc(VAN_STRING_ARRAY **arrp, size_t initsz);

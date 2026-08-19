@@ -39,7 +39,7 @@ int _van_store_path_noalloc(VAN_STORE *store,
     char *buf, size_t buflen, const char *file) {
 	const char *tbdir, *rptr;
 	int ret, rsize;
-	
+
 	/*
 	 * The dir is
 	 * store->store_dir --> .

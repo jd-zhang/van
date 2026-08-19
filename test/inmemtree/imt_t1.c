@@ -45,7 +45,7 @@ int imt_t1_1() {
 
 	fprintf(stderr, "**** Malloc Statistics ****\n");
 	_van_alloc_stat_print(stderr, " ");
-	
+
 	return (ret);
 }
 
@@ -203,7 +203,7 @@ int imt_t1_2(int verbose) {
 	if (verbose)
 		fclose(outf);
 	free_string_testdata(keys, ksizes, values, vsizes, cnt);
-	
+
 	return (ret);
 }
 

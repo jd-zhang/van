@@ -78,7 +78,7 @@ int _van_inmemtree_traverse_forard(INMEM_TREE *tree,
 
 	int ret;
 	INMEM_BLEAF *leaf;
-	
+
 	ret = 0;
 	if (tree == NULL)
 		return (ret);
@@ -109,7 +109,7 @@ int _van_inmemtree_traverse_backward(INMEM_TREE *tree,
 
 	int ret;
 	INMEM_BLEAF *leaf;
-	
+
 	ret = 0;
 	if (tree == NULL)
 		return (ret);

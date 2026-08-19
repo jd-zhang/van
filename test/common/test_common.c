@@ -310,7 +310,7 @@ static int verify_data(void *obj, char **keys, size_t *ksizes,
 		memset(&value, 0, sizeof(value));
 		key.data = keys[i];
 		key.size = ksizes[i];
-		
+
 		switch (otype) {
 			case OP_INMEMTREE:
 				info = "imtree->get";
@@ -402,7 +402,7 @@ static int verify_data_withcursor(void *obj, char **keys, size_t *ksizes,
 		memset(&value, 0, sizeof(value));
 		key.data = keys[i];
 		key.size = ksizes[i];
-		
+
 		switch (otype) {
 			case OP_INMEMTREE:
 				info = "imcursor->get";
@@ -485,7 +485,7 @@ int verify_ondisktreecursor_with_inmemtreecursor(INMEM_TREE *imtree,
 	char infobuf[MAX_BUF_LEN];
 
 	ret = 0;
-	
+
 	sprintf(infobuf, "cursor->get(%s)",
 	    get_van_cursor_get_flag_string(direction & VAN_MASKMODE));
 
@@ -762,7 +762,7 @@ static int verify_cursor_border(void *obj, flags_t direction,
 
 			ret = _van_ondisktree_cursor_init(odtree, &odcursor2, cflags);
 			CHK_RET(ret, "_van_ondisktree_cursor_init(odcursor2)");
-	
+
 			ret2 = odcursor2->get(odcursor2, &key2, &value2, direction2);
 			if (ret2 == 0) {
 				memcpy(kbuf2, key2.data, key2.size);

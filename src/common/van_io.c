@@ -25,7 +25,7 @@ int _van_path_isabsolute(const char *path) {
 int _van_file_fopen(const char *path, const char *mode, FILE **fp) {
 	FILE *f;
 	int ret;
-	
+
 	ret = 0;
 	f = fopen(path, mode);
 	if (f == NULL)
@@ -51,7 +51,7 @@ int _van_file_freadline(FILE *f, char *buf, size_t buflen) {
 	const char *rpath;
 	int ret;
 	size_t len;
-	
+
 	ret = 0;
 	rpath = fgets(buf, VAN_MAXPATHLEN, f);
 	if (rpath == NULL || strlen(rpath) == 0) {
@@ -142,7 +142,7 @@ int _van_file_openread(const char *path, off_t start,
 	*(char **)strp = buf;
 
 	if (0) {
-clean:	
+clean:
 		if (ret != 0)
 			ret = _van_getsys_error();
 		if (fd != -1) {
@@ -198,7 +198,7 @@ clean:
 		if (buf != NULL) {
 			_van_free(NULL, buf);
 			buf = NULL;
-		}		
+		}
 	}
 	return (ret);
 }
@@ -276,7 +276,7 @@ int _van_file_writeblk(int fd, uint32 blksize, uint32 blk,
 int _van_file_lseek(int fd, off_t pos) {
 	off_t off;
 	int ret;
-	
+
 	ret = 0;
 	off = lseek(fd, pos, SEEK_SET);
 	if (off == (off_t)-1)
@@ -371,7 +371,7 @@ int _van_iofile_open(const char *path, int oflag, mode_t mode, VAN_IOFILE **iofp
 	ret = _van_calloc(NULL, 1, sizeof(VAN_IOFILE), &iof);
 	if (ret != 0)
 		goto err;
-	
+
 	iof->fd = -1;
 	iof->oflag = oflag;
 	iof->mode = mode;
@@ -396,7 +396,7 @@ err:
 
 int _van_iofile_close(VAN_IOFILE *iofile) {
 	int ret;
-       	
+
 	ret = 0;
 	if (iofile->fd >= 0) {
 		ret = _van_file_close(iofile->fd);

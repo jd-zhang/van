@@ -39,7 +39,7 @@ int _van_inmemtree_config_alloc(INMEM_CONFIG **dstp) {
 
 int _van_inmemtree_config_destroy(INMEM_CONFIG *dst) {
 	int ret;
-	
+
 	ret = 0;
 	if (dst == NULL)
 		return (ret);

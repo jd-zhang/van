@@ -53,8 +53,8 @@ struct _inmem_stat {
 #define DEF_VAL_ULEN 4096
 
 #define IM_MAX_LEVEL 255
-/* 
- * The default threshold is 100MB, should be set larger 
+/*
+ * The default threshold is 100MB, should be set larger
  * when there is more memory and just a few tables.
  */
 #define IM_DEF_THRESHOLD	(100 * 1024 * 1024)
@@ -67,11 +67,11 @@ struct _inmem_tree {
 	INMEM_BLEAF	*last;
 	INMEM_STAT	stat;
 
-	/* 
+	/*
 	 * As the size and records are operated nearly at
 	 * the same time, we use the same mutex currently.
 	 */
-	size_t		size; /* Total size, not very exact. */ 
+	size_t		size; /* Total size, not very exact. */
 	size_t		records; /*  Record Count. */
 	pthread_mutex_t	size_mutex;
 	size_t		threshold;
@@ -166,7 +166,7 @@ struct _inmem_treecursor {
 	size_t		indx;
 
 	flags_t		flags;
-	
+
 	ticks_t		create_ticks;
 
 	/* For key/data smaller equal to or small than the default. */

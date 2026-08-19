@@ -213,7 +213,7 @@ int _van_table_close(VAN_TABLE *table, flags_t flags) {
 	table->closed = 1;
 	ret = 0;
 
-	/* 
+	/*
 	 * It is always NULL currently, so leave it does not
 	 * have any effect.
 	 */
@@ -257,7 +257,7 @@ int _van_table_close(VAN_TABLE *table, flags_t flags) {
 		table->frozen_free_job = NULL;
 	}
 
-	/* 
+	/*
 	 * This is unnecessary now, since the merge_join_job
 	 * will only return after graping all the merge jobs.
 	 */
@@ -269,7 +269,7 @@ int _van_table_close(VAN_TABLE *table, flags_t flags) {
 	/* handle the table->active and table->frozen */
 	ret1 = _van_table_dump_inmem(table);
 	SET_RET(ret1, ret);
-	
+
 	ret1 = _van_table_write_odt_paths(table);
 	SET_RET(ret1, ret);
 
@@ -546,7 +546,7 @@ err:
 		_van_free(NULL, tmplist);
 
 	return ret;
-	
+
 }
 
 int _van_table_put_record(VAN_TABLE *table, VAN_DATUM *key,
@@ -577,7 +577,7 @@ int _van_table_get_record(VAN_TABLE *table, VAN_DATUM *key,
 	SET_RET(ret1, ret);
 	if (ret == VAN_DELETED)
 		ret = VAN_NOTFOUND;
-err:	
+err:
 	return (ret);
 
 }
@@ -651,7 +651,7 @@ int _van_table_replace_odtpath(VAN_TABLE *table, ONDISK_TREE *odlow,
 	int ret, ret1, i, locked;
 	const char *pathlow, *pathhigh, *pathnew;
 	size_t idxlow, idxhigh, idxtop, ni, nj;
-	
+
 	ret = 0;
 	ret1 = 0;
 	locked = 0;
@@ -681,7 +681,7 @@ int _van_table_replace_odtpath(VAN_TABLE *table, ONDISK_TREE *odlow,
 		if (strcmp(pathhigh, table->odtpaths[i]) == 0) {
 			idxhigh = i;
 			break;
-		}		
+		}
 	}
 	VAN_ASSERT(idxhigh != -1);
 
@@ -754,7 +754,7 @@ int _van_table_copy_odtitem(VAN_TABLE *table, VAN_TABLE_ODT_ITEM *src,
 	return (ret);
 }
 
-/* 
+/*
  * Currently, the moving is from high to low, so always lock srcitem first,
  * and then the dstitem.
  */
@@ -765,7 +765,7 @@ int _van_table_move_odtitem(VAN_TABLE *table, VAN_TABLE_ODT_ITEM *src,
 	ret = 0;
 	srclocked = 0;
 	dstlocked = 0;
-	
+
 	if (src == dst)
 		return (ret);
 
@@ -776,8 +776,8 @@ int _van_table_move_odtitem(VAN_TABLE *table, VAN_TABLE_ODT_ITEM *src,
 	CHK_ERR(ret);
 	dstlocked = 1;
 
-	/* 
-	 * We must make sure that, the source is 
+	/*
+	 * We must make sure that, the source is
 	 * not empty item, while the destination must
 	 * be empty item.
 	 */
@@ -877,7 +877,7 @@ int _van_table_new_dumpfile(VAN_TABLE *table,
 
 	indx = table->odt_top;
 	item = &table->odt_items[indx];
-	(void)_van_table_clear_odtitem(table, item);	
+	(void)_van_table_clear_odtitem(table, item);
 	F_SET(item, VAN_ITEM_DUMPING);
 	F_CLR(item, VAN_ITEM_UNUSED);
 
@@ -893,7 +893,7 @@ int _van_table_new_dumpfile(VAN_TABLE *table,
 	*itemp = item;
 	*odtreep = odtree;
 	table->odt_top++;
-	
+
 	if (0) {
 err:
 		if (odtree != NULL)
@@ -908,7 +908,7 @@ int _van_table_dump_frozen(VAN_TABLE *table, ONDISK_TREE **odtreep) {
 	VAN_TABLE_ODT_ITEM *item;
 	ONDISK_TREE *odtree;
 	int ret;
-	
+
 	/* TODO: Mutex handling carefully. */
 
 	if (table->frozen == NULL)
@@ -1041,8 +1041,20 @@ int _van_table_replace_odt_items(VAN_TABLE *table, size_t st, size_t et,
 	for (i = 0; i < cnt; i++) {
 		ret = _van_ondisktree_close(odtrees[i], VAN_CLOSE_REMOVE);
 		CHK_ERR(ret);
-	}	
+	}
 
 err:
 	return (ret);
+}
+
+
+void _van_table_show_odt_items(VAN_TABLE *table, FILE *f) {
+	int i;
+	/*
+	it is just used for testing, so no mutex is locked/unlocked.
+	*/
+	fprintf(f, "odt_top: %d\n", table->odt_top);
+	for (i = 0; i < table->odtpath_cnt; i++) {
+		fprintf(f, "odtpath[%d]: %s\n", i, table->odtpaths[i]);
+	}
 }

@@ -23,7 +23,7 @@
 int _van_ondisktree_create(VAN_TABLE *table, ONDISK_TREE **treep) {
 	int ret;
 	ONDISK_TREE *tree;
-	
+
 	VAN_ASSERT(treep != NULL);
 	ret = _van_calloc(NULL, 1, sizeof(ONDISK_TREE), &tree);
 	if (ret != 0)
@@ -188,7 +188,7 @@ int _van_ondisktree_close(ONDISK_TREE *tree, flags_t flags) {
 	store = tree->table->store;
 	/* Put the cache */
 	while ((block = TAILQ_FIRST(&tree->odfile.head)) != NULL) {
-		TAILQ_REMOVE(&tree->odfile.head, block, tree_links); 
+		TAILQ_REMOVE(&tree->odfile.head, block, tree_links);
 		indx = block->hash_indx;
 		VAN_MUTEX_LOCK(&store->cache_header[indx], mtx_hash, ret);
 		/* panic handing */

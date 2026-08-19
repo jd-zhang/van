@@ -44,7 +44,7 @@ extern int _van_put_logrecord(VAN_STORE *store, VAN_TABLE *table, VAN_TXN *txnp,
     VAN_LOG_RECSPEC *spec, ...);
 extern int _van_read_logrecord(VAN_STORE *store, VAN_TABLE **tablepp, void *td,
     void* data, VAN_LOG_RECSPEC *spec, uint32 size, void **argp);
-extern int _van_print_logrecord(VAN_STORE *store, VAN_DATUM *datap, VAN_LSN *lsnp, 
+extern int _van_print_logrecord(VAN_STORE *store, VAN_DATUM *datap, VAN_LSN *lsnp,
     const char *str, VAN_LOG_RECSPEC *spec, void *info);
 extern int _van_logrec_init(VAN_STORE *store, uint32 orig_len,
     char **bufp, uint32 *bufsizep, int *typep, VAN_LSN *lsnp);

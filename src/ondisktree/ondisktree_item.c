@@ -41,7 +41,7 @@ int _van_ondiskitem_from_inmemkey(ONDISK_TREE *tree, const INMEM_KEY *key,
 		datum = key->v;
 	}
 	size = P_ITEMSIZE(datum.size);
-	
+
 	ret = _van_malloc(NULL, size, &item);
 	if (ret != 0)
 		goto clean;
@@ -89,7 +89,7 @@ int _van_ondiskitem_from_inmemdata(ONDISK_TREE *tree, const INMEM_DATA *data,
 		datum = data->v;
 	}
 	size = P_ITEMSIZE(datum.size);
-	
+
 	ret = _van_malloc(NULL, size, &item);
 	if (ret != 0)
 		goto clean;
@@ -122,7 +122,7 @@ int _van_ondiskitem_alloccopy(const ONDISK_ITEM *srcitem,
 		size = P_ITEMSIZE(0);
 	else
 		size = P_ITEMSIZE(srcitem->len);
-	
+
 	ret = _van_malloc(NULL, size, &item);
 	if (ret != 0)
 		return (ret);
@@ -136,7 +136,7 @@ int _van_ondiskitem_alloccopy(const ONDISK_ITEM *srcitem,
 int _van_datum_from_ondiskitem(const VAN_TABLE *table,
     const ONDISK_ITEM *item, VAN_DATUM *datum, int *tofree) {
 	int ret;
-	
+
 	memset(datum, 0, sizeof(VAN_DATUM));
 	*tofree = 0;
 	ret = 0;

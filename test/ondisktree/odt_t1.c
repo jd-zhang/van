@@ -27,7 +27,7 @@ int odt_t1_1() {
 	time_t t1, t2;
 
 	odtpath = "test1.ondisk.odt_t1";
-
+	system("rm -rf test1.ondisk.odt_t1*");
 	ret = _van_store_create(&store);
 	CHK_RET(ret, "_van_store_create");
 	ret = store->open(store, ".", 0);
@@ -101,7 +101,7 @@ int odt_t1_1() {
 	fprintf(stderr, "======== 5.2 trasverse ondisk tree using cursor(BACKWARD, with inmemtree) =======\n");
 	rcnt = 0;
 	ret = verify_ondisktreecursor_with_inmemtreecursor(tree, odtree, VAN_PREV, &rcnt);
-	CHK_RET(ret, "verify_ondisktreecursor_with_inmemtreecursor(VAN_PREV)");	
+	CHK_RET(ret, "verify_ondisktreecursor_with_inmemtreecursor(VAN_PREV)");
 	TEST_ASSERT(rcnt == cnt);
 
 	/* We close and reopen the tree here */
@@ -116,7 +116,6 @@ int odt_t1_1() {
 	fprintf(stderr, "======== 6 trasverse ondisk tree using cursor(VAN_SET) =======\n");
 	ret = verify_ondisktree_data(odtree, keys, ksizes, values, vsizes, cnt);
 	CHK_RET(ret, "verify_ondisktree_data");
-
 
 	/* We close and reopen the tree here */
 	ret = _van_ondisktree_close(odtree, 0);
@@ -134,7 +133,7 @@ int odt_t1_1() {
 
 	fprintf(stderr, "======== 8 trasverse ondisk tree using cursor(FIRST) =======\n");
 	ret = verify_ondisktree_cursor_border(odtree, VAN_FIRST, 0);
-	CHK_RET(ret, "verify_ondisktree_cursor_border(VAN_FIRST)");	
+	CHK_RET(ret, "verify_ondisktree_cursor_border(VAN_FIRST)");
 
 	fprintf(stderr, "====== 9 Destroy the tree(ondisk and inmemory) ====\n");
 	time(&t1);
@@ -142,9 +141,11 @@ int odt_t1_1() {
 	ret =  _van_ondisktree_close(odtree, 0);
 	ret = _van_inmemtree_destory(tree);
 	CHK_RET(ret, "_van_inmemtree_destory");
+	fprintf(stderr, "**** Malloc Statistics ****\n");
+	_van_alloc_stat_print(stderr, " ");
 
 	(void)free_string_testdata(keys, ksizes, values, vsizes, cnt);
-	
+
 	ret = table->close(table, 0);
 	CHK_RET(ret, "table->close");
 	ret = store->close(store);
@@ -152,9 +153,8 @@ int odt_t1_1() {
 	time(&t2);
 	fprintf(stderr, "time consuming: %g seconds\n", difftime(t2, t1));
 	_van_inmemtree_rwlock_stat_print(stderr, " ");
-	fprintf(stderr, "**** Malloc Statistics ****\n");
-	_van_alloc_stat_print(stderr, " ");
-	
+
+
 	return (ret);
 }
 
@@ -179,6 +179,8 @@ int odt_t1_2() {
 	(void)generate_string_testdata(keys, ksizes, 20, 30,
 	    values, vsizes, 50, 120, cnt);
 
+	system("rm -f od_table.ondisk*");
+	system("rm -f od_table.odlist*");
 	ret = _van_store_create(&store);
 	CHK_RET(ret, "_van_store_create");
 	ret = store->open(store, ".", 0);
@@ -231,6 +233,7 @@ int odt_t1_2() {
 
 	ret = _van_table_write_odt_paths(table);
 	CHK_RET(ret, "_van_table_write_odt_paths");
+	_van_table_show_odt_items(table, stderr);
 	fprintf(stderr, "========== 6 Get all using table (1) ==========\n");
 	ret = verify_table_data(table, keys, ksizes, values, vsizes, cnt);
 	CHK_RET(ret, "verify_table_data(1)");
@@ -246,9 +249,11 @@ int odt_t1_2() {
 	CHK_RET(ret, "verify_ondisktree_data(2, modtree)");
 	ret = _van_table_write_odt_paths(table);
 	CHK_RET(ret, "_van_table_write_odt_paths");
+	_van_table_show_odt_items(table, stderr);
 
 	ret = _van_table_replace_odt_items(table, 0, TNUM_ODT_T1_2 - 1, modtree);
 	CHK_RET(ret, "_van_table_replace_odt_items");
+	_van_table_show_odt_items(table, stderr);
 
 	fprintf(stderr, "========== 6 Get using table again (3) ==========\n");
 	ret = verify_table_data(table, keys, ksizes, values, vsizes, cnt);
@@ -295,7 +300,8 @@ int odt_t1_3() {
 
 	(void)generate_string_testdata(keys, ksizes, 20, 30,
 	    values, vsizes, 50, 120, cnt);
-
+	system("rm -f od_table.ondisk*");
+	system("rm -f od_table.odlist*");
 	ret = _van_store_create(&store);
 	CHK_RET(ret, "_van_store_create");
 	ret = store->open(store, ".", 0);

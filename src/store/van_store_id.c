@@ -19,11 +19,11 @@
 #include "van_inmem_tree.h"
 #include "van_table.h"
 
-/* 
+/*
  * The caller should have the store->tid_mtx locked,
  * or it is the init function or called by the init function.
  */
-static int _van_store_id_initfreelinks(VAN_STORE *store, 
+static int _van_store_id_initfreelinks(VAN_STORE *store,
     int st, int et) {
 	int ret, i;
 	VAN_STORE_IDMAP *tid;
@@ -63,7 +63,7 @@ int _van_store_id_destroy(VAN_STORE *store) {
 		_van_free(NULL, store->tids);
 		store->tids = NULL;
 		store->tid_cnt = 0;
-		/* 
+		/*
 		 * store->tid_capacity, store->tid_cnt, store->tid_free
 		 * will not be reset.
 		 */
@@ -135,11 +135,11 @@ int _van_store_id_unbind(VAN_STORE *store, VAN_TABLE *table) {
 
 	free = (int)table->tid;
 	freeid = &store->tids[free];
-	
+
 	freeid->nextfree = store->tid_free;
 	freeid->tid = (uint32)-1;
 	freeid->table = NULL;
-	
+
 	store->tid_free = free;
 	store->tid_cnt--;
 

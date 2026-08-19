@@ -74,7 +74,7 @@ int _van_inmemtree_alloc_binternal(INMEM_TREE *im_tree,
     INMEM_BINTERNAL **nodep) {
 	int ret;
 	INMEM_BNODE *node;
-	
+
 	VAN_ASSERT(nodep != NULL);
 
 	ret = _van_inmemtree_alloc_bnode(im_tree, &node);

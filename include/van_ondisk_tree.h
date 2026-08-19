@@ -53,7 +53,7 @@ struct _ondisk_meta {
 struct _ondisk_meta_summary {
 	uint32	metaversion;
 	uint32	metasize;
-	uint64	metaoff;	
+	uint64	metaoff;
 };
 
 /*

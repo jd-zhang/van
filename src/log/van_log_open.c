@@ -63,7 +63,7 @@ err:
 
 int _van_log_init(VAN_LOG *logp) {
 	int ret, fcnt;
-	
+
 	VAN_ASSERT(logp != NULL);
 	ret = 0;
 	fcnt = 0;
@@ -95,7 +95,7 @@ err:
 
 int _van_log_cleanup(VAN_LOG *logp) {
 	int ret;
-	
+
 	ret = 0;
 
 	/* Just free the handle currently */

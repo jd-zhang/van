@@ -62,7 +62,7 @@ int _van_table_op_init(VAN_OPERATION *tbop) {
 	VAN_MUTEX_UNLOCK(table, op_mtx, ret);
 
 	F_SET(tbop, VAN_OP_INITED);
-ret:		
+ret:
 	return (ret);
 }
 
@@ -88,7 +88,7 @@ int _van_table_op_close(VAN_OPERATION *tbop) {
 
 int _van_table_op_destory(VAN_OPERATION *tbop) {
 	int ret;
-	
+
 	ret = 0;
 	_van_free(NULL, tbop);
 
@@ -108,7 +108,8 @@ int _van_table_op_del(VAN_OPERATION *tbop, VAN_DATUM *key, flags_t flags) {
 	 * The active->del should return VAN_FROZEN after it is frozen,
 	 * before it is freed completely.
 	 */
-	while ((ret = active->del(active, key, flags)) == VAN_FROZEN) {
+	while (active == NULL || (ret = active->del(active, key, flags)) == VAN_FROZEN) {
+		_van_yield();
 		active = table->active;
 	}
 
@@ -128,7 +129,8 @@ int _van_table_op_put(VAN_OPERATION *tbop, VAN_DATUM *key,
 	 * The active->put should return VAN_FROZEN after it is frozen,
 	 * before it is freed completely.
 	 */
-	while ((ret = active->put(active, key, data, flags)) == VAN_FROZEN) {
+	while (active == NULL || (ret = active->put(active, key, data, flags)) == VAN_FROZEN) {
+		_van_yield();
 		active = table->active;
 	}
 

@@ -41,7 +41,7 @@ struct _van_store {
 #define VAN_STORE_CACHE_INITED	0x02
 #define	VAN_STORE_OPENED	0x04
 	flags_t		flags;
-	
+
 	/* open_flags */
 	flags_t		open_flags;
 
@@ -63,7 +63,7 @@ struct _van_store {
 
 	/* Recovery */
 	VAN_DISTAB   recover_dtab;
-	
+
 	/* Functions handles */
 	int (*open)(VAN_STORE *store, const char *dir, flags_t flags);
 	int (*close)(VAN_STORE *store);

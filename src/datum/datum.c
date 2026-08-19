@@ -66,7 +66,7 @@ int _van_datum_clone(const VAN_DATUM *src, VAN_DATUM **dstp) {
 
 	*dstp = dst;
 
-	return (ret);	
+	return (ret);
 }
 
 int _van_datum_copy(const VAN_DATUM *src, VAN_DATUM *dst) {
@@ -138,7 +138,7 @@ int _van_datum_clone_once(const VAN_DATUM *src, VAN_DATUM **dstp) {
 	int ret;
 	VAN_DATUM *dst;
 	size_t size;
-	
+
 	VAN_ASSERT(dst != NULL);
 	ret = 0;
 	/* Null src */
@@ -235,7 +235,7 @@ int _van_datum_uercopy(void *d, size_t len, VAN_DATUM **vdp) {
 	ret = _van_malloc(NULL, len, &vd->data);
 	memcpy(vd->data, d, len);
 	vd->size = len;
-	
+
 	return (ret);
 }
 
@@ -262,7 +262,7 @@ int _van_datum_defcmp(const VAN_DATUM *dt1, const VAN_DATUM *dt2) {
 		if (p1[i] != p2[i])
 			return (p1[i] > p2[i] ? 1 : -1);
 	}
-	
+
 	if (dt1->size == dt2->size)
 		return (0);
 

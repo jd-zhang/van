@@ -26,7 +26,7 @@ static void *tb_t1_1_popthread(void *obj) {
 	ret = populate_table(table, dataobj->keys, dataobj->ksizes,
 	    dataobj->values, dataobj->vsizes, dataobj->cnt);
 	CHK_RET(ret, "populate_table");
-	
+
 	return (NULL);
 }
 

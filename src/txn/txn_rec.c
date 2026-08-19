@@ -36,7 +36,7 @@ _txn_ckpt_recover(store, datp, lsnp, op, info)
 
 	ret = 0;
 
-out:	
+out:
 	return ret;
 }
 
@@ -61,7 +61,7 @@ _txn_begin_recover(store, datp, lsnp, op, info)
 
 	ret = 0;
 
-out:	
+out:
 	return ret;
 }
 
@@ -86,7 +86,7 @@ _txn_end_recover(store, datp, lsnp, op, info)
 
 	ret = 0;
 
-out:	
+out:
 	return ret;
 }
 

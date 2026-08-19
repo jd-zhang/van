@@ -71,10 +71,10 @@ int _van_ondisktree_cursor_init(ONDISK_TREE *tree,
 			    &cursor->reakey);
 		if (ret == 0)
 			ret = _van_calloc(NULL, 1, sizeof(VAN_DATUM),
-			    &cursor->readata);		
+			    &cursor->readata);
 
 	}
-	
+
 	if (ret == 0)
 		*cursorp = cursor;
 	else if (cursor != NULL)
@@ -240,7 +240,7 @@ int _van_ondisktree_cursor_next(ONDISK_TREECURSOR *cursor, flags_t flags) {
 	leaf = cursor->page;
 	cur_blkid = nxt_blkid = leaf->blkid;
 	i = 0;
-	
+
 	while (IS_VALID_BLKID(nxt_blkid)) {
 		st = (cur_blkid == nxt_blkid ? cursor->indx + 2 : 0);
 		et = leaf->size;
@@ -459,7 +459,7 @@ int _van_ondisktree_cursor_getraw(ONDISK_TREECURSOR *cursor,
 	ret = _van_ondisktree_cursor_locate(cursor, key, flags);
 	if (ret != 0)
 		return (ret);
-	
+
 	leaf = cursor->page;
 	indx = cursor->indx;
 	ik = P_KEY(leaf, indx);

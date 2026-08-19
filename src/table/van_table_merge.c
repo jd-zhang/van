@@ -141,7 +141,7 @@ int _van_table_merge_scan(VAN_TABLE *table) {
 	 * TODO: should be configured.
 	 */
 	while (table->mergecnt > 0) {
-		_van_sleep(2, 0);		
+		_van_sleep(2, 0);
 	}
 	VAN_ASSERT(table->mergecnt == 0);
 
@@ -235,7 +235,7 @@ int _van_table_clear_merged(VAN_TABLE *table, size_t low, size_t high) {
 		item = &table->odt_items[i];
 		ret = _van_table_clear_merged_one(table, item);
 	}
-	
+
 	return (ret);
 }
 
@@ -250,13 +250,13 @@ int _van_table_clear_merged_one(VAN_TABLE *table, VAN_TABLE_ODT_ITEM *item) {
 	VAN_MUTEX_UNLOCK(item, mutex, ret);
 
 	return ret;
-}	
+}
 
 int _van_table_new_merge_job(VAN_TABLE *table, size_t low,
     size_t high, size_t cnt) {
 	VAN_TABLE_MERGE_JOB *jobarg;
 	int ret;
-	
+
 	jobarg = NULL;
 	ret = _van_calloc(NULL, 1, sizeof(VAN_TABLE_MERGE_JOB), &jobarg);
 	if (ret != 0)
@@ -316,7 +316,9 @@ void *_van_table_merge_job_run(void *arg) {
 		VAN_ASSERT(item->trees[0] != NULL);
 		VAN_ASSERT(item->trees[1] == NULL);
 		trees[idx++] = item->trees[0];
-		job->max_ticks = item->ticks;
+		if (job->max_ticks < item->ticks) {
+			job->max_ticks = item->ticks;
+		}
 	}
 	VAN_ASSERT(idx == job->cnt);
 
@@ -345,8 +347,8 @@ void *_van_table_merge_job_run(void *arg) {
 		VAN_MUTEX_LOCK(table, op_mtx, ret);
 		minopticks = table->min_op_ticks;
 		VAN_MUTEX_UNLOCK(table, op_mtx, ret);
-		/* 
-		 * All operations after merged flag is set 
+		/*
+		 * All operations after merged flag is set
 		 * will not access the trees used for merging.
 		 */
 		if (minopticks > merged_ticks) {
@@ -377,12 +379,11 @@ void *_van_table_merge_job_run(void *arg) {
 						ctree = lowtree;
 					F_SET(item, VAN_ITEM_INUSE);
 				}
-				F_CLR(item, VAN_ITEM_MERGED);	
+				F_CLR(item, VAN_ITEM_MERGED);
 				VAN_MUTEX_UNLOCK(item, mutex, ret);
 				/* We put off the closing later. */
 			}
 			/* Now we need to write current  */
-
 			break;
 		} else {
 			/*

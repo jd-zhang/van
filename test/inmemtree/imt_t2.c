@@ -26,7 +26,7 @@ static void *imt_t2_1_popthread(void *obj) {
 	ret = populate_inmemtree(tree, dataobj->keys, dataobj->ksizes,
 	    dataobj->values, dataobj->vsizes, dataobj->cnt);
 	CHK_RET(ret, "populate_inmemtree");
-	
+
 	return (NULL);
 }
 

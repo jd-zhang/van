@@ -76,13 +76,13 @@ int _van_strarray_add(VAN_STRING_ARRAY *arr, const char *str) {
 
 	if (arr->size >= arr->capacity) {
 		new_capacity = arr->capacity * 2;
-		ret = _van_realloc(NULL, arr->array, 
+		ret = _van_realloc(NULL, arr->array,
 		    new_capacity * sizeof(char *), &arr->array);
 		for (i = arr->size; i < new_capacity; i++)
 			arr->array[i] = NULL;
 		arr->capacity = new_capacity;
 	}
-	
+
 	len = strlen(str);
 	ret = _van_malloc(NULL, len + 1, &bstr);
 	CHK_ERR(ret);

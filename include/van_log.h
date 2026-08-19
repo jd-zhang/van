@@ -49,8 +49,8 @@ extern "C" {
 #define LOG_EQUAL(lsn1, lsn2) ((lsn1)->file == (lsn2)->file && \
     ((lsn1)->offset == (lsn2)->offset))
 
-/* 
- * If one/two empty record, means we finish current file, 
+/*
+ * If one/two empty record, means we finish current file,
  * and move to next file. If no empty record, we stay
  * in current file.
  */
@@ -95,7 +95,7 @@ struct _van_log_recspec {
 	van_logrec_type_t type;
 	uint32 offset;
 	const char *name;
-	const char fmt[4];	
+	const char fmt[4];
 };
 
 struct _van_log {
@@ -125,8 +125,8 @@ struct _van_logfile_info {
 	VAN_LOGREC_HEADER tailhdr;
 };
 
-/* 
- * Log cursor should only supports 
+/*
+ * Log cursor should only supports
  * VAN_NEXT, VAN_PREV, VAN_SET, VAN_FIRST,
  * VAN_LAST.
  */

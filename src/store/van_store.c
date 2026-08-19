@@ -24,7 +24,9 @@ int _van_store_create(VAN_STORE **storep) {
 	int ret;
 	VAN_STORE *store;
 
-	VAN_ASSERT(storep != NULL);
+	if (storep == NULL)
+		return (VAN_INVALID);
+
 	store = NULL;
 	ret = _van_calloc(NULL, 1, sizeof(VAN_STORE), &store);
 	if (ret != 0)
@@ -64,7 +66,7 @@ int _van_store_init(VAN_STORE *store) {
 	store->get_cachesize = _van_store_get_cachesize;
 	store->set_ondisk_blksize = _van_store_set_ondisk_blksize;
 	store->get_ondisk_blksize = _van_store_get_ondisk_blksize;
-	
+
 	store->recover_dtab.int_size = 0;
 	store->recover_dtab.ext_size = 0;
 
@@ -75,7 +77,7 @@ int _van_store_init(VAN_STORE *store) {
 	F_SET(store, VAN_STORE_INITED);
 
 err:
-	return (ret);	
+	return (ret);
 }
 
 int _van_store_open(VAN_STORE *store, const char *st_dir, flags_t openflags) {
@@ -83,12 +85,15 @@ int _van_store_open(VAN_STORE *store, const char *st_dir, flags_t openflags) {
 	flags_t orig_oflags;
 
 	VAN_ASSERT(store != NULL);
+	if (!F_ISSET(store, VAN_STORE_INITED))
+		return (VAN_INVALID);
+
 	orig_oflags = openflags;
 
 	/* No other actions then just set the dir currently */
 	ret = _van_strdup(NULL, st_dir, &store->store_dir);
 	CHK_ERR(ret);
-	
+
 	if (store->cache_header_size == 0)
 		store->cache_header_size = DEF_CACHE_HEADER_SIZE;
 	if (store->ondisk_blksize == 0)
@@ -203,7 +208,6 @@ int _van_store_close(VAN_STORE *store) {
 		ret = _van_log_close(store);
 		CHK_ERR(ret);
 	}
-	F_CLR(store, VAN_STORE_INITED);
 	F_CLR(store, VAN_STORE_OPENED);
 
 	/* No special action beyond destory */
@@ -213,7 +217,7 @@ err:
 }
 
 int _van_store_destory(VAN_STORE *store) {
-	int ret;
+	int ret, ret1;
 
 	ret = 0;
 	if (store == NULL)
@@ -228,14 +232,13 @@ int _van_store_destory(VAN_STORE *store) {
 		store->store_name = NULL;
 	}
 	/* TODO: handling error */
-	VAN_MUTEX_DESTROY(store, tb_mtx, ret);
-	CHK_ERR(ret);
+	VAN_MUTEX_DESTROY(store, tb_mtx, ret1);
+	SET_RET(ret1, ret);
 
-	ret = _van_store_id_destroy(store);
-	CHK_ERR(ret);
+	ret1 = _van_store_id_destroy(store);
+	SET_RET(ret1, ret);
 
 	_van_free(NULL, store);
-err:
 	return (ret);
 }
 
@@ -248,6 +251,11 @@ err:
 int _van_store_printinfo(VAN_STORE *store, FILE* outf, flags_t flags) {
 	int ret;
 	ret = 0;
+
+	if (!F_ISSET(store, VAN_STORE_OPENED)) {
+		fprintf(outf,"store is not opened\n");
+		return (VAN_INVALID);
+	}
 
 	/* Store Information */
 	fprintf(outf,

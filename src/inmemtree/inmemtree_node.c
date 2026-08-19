@@ -80,7 +80,7 @@ size_t _van_inmemtree_key_size(INMEM_KEY *key) {
 		if (key->v.data != NULL)
 			sz += key->v.size;
 	}
-	
+
 	return sz;
 }
 
@@ -114,7 +114,7 @@ int _van_inmemtree_free_key(INMEM_KEY *key) {
 
 	_van_inmemtree_free_datum(&key->v);
 	_van_free(NULL, key);
-	
+
 	return (ret);
 }
 
@@ -144,7 +144,7 @@ size_t _van_inmemtree_data_size(INMEM_DATA *data) {
 		if (data->v.data != NULL)
 			sz += data->v.size;
 	}
-	
+
 	return sz;
 }
 
@@ -270,7 +270,7 @@ int _van_inmemtree_free_node(INMEM_TREE *tree, INMEM_BNODE *node,
 	else {
 		ret = _van_error_print("Invalid Node type!");
 	}
-	
+
 	return (ret);
 }
 
@@ -359,7 +359,7 @@ int _van_inmem_initialize_newroot(INMEM_BINTERNAL *newroot, INMEM_BNODE *left,
 	child2->pointer = right;
 	newroot->childs[1] = child2;
 	newroot->size = 2;
-	
+
 	return (ret);
 }
 

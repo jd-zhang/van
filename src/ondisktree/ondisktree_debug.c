@@ -38,7 +38,7 @@ int _van_ondisktree_dump(ONDISK_TREE *tree, FILE *f) {
 
 	ret = _van_file_stat(tree->tree_fid, &st);
 	VAN_ASSERT(ret == 0);
-	
+
 	for (i = 0; i <= meta->root_blkid; i++) {
 		ret = _van_ondisk_cache_get(tree, i, &page);
 		VAN_ASSERT(ret == 0);
@@ -69,7 +69,7 @@ int _van_ondisktree_dump_meta(ONDISK_META *meta, FILE *f) {
 int _van_ondisktree_dump_header(ONDISK_HEADER *hdr, FILE *f) {
 	const char *type;
 	int ret, pginval;
-	
+
 	ret = 0;
 	type = _van_ondisktree_blk_typestr((int)hdr->type);
 	pginval = 0;

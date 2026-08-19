@@ -51,7 +51,7 @@ clean:
 int _van_ondisktree_buildinfo_clean(ONDISK_TREE *od_tree) {
 	ONDISK_BUILDINFO *bi;
 	int ret;
-	
+
 	size_t i;
 	ret = 0;
 	bi = od_tree->buildinfo;
@@ -217,7 +217,7 @@ int _van_ondisktree_inmem_addpair(void *obj, const INMEM_KEY *key,
 			goto clean;
 		alloc_d = 1;
 	}
-	
+
 	ret = _van_ondisktree_ondiskitem_addpair(obj, kitem, ditem);
 clean:
 	_van_free(NULL, kitem);
@@ -277,7 +277,7 @@ int _van_ondisktree_ondiskitem_addpair(void *obj, const ONDISK_ITEM *kitem,
 		VAN_ASSERT(ret == 0);
 	} else {
 		/* Full, need to add new page and add to uplayer */
-		
+
 		/* Allocate the new page */
 		ret = _van_calloc(NULL, 1, meta->blksize, &newpage);
 		if (ret != 0)
@@ -311,7 +311,7 @@ int _van_ondisktree_ondiskitem_addpair(void *obj, const ONDISK_ITEM *kitem,
 		newpage->prev_blkid = page->blkid;
 		bi->last_blkid = newpage->blkid;
 	}
-	
+
 	/* Now, write the page if necessary */
 	for (i = 0; i <= OD_MAX_LEVEL; i++) {
 		/* No page to write */
@@ -345,7 +345,7 @@ int _van_ondisktree_addto_internal(ONDISK_TREE *tree,
 	meta = tree->meta;
 	bi = tree->buildinfo;
 	newpage = page = NULL;
-	
+
 	page = bi->nodes[level][0];
 	VAN_ASSERT(bi->nodes[level][1] == NULL);
 
@@ -482,7 +482,7 @@ int _van_ondisktree_add_lpage(ONDISK_HEADER *page,
 		VAN_ASSERT((page->offset - newoff) ==
 		    (P_ITEMSIZE(key->len) + P_ITEMSIZE(data->len)));
 	}
-	
+
 	page->left -= 2 * sizeof(uint32) + (page->offset - newoff);
 	page->offset = newoff;
 	page->size += 2;
@@ -493,7 +493,7 @@ int _van_ondisktree_add_lpage(ONDISK_HEADER *page,
 int _van_ondisktree_init_header(ONDISK_META *meta,
     ONDISK_HEADER *header, uint32 level, uint32 type) {
 	int ret;
-	
+
 	ret = 0;
 	memset(header, 0, meta->blksize);
 	header->level = level;
@@ -530,7 +530,7 @@ int _van_ondisktree_read(ONDISK_TREE *tree) {
 		ret = VAN_INVALID;
 		goto err;
 	}
-	
+
 	/* Read the meta data */
 	ret = _van_file_read(tree->tree_fid, sumbuf, sumtotal,
 	    st.st_size - sumtotal);

@@ -137,7 +137,7 @@ again:
 		if (expgen != current->gen) {
 			/*
 			 * The node has been splitted, so
-			 * start from the root again. 
+			 * start from the root again.
 			 * TODO: Start from last unchanged node instead
 			 *       of the root node.
 			 */
@@ -145,10 +145,10 @@ again:
 			VAN_ASSERT(ret1 == 0);
 			goto again;
 		}
-		
+
 		/* Now we lock the node, and know the gen
 		 * does not changed, means no split.
-		 */	
+		 */
 
 		/*
 		 * TODO:
@@ -291,7 +291,7 @@ have_node:
 		imc->indx = findx;
 	else
 		imc->indx = findx + 1;
-	
+
 	switch (flags & VAN_MASKMODE) {
 		case 0:
 		case VAN_SET:

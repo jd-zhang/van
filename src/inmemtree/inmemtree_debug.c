@@ -80,7 +80,7 @@ int _van_inmemtree_dump_node(INMEM_TREE *im_tree,
 	int ret;
 	INMEM_BINTERNAL *internal;
 	INMEM_BLEAF *leaf;
-	
+
 	ret = 0;
 	if (node == NULL || node->size == 0)
 		return (ret);
@@ -103,7 +103,7 @@ int _van_inmemtree_dump_node(INMEM_TREE *im_tree,
 int _van_inmemtree_dump_all_leaves(INMEM_TREE *im_tree, FILE *f) {
 	int ret;
 	INMEM_BLEAF *leaf;
-	
+
 	ret = 0;
 	if (im_tree == NULL)
 		return (ret);
@@ -121,7 +121,7 @@ int _van_inmemtree_dump_all_leaves(INMEM_TREE *im_tree, FILE *f) {
 
 int _van_inmemtree_dump_tree(INMEM_TREE *im_tree, FILE *f) {
 	int ret;
-	
+
 	ret = 0;
 	if (im_tree == NULL)
 		return (ret);

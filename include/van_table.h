@@ -23,7 +23,7 @@ extern "C" {
 #define MAX_ONDISK_CNT	1000
 #define DEFAULT_SCAN_INTERVAL	10
 
-#define VAN_TABLE_MERGE_MIN 4 
+#define VAN_TABLE_MERGE_MIN 4
 #define VAN_TABLE_MERGE_MAX 10
 
 struct _van_table_merge_config {
@@ -108,7 +108,7 @@ struct _van_table {
 	TAILQ_HEAD(_im_free_trees, _inmem_tree)	im_free_trees;
 
 	pthread_mutex_t od_merge_mtx;
-	TAILQ_HEAD(_od_merge_trees, _ondisk_tree)	od_merge_trees;	
+	TAILQ_HEAD(_od_merge_trees, _ondisk_tree)	od_merge_trees;
 
 	pthread_mutex_t od_free_mtx;
 	TAILQ_HEAD(_od_free_trees, _ondisk_tree)	od_free_trees;

@@ -30,7 +30,7 @@ int _van_ondisktree_ret(ONDISK_TREECURSOR *cursor, const ONDISK_ITEM *k2,
 	limit = 0;
 	isfile = 0;
 	memset(&datum, 0, sizeof(VAN_DATUM));
-	
+
 	switch(k2->type) {
 		case OD_VARCHAR:
 			datum.data = (void *)k2->data;
@@ -108,7 +108,7 @@ int _van_ondisktree_ret(ONDISK_TREECURSOR *cursor, const ONDISK_ITEM *k2,
 			goto clean;
 		dat->ulen = datum.size;
 	}
-	
+
 	dat->size = datum.size;
 	memcpy(dat->data, datum.data, datum.size);
 	*rdatum = *dat;

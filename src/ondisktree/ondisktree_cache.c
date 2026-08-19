@@ -28,7 +28,7 @@ int _van_ondisk_cache_init(VAN_STORE *store) {
 	    sizeof(ONDISK_CACHE_HEADER), &store->cache_header);
 	if (ret != 0)
 		return (ret);
-	
+
 	for (i = 0; i < store->cache_header_size; i++) {
 		TAILQ_INIT(&store->cache_header[i].head);
 		VAN_MUTEX_INIT(&store->cache_header[i], mtx_hash, ret1);
@@ -57,7 +57,7 @@ int _van_ondisk_cache_destroy(VAN_STORE *store) {
 		SET_RET(ret1, ret);
 	}
 	_van_free(NULL, store->cache_header);
-	
+
 	return (ret);
 }
 
@@ -84,7 +84,7 @@ int _van_ondisk_cache_get(ONDISK_TREE *tree, uint32 blkid,
 		    OD_FILEID_LEN) == 0 && block->blkid == blkid)
 			break;
 	}
-	
+
 	if (block != NULL) {
 		/* Found. */
 		/* The cache has been read */
@@ -101,7 +101,7 @@ int _van_ondisk_cache_get(ONDISK_TREE *tree, uint32 blkid,
 		if (block->load) {
 			VAN_MUTEX_LOCK(block, mtx_load_cond, ret);
 			CHK_ERR(ret);
-			goto ready;	
+			goto ready;
 		}
 		/* Need to wait */
 		VAN_COND_WAIT(block, load_cond,
@@ -127,9 +127,12 @@ int _van_ondisk_cache_get(ONDISK_TREE *tree, uint32 blkid,
 		/* All set up, so unlock to read the page */
 		VAN_MUTEX_UNLOCK(&store->cache_header[indx],
 		    mtx_hash, ret);
-		
+
+			/*
 		fprintf(stderr, "Read block(%lu) from (%d)%s\n",
 		    (unsigned long)blkid, tree->tree_fid, tree->file_path);
+			*/
+
 		ret = _van_file_readblk(tree->tree_fid,
 		    tree->meta->blksize, blkid, 0, block->page);
 		CHK_ERR(ret);
@@ -176,7 +179,7 @@ int _van_ondisk_cache_put(ONDISK_TREE *tree, void *cache) {
 
 int _van_ondisk_cache_block_destory(ONDISK_CACHE_BLOCK *block) {
 	int ret;
-	
+
 	ret = 0;
 	if (block == NULL)
 		return (ret);

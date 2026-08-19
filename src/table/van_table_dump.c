@@ -110,13 +110,13 @@ void *_van_table_frozen_dump_thread(void *arg) {
 	F_SET(item, VAN_ITEM_INUSE);
 	F_CLR(item, VAN_ITEM_DUMPING);
 	VAN_MUTEX_UNLOCK(table, odt_mtx, ret);
-	
+
 	table->frozen = NULL;
 	F_SET(frozen, INMEM_TREE_DUMPED);
 	ret = _van_table_curticks(table, &frozen->dumped_ticks);
 
-	/* 
-	 * Insert to the tail and later we will 
+	/*
+	 * Insert to the tail and later we will
 	 * check from head.
 	 */
 	VAN_MUTEX_LOCK(table, im_dump_mtx, ret);
@@ -142,14 +142,14 @@ int _van_table_dump_join_init(VAN_TABLE *table) {
 
 	ret = pthread_create(&joinjob->thread_id, NULL,
 	    _van_table_dump_join_thread, joinjob);
-	
+
 	if (ret == 0)
 		table->dump_join_job = joinjob;
 
 	return (ret);
 }
 
-/* 
+/*
  * This function supports multiple dump trees,
  * but we only have one dumping job currently.
  *
@@ -214,7 +214,7 @@ int _van_table_frozen_free_init(VAN_TABLE *table) {
 
 	ret = pthread_create(&freejob->thread_id, NULL,
 	    _van_table_frozen_free_thread, freejob);
-	
+
 	if (ret == 0)
 		table->frozen_free_job = freejob;
 
@@ -234,7 +234,7 @@ void *_van_table_frozen_free_thread(void *arg) {
 	while (!table->closed) {
 		/* TODO: whether we need to lock here ? */
 		ticks = table->min_op_ticks;
-		
+
 		VAN_MUTEX_LOCK(table, im_dump_mtx, ret);
 		frozen = TAILQ_FIRST(&table->im_dump_trees);
 		VAN_MUTEX_UNLOCK(table, im_dump_mtx, ret);

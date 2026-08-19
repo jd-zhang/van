@@ -168,7 +168,7 @@ have_page:
 		cursor->indx = findx;
 	else
 		cursor->indx = findx + 2;
-	
+
 	switch (flags & VAN_MASKMODE) {
 		case 0:
 		case VAN_SET:

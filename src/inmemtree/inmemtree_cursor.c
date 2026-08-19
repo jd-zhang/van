@@ -73,9 +73,9 @@ int _van_inmemtree_cursor_init(INMEM_TREE *im_tree,
 			    &cursor->reakey);
 		if (ret == 0)
 			ret = _van_calloc(NULL, 1, sizeof(VAN_DATUM),
-			    &cursor->readata);		
+			    &cursor->readata);
 	}
-	
+
 	if (ret == 0)
 		*cursorp = cursor;
 	else if (cursor != NULL)
@@ -269,7 +269,7 @@ int _van_inmemtree_cursor_next(INMEM_TREECURSOR *cursor, flags_t flags) {
 	config = im_tree->config;
 	leaf = orig = (INMEM_BLEAF *)cursor->node;
 	i = 0;
-	
+
 	while (leaf != NULL) {
 		cur = leaf;
 		st = (leaf == orig ? cursor->indx + 1 : 0);
@@ -768,9 +768,9 @@ int _van_inmemtree_cursor_justdel(INMEM_TREECURSOR *cursor, flags_t flags) {
 	size_t indx, dsize;
 	VAN_LSN lsn;
 
-	/* 
+	/*
 	 * Notice that, delete will not increase in size,
-	 * so it will not trigger the frozen process. 
+	 * so it will not trigger the frozen process.
 	 * So no 'exp_ret' setting and check is necessary.
 	 */
 
@@ -797,8 +797,8 @@ int _van_inmemtree_cursor_justdel(INMEM_TREECURSOR *cursor, flags_t flags) {
 	 * If it is, then it is good, just return.
 	 */
 	if (F_ISSET(leaf->keys[indx], IM_DEL)) {
-		/* 
-		 * If delete flag is set, the value part 
+		/*
+		 * If delete flag is set, the value part
 		 * must be NULL.
 		 */
 		VAN_ASSERT(leaf->values[indx] == NULL);
@@ -855,7 +855,7 @@ int _van_inmemtree_cursor_getraw(INMEM_TREECURSOR *cursor,
 	ret = _van_inmemtree_cursor_locate(cursor, key, flags);
 	if (ret != 0)
 		return (ret);
-	
+
 	leaf = (INMEM_BLEAF *)cursor->node;
 	indx = cursor->indx;
 	ik = leaf->keys[indx];
@@ -942,7 +942,7 @@ int _van_inmemtree_cursor_del(INMEM_TREECURSOR *cursor,
 	/* We only accept return values of 0 and VAN_NOTFOUND */
 	if (ret != 0 && ret != VAN_NOTFOUND)
 		return (ret);
-	
+
 	if (ret == 0)
 		ret = _van_inmemtree_cursor_justdel(cursor, 0);
 	else

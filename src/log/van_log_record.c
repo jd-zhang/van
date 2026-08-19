@@ -56,8 +56,8 @@ int _van_put_logrecord(VAN_STORE *store, VAN_TABLE *table, VAN_TXN *txnp,
 	CHK_ERR(ret);
 
 	wp = buf + VAN_LOGREC_HDRSIZE;
-	
-	/* 
+
+	/*
 	 * Write the common things: rectype, txnid, txn->prev_lsn.
 	 */
 	memcpy(wp, &rectype, sizeof(uint32));
@@ -134,7 +134,7 @@ err:
 	return (ret);
 }
 
-int _van_print_logrecord(VAN_STORE *store, VAN_DATUM *datap, VAN_LSN *lsnp, 
+int _van_print_logrecord(VAN_STORE *store, VAN_DATUM *datap, VAN_LSN *lsnp,
     const char *str, VAN_LOG_RECSPEC *spec, void *info) {
 	int ret;
 
@@ -151,7 +151,7 @@ int _van_logrec_init(VAN_STORE *store, uint32 orig_len,
 	VAN_LSN lsn;
 	VAN_LOGREC_HEADER hdr;
 	uint32 woff;
-	
+
 	logp = store->log_handle;
 	type = VAN_LOGPUT_INVALID;
 	bufsize = 0;
@@ -160,7 +160,7 @@ int _van_logrec_init(VAN_STORE *store, uint32 orig_len,
 	memset(&hdr, 0, sizeof(hdr));
 
 	rec_len = VAN_ALIGN(orig_len, 8);
-	tlen = VAN_LOGREC_HDRSIZE + rec_len; 
+	tlen = VAN_LOGREC_HDRSIZE + rec_len;
 	left = VAN_LOGFILE_LEFT(logp);
 	hdrsz = VAN_LOGREC_HDRSIZE;
 	memset(&lsn, 0, sizeof(lsn));
@@ -171,9 +171,9 @@ int _van_logrec_init(VAN_STORE *store, uint32 orig_len,
 	hdr.hdrlen = hdrsz;
 
 	if (tlen + hdrsz > left) {
-		/* 
+		/*
 		 * write two empty header, and some empty chars.
-		 * This means no space to put the 
+		 * This means no space to put the
 		 * record(and an empty record).
 		 */
 		ret = _van_malloc(NULL, left, &buf);
@@ -186,7 +186,7 @@ int _van_logrec_init(VAN_STORE *store, uint32 orig_len,
 		memcpy(buf, &hdr, sizeof(hdr));
 
 		woff = left - hdrsz;
-		/* We link two empty records to the 
+		/* We link two empty records to the
 		 * last non-empty records instead of
 		 * link the last to an empty record.
 		 * hdr.prev = logp->cur_lsn.offset;
@@ -204,9 +204,9 @@ int _van_logrec_init(VAN_STORE *store, uint32 orig_len,
 		    bufp, bufsizep, typep, lsnp);
 
 	} else if (tlen + 3 * hdrsz >= left) {
-		/* 
+		/*
 		 * This means after we putting the record,
-		 * there is no space to put other records in 
+		 * there is no space to put other records in
 		 * this file.
 		 */
 		type = VAN_LOGPUT_ONE_EMPTY;
@@ -234,7 +234,7 @@ int _van_logrec_init(VAN_STORE *store, uint32 orig_len,
 		*typep = type;
 
 	} else {
-		/* 
+		/*
 		 * This means there are enough space to put
 		 * the record, and after putting this record,
 		 * the left space may be put for other
@@ -263,7 +263,7 @@ err:
 	return (ret);
 }
 
-/* 
+/*
  * The caller should free the 'buf'.
  */
 int _van_logrec_write(VAN_STORE *store, const char *buf,
@@ -281,7 +281,7 @@ int _van_logrec_write(VAN_STORE *store, const char *buf,
 	    type == VAN_LOGPUT_TWO_EMPTY);
 
 	switch (type) {
-		case VAN_LOGPUT_NO_EMPTY: 
+		case VAN_LOGPUT_NO_EMPTY:
 			ret = _van_iofile_write(logp->cur_logfile, lsn.offset, (uint8 *)buf, bufsize);
 			if (ret != 0)
 				break;
@@ -290,12 +290,12 @@ int _van_logrec_write(VAN_STORE *store, const char *buf,
 			break;
 		case VAN_LOGPUT_ONE_EMPTY:
 		case VAN_LOGPUT_TWO_EMPTY:
-			ret = _van_iofile_write(logp->cur_logfile, lsn.offset, (uint8 *)buf, bufsize); 
+			ret = _van_iofile_write(logp->cur_logfile, lsn.offset, (uint8 *)buf, bufsize);
 			if (ret != 0)
 				break;
 			ret = _van_log_newfile(logp);
 			break;
-		default: 
+		default:
 			ret = _van_error_print(
 			    "_van_logrec_write: Invalid type !");
 	}

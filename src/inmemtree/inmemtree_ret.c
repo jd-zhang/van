@@ -85,7 +85,7 @@ int _van_inmemtree_ret(INMEM_TREECURSOR *cursor, const VAN_DATUM *datum,
 			return (ret);
 		dat->ulen = datum->size;
 	}
-	
+
 	dat->size = datum->size;
 	memcpy(dat->data, datum->data, datum->size);
 	*rdatum = *dat;

@@ -23,3 +23,12 @@ void _van_sleep(int32 seconds, int32 useconds) {
 
 	(void)select(0, NULL, NULL, NULL, &t);
 }
+
+void _van_yield(void) {
+	struct timeval t;
+
+	t.tv_sec = 0;
+	t.tv_usec = 0;
+
+	(void)select(0, NULL, NULL, NULL, &t);
+}

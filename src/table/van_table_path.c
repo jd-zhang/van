@@ -37,7 +37,7 @@ int _van_table_path_noalloc(VAN_TABLE *table,
     char *buf, size_t buflen, const char *file) {
 	const char *tbdir, *rptr;
 	int ret, rsize;
-	
+
 	/*
 	 * The dir is
 	 * table->table_dir ---> store->store_dir --> .

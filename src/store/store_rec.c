@@ -36,7 +36,7 @@ _store_tabopen_recover(store, datp, lsnp, op, info)
 
 	ret = 0;
 
-out:	
+out:
 	return ret;
 }
 
@@ -61,7 +61,7 @@ _store_tabids_recover(store, datp, lsnp, op, info)
 
 	ret = 0;
 
-out:	
+out:
 	return ret;
 }
 

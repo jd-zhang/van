@@ -35,7 +35,7 @@ int _van_log_listfiles(VAN_LOG *logp, int *cntp) {
 	const char *ldir;
 	DIR *dirobj;
 	struct dirent *dent;
-	
+
 	cnt = 0;
 	store = logp->store;
 	ldir = store->store_dir;
@@ -45,7 +45,7 @@ int _van_log_listfiles(VAN_LOG *logp, int *cntp) {
 		ret = _van_getsys_error();
 		goto err;
 	}
-	
+
 	while ((dent = readdir(dirobj)) != NULL) {
 		if (!_van_log_islogfile(dent->d_name))
 			continue;
@@ -186,7 +186,7 @@ int _van_log_openfile(VAN_LOG *logp, uint32 fnum, VAN_LOGFILE_INFO **infopp) {
 
 	/* Only read the tail record if it is complete */
 	if (infop->completed) {
-		ret = _van_iofile_read(infop->logfile, 
+		ret = _van_iofile_read(infop->logfile,
 		    infop->filehdr.logsize - VAN_LOGREC_HDRSIZE,
 		    buf, VAN_LOGREC_HDRSIZE);
 		CHK_ERR(ret);
@@ -259,7 +259,7 @@ int _van_logc_openfile(VAN_LOG_CURSOR *lgc, VAN_LSN *lsn) {
 
 	/* Only read the tail record if it is complete */
 	if (lgc->completed) {
-		ret = _van_iofile_read(lgc->logfile, 
+		ret = _van_iofile_read(lgc->logfile,
 		    lgc->filehdr.logsize - VAN_LOGREC_HDRSIZE,
 		    buf, VAN_LOGREC_HDRSIZE);
 		CHK_ERR(ret);

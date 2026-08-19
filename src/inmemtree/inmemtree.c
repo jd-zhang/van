@@ -69,7 +69,7 @@ int _van_inmemtree_create(VAN_TABLE *table, INMEM_TREE **treep) {
 	ret = _van_inmemtree_alloc_bleaf(tree, &leaf);
 	if (ret != 0)
 		goto err;
-	
+
 	ret = _van_calloc(NULL, 1, sizeof(INMEM_CHILD), &child);
 	if (ret != 0)
 		goto err;
@@ -99,7 +99,7 @@ int _van_inmemtree_create(VAN_TABLE *table, INMEM_TREE **treep) {
 
 	child->gen = leaf->gen;
 	child->pointer = (INMEM_BNODE *)leaf;
-	
+
 	internal->level = leaf->level + 1;
 	internal->size = 1;
 	internal->keys[0] = NULL;
@@ -110,7 +110,7 @@ int _van_inmemtree_create(VAN_TABLE *table, INMEM_TREE **treep) {
 	tree->first = tree->last = leaf;
 	tree->size = 0;
 	tree->records = 0;
-	/* 
+	/*
 	 * TODO: Allow setting threshold.
 	 * Just default value currently.
 	 */
@@ -162,7 +162,7 @@ int _van_inmemtree_destory(INMEM_TREE *tree) {
 	/* Free the nodes of the tree */
 	while ((node = TAILQ_FIRST(&tree->nodelist)) != NULL) {
 		_van_inmemtree_free_node(tree, node, 0, 0);
-		ccnt++;	
+		ccnt++;
 		/* Print the progress */
 		/*
 		if (ccnt >= now * tcnt / top) {
@@ -170,7 +170,7 @@ int _van_inmemtree_destory(INMEM_TREE *tree) {
 			    (unsigned long)now, (unsigned long)top);
 			now++;
 		} */
-		
+
 	}
 
 	/* Free the config */

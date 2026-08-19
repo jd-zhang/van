@@ -119,7 +119,7 @@ extern int populate_table(VAN_TABLE *table, char **keys, size_t *ksizes,
 extern int populate_inmemtree(INMEM_TREE *tree, char **keys, size_t *ksizes,
     char **values, size_t *vsizes, size_t cnt);
 
-extern int verify_inmemtree_data(INMEM_TREE *tree, char **keys, 
+extern int verify_inmemtree_data(INMEM_TREE *tree, char **keys,
     size_t *ksizes, char **values, size_t *vsizes, size_t cnt);
 extern int verify_ondisktree_data(ONDISK_TREE *tree, char **keys,
     size_t *ksizes, char **values, size_t *vsizes, size_t cnt);
@@ -174,8 +174,8 @@ typedef struct _populate_data {
 	size_t cnt;
 } POPULATE_DATA;
 
-extern int generate_string_testdata(char **keys, size_t *ksizes, 
-    int kmin, int kmax, char **values, size_t *vsizes, int vmin, 
+extern int generate_string_testdata(char **keys, size_t *ksizes,
+    int kmin, int kmax, char **values, size_t *vsizes, int vmin,
     int vmax, size_t cnt);
 extern int generate_string_testdata2(char **keys, size_t *ksizes, char *kpref,
     char **values, size_t *vsizes, char *vpref, size_t cnt, int start);
