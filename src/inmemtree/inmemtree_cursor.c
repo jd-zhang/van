@@ -76,9 +76,10 @@ int _van_inmemtree_cursor_init(INMEM_TREE *im_tree,
 			    &cursor->readata);
 	}
 
-	if (ret == 0)
+	if (ret == 0) {
 		*cursorp = cursor;
-	else if (cursor != NULL)
+		atomic_fetch_add(&im_tree->refcount, 1);
+	} else if (cursor != NULL)
 		(void)_van_inmemtree_cursor_cleanup(cursor);
 
 	return (ret);
@@ -173,6 +174,7 @@ int _van_inmemtree_cursor_cleanup_nounlock(INMEM_TREECURSOR *src) {
 		if (src->defretkey != NULL)
 			_van_datum_free(src->defretkey);
 	}
+	atomic_fetch_sub(&src->im_tree->refcount, 1);
 	_van_free(NULL, src);
 
 	return (ret);

@@ -205,7 +205,7 @@ int _van_inmemtree_split_rootinternal(INMEM_TREE *im_tree) {
 		 */
 		return (ret);
 	}
-	im_tree->maxlevel++;
+	im_tree->nlevel++;
 	im_tree->rootgen = newroot->gen;
 	im_tree->root = newroot;
 

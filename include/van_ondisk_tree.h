@@ -132,8 +132,8 @@ struct _ondisk_tree {
 	int		bloom_fid;
 	uint32		metasize;
 	uint32		blksize;
-	size_t		blob_threshold;
-	size_t		blk_cachesize;
+	size_t		blob_threshold; // not processing currently.
+	size_t		blk_cachesize; // not processing currently.
 
 	mode_t		omode;
 	char		*blob_dir;
@@ -142,7 +142,6 @@ struct _ondisk_tree {
 
 	ONDISK_BUILDINFO *buildinfo;
 
-	ticks_t		created_ticks;
 	ticks_t		merged_ticks;
 	/* The index on table's ondisk_tree list. */
 	size_t		table_indx;
@@ -150,9 +149,10 @@ struct _ondisk_tree {
 #define ONDISK_TREE_FREED	0x02
 #define ONDISK_TREE_DUMPED	0x04
 	flags_t		flags;
-	int		refcount;
 	/* Protect flags, refcount, and table_index. */
 	pthread_mutex_t	tree_mutex;
+
+	atomic_size_t		refcount;
 
 	/* For key/data smaller equal to or small than the default. */
 	VAN_DATUM	*defretkey;

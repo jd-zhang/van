@@ -70,8 +70,11 @@ struct _inmem_tree {
 	/*
 	 * As the size and records are operated nearly at
 	 * the same time, we use the same mutex currently.
+	 * if size >= threshold, we need to frozen the tree.
+	 *
+	 * Notice size and records are both protected by size_mutex.
 	 */
-	size_t		size; /* Total size, not very exact. */
+	size_t		size; /* Total size, not very exact, used for frozen check */
 	size_t		records; /*  Record Count. */
 	pthread_mutex_t	size_mutex;
 	size_t		threshold;
@@ -80,29 +83,24 @@ struct _inmem_tree {
 	int		nlevel;
 	int		maxlevel;
 
-	size_t		nodes_cnt;
-
 	/*
 	 * The life cycle of a in-memory tree:
 	 * active -> frozen -> dumped ->destroyed.
 	 */
 /*	ticks_t		created_ticks; */
-	ticks_t		frozen_ticks;
-	ticks_t		dumped_ticks;
+	ticks_t		frozen_ticks; // actually not used.
+	ticks_t		dumped_ticks; // actually not used.
 /*	ticks_t		freed_ticks; */
 /* #define INMEM_TREE_ACTIVE	0x01 */
 #define INMEM_TREE_FROZEN	0x02
 #define INMEM_TREE_DUMPED	0x04
 /* #define INMEM_TREE_FREED	0x08 */
 	flags_t		flags;
-	int		refcount;
 
-	/* Protect the ref, and flags. */
-	pthread_mutex_t	tree_mutex;
+	atomic_size_t		refcount;
 
-
-	int		nlmtx_allocated;
 	pthread_mutex_t mtx_nodelist;
+	size_t		nodes_cnt;
 	TAILQ_HEAD(_nodelist, _inmem_bnode) nodelist;
 
 	/* For key/data smaller equal to or small than the default. */

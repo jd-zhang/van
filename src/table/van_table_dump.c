@@ -108,7 +108,6 @@ void *_van_table_frozen_dump_thread(void *arg) {
 	item->trees[0] = odtree;
 	_van_table_curticks(table, &item->ticks);
 	F_SET(item, VAN_ITEM_INUSE);
-	F_CLR(item, VAN_ITEM_DUMPING);
 	VAN_MUTEX_UNLOCK(table, odt_mtx, ret);
 
 	table->frozen = NULL;
@@ -239,7 +238,7 @@ void *_van_table_frozen_free_thread(void *arg) {
 		frozen = TAILQ_FIRST(&table->im_dump_trees);
 		VAN_MUTEX_UNLOCK(table, im_dump_mtx, ret);
 
-		while (frozen != NULL && ticks > frozen->dumped_ticks) {
+		while (frozen != NULL && atomic_load(&frozen->refcount) == 0) {
 			tofree = frozen;
 			VAN_MUTEX_LOCK(table, im_dump_mtx, ret);
 			TAILQ_REMOVE(&table->im_dump_trees, frozen, links);

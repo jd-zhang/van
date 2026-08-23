@@ -75,9 +75,10 @@ int _van_ondisktree_cursor_init(ONDISK_TREE *tree,
 
 	}
 
-	if (ret == 0)
+	if (ret == 0) {
 		*cursorp = cursor;
-	else if (cursor != NULL)
+		atomic_fetch_add(&cursor->tree->refcount, 1);
+	} else if (cursor != NULL)
 		(void)_van_ondisktree_cursor_cleanup(cursor);
 
 	return (ret);
@@ -133,7 +134,7 @@ int _van_ondisktree_cursor_cleanup(ONDISK_TREECURSOR *src) {
 		VAN_ASSERT(ret == 0);
 		src->page = NULL;
 	}
-
+	atomic_fetch_sub(&src->tree->refcount, 1);
 	ret = _van_ondisktree_cursor_cleanup_noput(src);
 
 	return (ret);

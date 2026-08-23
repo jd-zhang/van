@@ -59,8 +59,9 @@ int _van_inmemtree_create(VAN_TABLE *table, INMEM_TREE **treep) {
 	INMEM_MUTEX_INIT(tree, mtx_nodelist, ret);
 	if (ret != 0)
 		goto err;
-	tree->nlmtx_allocated = 1;
 	TAILQ_INIT(&tree->nodelist);
+
+	tree->refcount = ATOMIC_VAR_INIT(0);
 
 	ret = _van_inmemtree_alloc_binternal(tree, &internal);
 	if (ret != 0)
@@ -195,11 +196,7 @@ int _van_inmemtree_destory(INMEM_TREE *tree) {
 
 	/* Free the INMEM_TREE structure itself */
 	TAILQ_INIT(&tree->nodelist);
-	if (tree->nlmtx_allocated) {
-		tree->nlmtx_allocated = 0;
-		INMEM_MUTEX_DESTROY(tree, mtx_nodelist, ret1);
-		SET_RET(ret1, ret);
-	}
+	INMEM_MUTEX_DESTROY(tree, mtx_nodelist, ret);
 	_van_free(NULL, tree);
 
 	return (ret);
