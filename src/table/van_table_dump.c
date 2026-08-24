@@ -68,12 +68,16 @@ int _van_table_dump_frozen_init(VAN_TABLE *table) {
 	dumpjob->table = table;
 	dumpjob->finished = VAN_FALSE;
 
+	ret = pthread_create(&dumpjob->thread_id, NULL,
+	    _van_table_frozen_dump_thread, dumpjob);
+	if (ret != 0) {
+		_van_free(NULL, dumpjob);
+		return (ret);
+	}
+
 	VAN_MUTEX_LOCK(table, dump_mutex, ret);
 	TAILQ_INSERT_TAIL(&table->dump_jobs, dumpjob, links);
 	VAN_MUTEX_UNLOCK(table, dump_mutex, ret);
-
-	ret = pthread_create(&dumpjob->thread_id, NULL,
-	    _van_table_frozen_dump_thread, dumpjob);
 
 	return (ret);
 }
@@ -144,6 +148,8 @@ int _van_table_dump_join_init(VAN_TABLE *table) {
 
 	if (ret == 0)
 		table->dump_join_job = joinjob;
+	else
+		_van_free(NULL, joinjob);
 
 	return (ret);
 }
@@ -167,7 +173,11 @@ void *_van_table_dump_join_thread(void *arg) {
 
 	while (!table->closed) {
 		VAN_MUTEX_LOCK(table, dump_mutex, ret);
-		/* fprintf(stderr, "VAN_COND_WAIT(table, dump_join_cond, &table->dump_mutex, ret)\n"); */
+		/* 
+		fprintf(stderr, "VAN_COND_WAIT(table, dump_join_cond, &table->dump_mutex, ret)\n"); 
+		we use prejob here, because we can not remove the dumpjob from the list
+		when we are iterating it.
+		*/
 		VAN_COND_WAIT(table, dump_join_cond, &table->dump_mutex, ret);
 		prejob = NULL;
 		for (dumpjob = TAILQ_FIRST(&table->dump_jobs); dumpjob != NULL;
@@ -216,6 +226,8 @@ int _van_table_frozen_free_init(VAN_TABLE *table) {
 
 	if (ret == 0)
 		table->frozen_free_job = freejob;
+	else
+		_van_free(NULL, freejob);
 
 	return (ret);
 }
@@ -224,21 +236,23 @@ void *_van_table_frozen_free_thread(void *arg) {
 	int ret;
 	VAN_TABLE_FROZEN_FREE_JOB *freejob;
 	INMEM_TREE *frozen, *tofree;
-	ticks_t ticks;
 	VAN_TABLE *table;
+	ticks_t minopticks;
 
 	freejob = (VAN_TABLE_FROZEN_FREE_JOB *)arg;
 	table = freejob->table;
 
 	while (!table->closed) {
-		/* TODO: whether we need to lock here ? */
-		ticks = table->min_op_ticks;
 
 		VAN_MUTEX_LOCK(table, im_dump_mtx, ret);
 		frozen = TAILQ_FIRST(&table->im_dump_trees);
 		VAN_MUTEX_UNLOCK(table, im_dump_mtx, ret);
 
-		while (frozen != NULL && atomic_load(&frozen->refcount) == 0) {
+		VAN_MUTEX_LOCK(table, op_mtx, ret);
+		minopticks = table->min_op_ticks;
+		VAN_MUTEX_UNLOCK(table, op_mtx, ret);
+
+		while (frozen != NULL && minopticks > frozen->dumped_ticks) {
 			tofree = frozen;
 			VAN_MUTEX_LOCK(table, im_dump_mtx, ret);
 			TAILQ_REMOVE(&table->im_dump_trees, frozen, links);

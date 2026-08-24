@@ -576,7 +576,7 @@ int _van_inmemtree_cursor_insert(INMEM_TREECURSOR *cursor,
 	 * we assume to use pre-split. So an insert
 	 * will not cause the node full.
 	 */
-	if (leaf->size == leaf->capacity) {
+	if (leaf->size == leaf->capacity) { 
 		/* TODO: Do split here ? */
 	}
 
@@ -918,10 +918,6 @@ int _van_inmemtree_cursor_put(INMEM_TREECURSOR *cursor,
 		ret = _van_inmemtree_cursor_insert(cursor,
 		    key, data);
 
-	if (ret == VAN_INMEM_FULL) {
-		ret = _van_table_freeze(cursor->im_tree->table);
-	}
-
 	return (ret);
 }
 
@@ -949,10 +945,6 @@ int _van_inmemtree_cursor_del(INMEM_TREECURSOR *cursor,
 		ret = _van_inmemtree_cursor_justdel(cursor, 0);
 	else
 		ret = _van_inmemtree_cursor_putfordel(cursor, key, 0);
-
-	if (ret == VAN_INMEM_FULL) {
-		ret = _van_table_freeze(cursor->im_tree->table);
-	}
 
 	return (ret);
 }

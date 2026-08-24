@@ -32,7 +32,12 @@ int _van_table_merge_scan_init(VAN_TABLE *table) {
 	ret = pthread_create(&jobarg->thread_id, NULL,
 	    _van_table_merge_scan_run, jobarg);
 
-	table->scan_job = jobarg;
+	if (ret == 0) {
+		table->scan_job = jobarg;
+	} else {
+		_van_free(NULL, jobarg);
+		jobarg = NULL;
+	}
 err:
 	return (ret);
 }
@@ -72,8 +77,8 @@ int _van_table_merge_scan(VAN_TABLE *table) {
 	low = 0;
 	cnt = 0;
 
-	fprintf(stderr, "_van_table_merge_scan\n");
-	VAN_ASSERT(table->mergecnt == 0);
+	// fprintf(stderr, "_van_table_merge_scan\n");
+	VAN_ASSERT(atomic_load(&table->mergecnt) == 0);
 	while (cur_indx >= 0 && !table->closed) {
 		domerge = 0;
 		reset = 0;
@@ -113,16 +118,17 @@ int _van_table_merge_scan(VAN_TABLE *table) {
 		if (domerge) {
 			reset = 1;
 
-			VAN_MUTEX_LOCK(table, mergecnt_mtx, ret);
-			/* TODO: panic check */
-			table->mergecnt++;
-			VAN_MUTEX_UNLOCK(table, mergecnt_mtx, ret);
-			/* TODO: panic check */
+			atomic_fetch_add(&table->mergecnt, 1);
 
 			ret = _van_table_new_merge_job(table, low,
 			    high, cnt);
+			if (ret != 0) {
+				clear = 1;
+				atomic_fetch_sub(&table->mergecnt, 1);
+			}
 			/* TODO: error check */
-		} else if (clear) {
+		} 
+		if (clear) {
 			reset = 1;
 			ret = _van_table_clear_merging(table, low, high);
 			/* TODO: error check */
@@ -140,10 +146,10 @@ int _van_table_merge_scan(VAN_TABLE *table) {
 	 * Sleep for 2 seconds
 	 * TODO: should be configured.
 	 */
-	while (table->mergecnt > 0) {
+	while (atomic_load(&table->mergecnt) > 0) {
 		_van_sleep(2, 0);
 	}
-	VAN_ASSERT(table->mergecnt == 0);
+	VAN_ASSERT(atomic_load(&table->mergecnt) == 0);
 
 	/* Grape all the threads */
 	ret = _van_table_merge_clean(table);
@@ -223,35 +229,6 @@ int _van_table_update_merge(VAN_TABLE *table,
 	return ret;
 }
 
-/*
- * Change merge flags from VAN_ITEM_MERGED to VAN_ITEM_UNUSED.
- */
-int _van_table_clear_merged(VAN_TABLE *table, size_t low, size_t high) {
-	VAN_TABLE_ODT_ITEM *item;
-	size_t i;
-	int ret;
-
-	for (i = low; i <= high; i++) {
-		item = &table->odt_items[i];
-		ret = _van_table_clear_merged_one(table, item);
-	}
-
-	return (ret);
-}
-
-int _van_table_clear_merged_one(VAN_TABLE *table, VAN_TABLE_ODT_ITEM *item) {
-	int ret;
-
-	VAN_MUTEX_LOCK(item, mutex, ret);
-	if (F_ISSET(item, VAN_ITEM_MERGED)) {
-		F_SET(item, VAN_ITEM_UNUSED);
-		F_CLR(item, VAN_ITEM_MERGED);
-	}
-	VAN_MUTEX_UNLOCK(item, mutex, ret);
-
-	return ret;
-}
-
 int _van_table_new_merge_job(VAN_TABLE *table, size_t low,
     size_t high, size_t cnt) {
 	VAN_TABLE_MERGE_JOB *jobarg;
@@ -268,13 +245,16 @@ int _van_table_new_merge_job(VAN_TABLE *table, size_t low,
 	jobarg->table = table;
 	jobarg->finished = VAN_FALSE;
 
+	ret = pthread_create(&jobarg->thread_id, NULL,
+	    _van_table_merge_job_run, jobarg);
+	if(ret != 0) {
+		_van_free(NULL, jobarg);
+		return (ret);
+	}
 	/* Add the job into the list */
 	VAN_MUTEX_LOCK(table, merge_mutex, ret);
 	TAILQ_INSERT_TAIL(&table->merge_jobs, jobarg, links);
 	VAN_MUTEX_UNLOCK(table, merge_mutex, ret);
-
-	ret = pthread_create(&jobarg->thread_id, NULL,
-	    _van_table_merge_job_run, jobarg);
 
 	return ret;
 }
@@ -287,19 +267,21 @@ void *_van_table_merge_job_run(void *arg) {
 	VAN_TABLE_MERGE_JOB *job;
 	VAN_TABLE *table;
 	VAN_TABLE_ODT_ITEM *item;
-	ONDISK_TREE *tree, *lowtree, *ctree, **trees, *restree;
+	ONDISK_TREE *tree, *lowtree, **trees, *restree;
 	int i, ret, idx;
 	ticks_t minopticks, merged_ticks;
 
 	ret = 0;
 	job = (VAN_TABLE_MERGE_JOB *)arg;
 	table = job->table;
+	trees = NULL;
+	restree = NULL;
 
 	if (table->closed) {
 		goto out;
 	}
 
-	fprintf(stderr, "_van_table_merge_job_run\n");
+	// fprintf(stderr, "_van_table_merge_job_run\n");
 	/*
 	 * Put the merge logic here.
 	 */
@@ -363,20 +345,16 @@ void *_van_table_merge_job_run(void *arg) {
 				item = &table->odt_items[i];
 				if (!F_ISSET(item, VAN_ITEM_MERGED))
 					continue;
-				ctree = NULL;
 				VAN_MUTEX_LOCK(item, mutex, ret);
 				item->trees[1] = NULL;
 				item->merged_indx = 0;
 				item->merged_ticks = 0;
 				if (i > job->low) {
 					VAN_ASSERT(item->trees[0] != NULL);
-					ctree = item->trees[0];
 					item->trees[0] = NULL;
 					F_CLR(item, VAN_ITEM_INUSE);
 					F_SET(item, VAN_ITEM_UNUSED);
 				} else {
-					if (lowtree != NULL)
-						ctree = lowtree;
 					F_SET(item, VAN_ITEM_INUSE);
 				}
 				F_CLR(item, VAN_ITEM_MERGED);
@@ -412,79 +390,11 @@ void *_van_table_merge_job_run(void *arg) {
 out:
 	/* Set finished */
 	job->finished = VAN_TRUE;
-
-	VAN_MUTEX_LOCK(table, mergecnt_mtx, ret);
-	/* TODO: panic check */
-	table->mergecnt--;
-	VAN_MUTEX_UNLOCK(table, mergecnt_mtx, ret);
-	/* TODO: panic check */
+	atomic_fetch_sub(&table->mergecnt, 1);
 
 err:
+	if(trees != NULL)
+		_van_free(NULL, trees);
 	return (void *)(uintmax_t)ret;
 }
-
-
-/* ####################################################### */
-/* The following functions are not used currently. */
-/* ####################################################### */
-
-/* NOT USED CURRENTLY */
-int _van_table_merge_join_init(VAN_TABLE *table) {
-	int ret;
-	VAN_TABLE_MERGE_JOIN_JOB *jobarg;
-
-	ret = _van_calloc(NULL, 1, sizeof(VAN_TABLE_MERGE_JOIN_JOB), &jobarg);
-	CHK_ERR(ret);
-
-	jobarg->table = table;
-	jobarg->finished = VAN_FALSE;
-
-	ret = pthread_create(&jobarg->thread_id, NULL,
-	    _van_table_merge_join_run, jobarg);
-
-	table->merge_join_job = jobarg;
-err:
-	return (ret);
-}
-
-/* NOT USED CURRENTLY */
-void *_van_table_merge_join_run(void *arg) {
-	int ret, ret1;
-	VAN_TABLE_MERGE_JOIN_JOB *taskarg;
-	VAN_TABLE *table;
-	VAN_TABLE_MERGE_JOB *job;
-	void *rptr;
-
-	ret = 0;
-	taskarg = (VAN_TABLE_MERGE_JOIN_JOB *)arg;
-	table = taskarg->table;
-
-	VAN_MUTEX_LOCK(table, merge_mutex, ret);
-	CHK_ERR(ret);
-check:
-	/* TODO: decrease lock time before/after pthread_join */
-	while ((job = TAILQ_FIRST(&table->free_merge_jobs)) != NULL) {
-		rptr = NULL;
-		pthread_join(job->thread_id, &rptr);
-		ret1 = (int)(uintmax_t)rptr;
-		SET_RET(ret1, ret);
-		TAILQ_REMOVE(&table->free_merge_jobs, job, links);
-		_van_free(NULL, job);
-	}
-	if (table->closed)
-		goto unlock;
-	else {
-		VAN_COND_WAIT(table, merge_join_cond, &table->merge_mutex, ret);
-		if (ret != 0)
-			goto unlock;
-		else
-			goto check;
-	}
-unlock:
-	VAN_MUTEX_UNLOCK(table, merge_mutex, ret);
-err:
-	taskarg->finished = VAN_TRUE;
-	return (void *)(uintmax_t)ret;
-}
-
 

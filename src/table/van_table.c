@@ -59,8 +59,7 @@ int _van_table_init(VAN_TABLE *table) {
 	CHK_ERR(ret);
 	table->cur_ticks = 0;
 
-	VAN_MUTEX_INIT(table, mergecnt_mtx, ret);
-	table->mergecnt = 0;
+	atomic_store(&table->mergecnt, 0);
 
 	VAN_MUTEX_INIT(table, odt_mtx, ret);
 	CHK_ERR(ret);
@@ -309,7 +308,6 @@ int _van_table_close(VAN_TABLE *table, flags_t flags) {
 	VAN_MUTEX_DESTROY(table, ticks_mtx, ret1);
 	SET_RET(ret1, ret);
 
-	VAN_MUTEX_DESTROY(table, mergecnt_mtx, ret1);
 	SET_RET(ret1, ret);
 
 	_van_free(NULL, table->odt_items);

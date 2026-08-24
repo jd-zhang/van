@@ -21,11 +21,10 @@ extern "C" {
 #endif
 
 #define MAX_ONDISK_CNT	1000
-#define DEFAULT_SCAN_INTERVAL	10
+
 
 #define VAN_TABLE_MERGE_MIN 4
 #define VAN_TABLE_MERGE_MAX 10
-
 struct _van_table_merge_config {
 	size_t	merge_min;
 	size_t	merge_max;
@@ -44,10 +43,8 @@ struct _van_table {
 	pthread_mutex_t	ticks_mtx;
 	ticks_t	cur_ticks;
 
-
-	pthread_mutex_t mergecnt_mtx;
-	int mergecnt;
-
+	atomic_int mergecnt;
+	
 	pthread_mutex_t	odt_mtx;
 	VAN_TABLE_ODT_ITEM	*odt_items;
 	size_t odt_top;
@@ -70,6 +67,8 @@ struct _van_table {
 	ticks_t	min_op_ticks;
 
 	VAN_TABLE_SCAN_JOB	*scan_job;
+
+	#define DEFAULT_SCAN_INTERVAL	10
 	size_t			nsleep;
 
 	pthread_mutex_t merge_mutex;
@@ -95,24 +94,6 @@ struct _van_table {
 	TAILQ_HEAD(_im_dump_trees, _inmem_tree)	im_dump_trees;
 	VAN_TABLE_FROZEN_FREE_JOB *frozen_free_job;
 
-	/*
-	 * The freed trees, the nodes of which have been
-	 * freed, and only leaving the structure, in case
-	 * some threads may access it. They can be freed
-	 * when all cursors have ticks >= dumped_ticks.
-	 */
-
-	/* Not used currently */
-	/*
-	pthread_mutex_t im_free_mtx;
-	TAILQ_HEAD(_im_free_trees, _inmem_tree)	im_free_trees;
-
-	pthread_mutex_t od_merge_mtx;
-	TAILQ_HEAD(_od_merge_trees, _ondisk_tree)	od_merge_trees;
-
-	pthread_mutex_t od_free_mtx;
-	TAILQ_HEAD(_od_free_trees, _ondisk_tree)	od_free_trees;
-	*/
 
 #define VAN_TABLE_INITED	0x01
 #define	VAN_TABLE_OPENED	0x02

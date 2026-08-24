@@ -116,8 +116,20 @@ extern int check_table_duplicate(VAN_TABLE *table,
 
 extern int populate_table(VAN_TABLE *table, char **keys, size_t *ksizes,
     char **values, size_t *vsizes, size_t cnt);
+extern int populate_table_with_expected(VAN_TABLE *table, char **keys, size_t *ksizes,
+    char **values, size_t *vsizes, size_t cnt, int expected);
 extern int populate_inmemtree(INMEM_TREE *tree, char **keys, size_t *ksizes,
     char **values, size_t *vsizes, size_t cnt);
+extern int populate_inmemtree_with_expected(INMEM_TREE *tree, char **keys, size_t *ksizes,
+    char **values, size_t *vsizes, size_t cnt, int expected);
+int delete_inmemtree_with_expected(INMEM_TREE *tree, char **keys, size_t *ksizes,
+	size_t cnt, int start, int step, int expected);
+int delete_inmemtree(INMEM_TREE *tree, char **keys, size_t *ksizes,
+	size_t cnt, int step);
+int delete_table_with_expected(VAN_TABLE *table, char **keys, size_t *ksizes,
+	size_t cnt, int start, int step, int expected);
+int delete_table(VAN_TABLE *table, char **keys, size_t *ksizes,
+	size_t cnt, int step);
 
 extern int verify_inmemtree_data(INMEM_TREE *tree, char **keys,
     size_t *ksizes, char **values, size_t *vsizes, size_t cnt);
@@ -125,6 +137,12 @@ extern int verify_ondisktree_data(ONDISK_TREE *tree, char **keys,
     size_t *ksizes, char **values, size_t *vsizes, size_t cnt);
 extern int verify_table_data(VAN_TABLE *table, char **keys, size_t *ksizes,
     char **values, size_t *vsizes, size_t cnt);
+extern int verify_inmemtree_with_expected(INMEM_TREE *tree, char **keys, size_t *ksizes,
+    char **values, size_t *vsizes, size_t cnt, int start, int step, int expected);
+extern int verify_ondisktree_with_expected(ONDISK_TREE *tree, char **keys, size_t *ksizes,
+    char **values, size_t *vsizes, size_t cnt, int start, int step, int expected);
+extern int verify_table_with_expected(VAN_TABLE *table, char **keys, size_t *ksizes,
+    char **values, size_t *vsizes, size_t cnt, int start, int step, int expected);
 
 extern int verify_inmemtree_data_withcursor(INMEM_TREE *tree, char **keys,
     size_t *ksizes, char **values, size_t *vsizes, size_t cnt);

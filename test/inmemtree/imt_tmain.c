@@ -18,6 +18,7 @@
 extern int imt_t1_1();
 extern int imt_t1_2(int verbose);
 extern int imt_t1_3();
+extern int imt_t1_4();
 extern int imt_t2_1();
 
 int main(int argc, char *argv[]) {
@@ -39,6 +40,12 @@ int main(int argc, char *argv[]) {
 	if (strcmp(argv[1], "imt_t1_3") == 0) {
 		fprintf(stderr, "============ imt_t1_3() ===========\n");
 		ret = imt_t1_3();
+		fprintf(stderr, "\n");
+	}
+
+	if (strcmp(argv[1], "imt_t1_4") == 0) {
+		fprintf(stderr, "============ imt_t1_4() ===========\n");
+		ret = imt_t1_4();
 		fprintf(stderr, "\n");
 	}
 

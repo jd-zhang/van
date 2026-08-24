@@ -205,9 +205,10 @@ int _van_inmemtree_destory(INMEM_TREE *tree) {
 int _van_inmemtree_freeze(INMEM_TREE *tree) {
 	int ret = 0;
 
-	VAN_ASSERT(tree->table != NULL);
+	if (F_ISSET(tree, INMEM_TREE_FROZEN)) {
+		return ret;
+	}	
 	F_SET(tree, INMEM_TREE_FROZEN);
-	ret = _van_table_curticks(tree->table, &tree->frozen_ticks);
 	tree->put = _van_inmemtree_put_frozen;
 	tree->del = _van_inmemtree_del_frozen;
 

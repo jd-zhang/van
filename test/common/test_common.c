@@ -32,6 +32,8 @@ static int check_duplicate(void *obj, size_t maxksz, size_t *totalp,
     size_t *dupcountp, int otype);
 static int populate_data(void *obj, char **keys, size_t *ksizes,
     char **values, size_t *vsizes, size_t cnt, int otype);
+static int delete_data_with_expected(void *obj, char **keys, size_t *ksizes,
+    size_t cnt, int otype, int start, int step, int expected) ;
 static int verify_data(void *obj, char **keys, size_t *ksizes,
     char **values, size_t *vsizes, size_t cnt, int otype);
 static int verify_data_withcursor(void *obj, char **keys, size_t *ksizes,
@@ -230,10 +232,10 @@ int check_table_duplicate(VAN_TABLE *table,
 	    dupcountp, OP_TABLE);
 }
 
-static int populate_data(void *obj, char **keys, size_t *ksizes,
-    char **values, size_t *vsizes, size_t cnt, int otype) {
+static int populate_data_with_expected(void *obj, char **keys, size_t *ksizes,
+    char **values, size_t *vsizes, size_t cnt, int otype, int expected) {	
 	size_t i;
-	int ret;
+	int ret, rret;
 	VAN_DATUM key, value;
 	time_t t1, t2;
 	VAN_TABLE *table;
@@ -242,6 +244,7 @@ static int populate_data(void *obj, char **keys, size_t *ksizes,
 
 	table = (VAN_TABLE *)obj;
 	tree = (INMEM_TREE *)obj;
+	rret = 0;
 
 	time(&t1);
 	for (i = 0; i < cnt; i++) {
@@ -265,18 +268,38 @@ static int populate_data(void *obj, char **keys, size_t *ksizes,
 				ret = _van_error_print("BAD OP_TYPE");
 				break;
 		}
-		CHK_RET(ret, info);
+		if (ret != expected) {
+			fprintf(stderr, "Expected return: %d, got: %d\n",
+			    expected, ret);
+			if(rret == 0)
+				rret = ret;
+		}
+		CHK_RET(ret != expected, info);
+
 	}
 	time(&t2);
 	fprintf(stderr, "time consuming: %g seconds\n", difftime(t2, t1));
 
-	return (ret);
+	return (rret);
 }
+
+
+static int populate_data(void *obj, char **keys, size_t *ksizes,
+    char **values, size_t *vsizes, size_t cnt, int otype){
+	return populate_data_with_expected(obj, keys, ksizes,
+	    values, vsizes, cnt, otype, 0);
+	}
 
 int populate_table(VAN_TABLE *table, char **keys, size_t *ksizes,
     char **values, size_t *vsizes, size_t cnt) {
 	return populate_data(table,
 	    keys, ksizes, values, vsizes, cnt, OP_TABLE);
+}
+
+int populate_table_with_expected(VAN_TABLE *table, char **keys, size_t *ksizes,
+    char **values, size_t *vsizes, size_t cnt, int expected) {
+	return populate_data_with_expected(table,
+	    keys, ksizes, values, vsizes, cnt, OP_TABLE, expected);
 }
 
 int populate_inmemtree(INMEM_TREE *tree, char **keys, size_t *ksizes,
@@ -285,12 +308,89 @@ int populate_inmemtree(INMEM_TREE *tree, char **keys, size_t *ksizes,
 	    keys, ksizes, values, vsizes, cnt, OP_INMEMTREE);
 }
 
+int populate_inmemtree_with_expected(INMEM_TREE *tree, char **keys, size_t *ksizes,
+    char **values, size_t *vsizes, size_t cnt, int expected) {
+	return populate_data_with_expected(tree,
+	    keys, ksizes, values, vsizes, cnt, OP_INMEMTREE, expected);
+}
+
+static int delete_data_with_expected(void *obj, char **keys, size_t *ksizes,
+    size_t cnt, int otype, int start, int step, int expected) {	
+	size_t i;
+	int ret, rret;
+	VAN_DATUM key;
+	time_t t1, t2;
+	VAN_TABLE *table;
+	INMEM_TREE *tree;
+	const char *info;
+
+	table = (VAN_TABLE *)obj;
+	tree = (INMEM_TREE *)obj;
+	rret = 0;
+
+	time(&t1);
+	for (i = start; i < cnt; i+=step) {
+		memset(&key, 0, sizeof(key));
+		key.data = keys[i];
+		key.size = ksizes[i];
+		switch (otype) {
+			case OP_TABLE:
+				info = "table->del";
+				ret = table->del(table, &key, 0);
+				break;
+			case OP_INMEMTREE:
+				info = "tree->del";
+				ret = tree->del(tree, &key, 0);
+				break;
+			default:
+				info = "Unknown op_type";
+				ret = _van_error_print("BAD OP_TYPE");
+				break;
+		}
+		if (ret != expected) {
+			fprintf(stderr, "Expected return: %d, got: %d\n",
+			    expected, ret);
+			if(rret == 0)
+				rret = ret;
+		}
+		CHK_RET(ret != expected, info);
+	}
+	time(&t2);
+	fprintf(stderr, "time consuming: %g seconds\n", difftime(t2, t1));
+
+	return (rret);
+}
+
+int delete_inmemtree_with_expected(INMEM_TREE *tree, char **keys, size_t *ksizes,
+	size_t cnt, int start, int step, int expected) {
+	return delete_data_with_expected(tree,
+	    keys, ksizes, cnt, OP_INMEMTREE, start, step, expected);
+}
+
+int delete_inmemtree(INMEM_TREE *tree, char **keys, size_t *ksizes,
+	size_t cnt, int step) {
+	return delete_data_with_expected(tree,
+	    keys, ksizes, cnt, OP_INMEMTREE, 0, step, 0);
+}
+
+int delete_table_with_expected(VAN_TABLE *table, char **keys, size_t *ksizes,
+	size_t cnt, int start, int step, int expected) {
+	return delete_data_with_expected(table,
+	    keys, ksizes, cnt, OP_TABLE, start, step, expected);
+}
+
+int delete_table(VAN_TABLE *table, char **keys, size_t *ksizes,
+	size_t cnt, int step) {
+	return delete_data_with_expected(table,
+	    keys, ksizes, cnt, OP_TABLE, 0,step, 0);
+}
+
 /*
 verify the records using the inmemtree/odisktree/table get function,
 and verify the records are the same as the input data.
 */
-static int verify_data(void *obj, char **keys, size_t *ksizes,
-    char **values, size_t *vsizes, size_t cnt, int otype) {
+static int verify_data_with_expected(void *obj, char **keys, size_t *ksizes,
+    char **values, size_t *vsizes, size_t cnt, int otype, int start, int step, int expected) {
 	INMEM_TREE *imtree;
 	ONDISK_TREE *odtree;
 	VAN_TABLE *table;
@@ -305,7 +405,7 @@ static int verify_data(void *obj, char **keys, size_t *ksizes,
 	table = (VAN_TABLE *)obj;
 
 	time(&t1);
-	for (i = 0; i < cnt; i++) {
+	for (i = start; i < cnt; i+= step) {
 		memset(&key, 0, sizeof(key));
 		memset(&value, 0, sizeof(value));
 		key.data = keys[i];
@@ -329,9 +429,15 @@ static int verify_data(void *obj, char **keys, size_t *ksizes,
 				info = "bad otype";
 				ret = _van_error_print("BAD OP_TYPE");
 		}
-		CHK_RET(ret, info);
-		VAN_ASSERT(value.size == vsizes[i]);
-		VAN_ASSERT((memcmp(value.data, values[i], value.size) == 0));
+		if (ret == 0) {
+			VAN_ASSERT(value.size == vsizes[i]);
+			VAN_ASSERT((memcmp(value.data, values[i], value.size) == 0));
+		}
+		if (ret != expected) {
+			fprintf(stderr, "Expected return: %d, got: %d\n",
+			    expected, ret);
+		}
+		CHK_RET(ret != expected, info);
 	}
 	time(&t2);
 	fprintf(stderr, "time consuming: %g seconds\n", difftime(t2, t1));
@@ -341,20 +447,38 @@ static int verify_data(void *obj, char **keys, size_t *ksizes,
 
 int verify_inmemtree_data(INMEM_TREE *tree, char **keys, size_t *ksizes,
     char **values, size_t *vsizes, size_t cnt) {
-	return verify_data(tree, keys, ksizes,
-	    values, vsizes, cnt, OP_INMEMTREE);
+	return verify_data_with_expected(tree, keys, ksizes,
+	    values, vsizes, cnt, OP_INMEMTREE, 0, 1, 0);
+}
+
+int verify_inmemtree_with_expected(INMEM_TREE *tree, char **keys, size_t *ksizes,
+    char **values, size_t *vsizes, size_t cnt, int start, int step, int expected) {
+	return verify_data_with_expected(tree, keys, ksizes,
+	    values, vsizes, cnt, OP_INMEMTREE, start, step, expected);
 }
 
 int verify_ondisktree_data(ONDISK_TREE *tree, char **keys, size_t *ksizes,
     char **values, size_t *vsizes, size_t cnt) {
-	return verify_data(tree, keys, ksizes,
-	    values, vsizes, cnt, OP_ONDISKTREE);
+	return verify_data_with_expected(tree, keys, ksizes,
+	    values, vsizes, cnt, OP_ONDISKTREE, 0, 1, 0);
+}
+
+int verify_ondisktree_with_expected(ONDISK_TREE *tree, char **keys, size_t *ksizes,
+    char **values, size_t *vsizes, size_t cnt, int start, int step, int expected) {
+	return verify_data_with_expected(tree, keys, ksizes,
+	    values, vsizes, cnt, OP_ONDISKTREE, start, step, expected);
 }
 
 int verify_table_data(VAN_TABLE *table, char **keys, size_t *ksizes,
     char **values, size_t *vsizes, size_t cnt) {
-	return verify_data(table, keys, ksizes,
-	    values, vsizes, cnt, OP_TABLE);
+	return verify_data_with_expected(table, keys, ksizes,
+	    values, vsizes, cnt, OP_TABLE, 0, 1, 0);
+}
+
+int verify_table_with_expected(VAN_TABLE *table, char **keys, size_t *ksizes,
+	char **values, size_t *vsizes, size_t cnt, int start, int step, int expected) {
+	return verify_data_with_expected(table, keys, ksizes,
+	    values, vsizes, cnt, OP_TABLE, start, step, expected);
 }
 
 static int verify_data_withcursor(void *obj, char **keys, size_t *ksizes,

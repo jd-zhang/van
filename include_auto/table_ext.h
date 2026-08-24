@@ -73,15 +73,9 @@ extern int _van_table_merge_scan(VAN_TABLE *table);
 extern int _van_table_new_merge_job(VAN_TABLE *table, size_t low,
     size_t high, size_t cnt);
 extern int _van_table_clear_merging(VAN_TABLE *table, size_t low, size_t high);
-extern int _van_table_merge_join_init(VAN_TABLE *table);
-extern void *_van_table_merge_join_run(void *arg);
 extern int _van_table_merge_clean(VAN_TABLE *table);
 extern int _van_table_update_merge(VAN_TABLE *table,
     const VAN_TABLE_MERGE_JOB *jobarg);
-extern int _van_table_clear_merged(VAN_TABLE *table,
-    size_t low, size_t high);
-extern int _van_table_clear_merged_one(VAN_TABLE *table,
-    VAN_TABLE_ODT_ITEM *item);
 extern void *_van_table_merge_job_run(void *arg);
 
 /* src/table/van_table_op.c */

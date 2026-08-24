@@ -339,3 +339,68 @@ int imt_t1_3() {
 
 	return (ret);
 }
+
+/*
+ * Verify put on a frozen tree, returns VAN_FROZEN
+ */
+int imt_t1_4() {
+	VAN_TABLE table;
+	INMEM_TREE *tree;
+	int ret, cnt;
+	STRING_TESTDATA_DEFINE;
+
+	memset(&table, 0, sizeof(VAN_TABLE));
+	ret = _van_inmemtree_create(&table, &table.active);
+	CHK_RET(ret, "_van_inmemtree_create");
+	tree = table.active;
+
+	cnt = 10000;
+	STRING_TESTDATA_INIT;
+
+	fprintf(stderr, "========== 1 generate test data ============\n");
+	(void)generate_string_testdata(keys, ksizes, 5, 15, values, vsizes,
+	    10, 20, cnt);
+
+	fprintf(stderr, "========== 2 populate tree ============\n");
+	ret = populate_inmemtree(tree, keys, ksizes, values, vsizes, cnt);
+	CHK_RET(ret, "populate_inmemtree");
+
+	fprintf(stderr, "========== 3 delete from tree ============\n");
+	ret = delete_inmemtree_with_expected(tree, keys, ksizes, cnt, 0, 3, 0);
+
+	fprintf(stderr, "========== 4 delete records deleted from tree ============\n");
+	ret = delete_inmemtree_with_expected(tree, keys, ksizes, cnt, 0, 3, VAN_NOTFOUND);
+
+	fprintf(stderr, "========== 5 verify the tree does not contain deleted data ============\n");
+	ret = verify_inmemtree_with_expected(tree, keys, ksizes, values, vsizes,
+	    cnt, 0, 3, VAN_NOTFOUND);
+	
+	fprintf(stderr, "========== 6 verify the tree contains non-deleted data ============\n");
+	ret = verify_inmemtree_with_expected(tree, keys, ksizes, values, vsizes,
+	    cnt, 1, 3, 0);
+	ret = verify_inmemtree_with_expected(tree, keys, ksizes, values, vsizes,
+	    cnt, 2, 3, 0);
+
+	fprintf(stderr, "========== 7 freeze the tree ============\n");
+	ret = _van_inmemtree_freeze(tree);
+	CHK_RET(ret, "_van_inmemtree_freeze");
+
+	fprintf(stderr, "========== 8 populate frozen tree with expected ============\n");
+	ret = populate_inmemtree_with_expected(tree, 
+		keys, ksizes, values, vsizes,  cnt, VAN_FROZEN);
+
+	fprintf(stderr, "========== 9 delete from frozen tree with expected ============\n");
+	ret = delete_inmemtree_with_expected(tree, keys, ksizes, cnt, 0, 1, VAN_FROZEN);
+
+	fprintf(stderr, "========== 10 cleanup test data ============\n");
+	(void)free_string_testdata(keys, ksizes, values, vsizes, cnt);
+
+	fprintf(stderr, "========== 11 destroy the tree ============\n");
+	ret = _van_inmemtree_destory(tree);
+	CHK_RET(ret, "_van_inmemtree_destory");
+
+	fprintf(stderr, "**** Malloc Statistics ****\n");
+	_van_alloc_stat_print(stderr, " ");
+
+	return (ret);
+}
