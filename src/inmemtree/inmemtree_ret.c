@@ -80,6 +80,9 @@ int _van_inmemtree_ret(INMEM_TREECURSOR *cursor, const VAN_DATUM *datum,
 	 * necessary.
 	 */
 	if (datum->size > limit) {
+		if (dat->data != NULL)
+			_van_free(NULL, dat->data);
+		dat->data = NULL;
 		ret = _van_realloc(NULL, dat->data, datum->size, &dat->data);
 		if (ret != 0)
 			return (ret);

@@ -58,7 +58,7 @@ int _van_log_listfiles(VAN_LOG *logp, int *cntp) {
 err:
 	if (dirobj != NULL) {
 		ret1 = closedir(dirobj);
-		if (ret = 0)
+		if (ret == 0)
 			ret = ret1;
 	}
 	if (ret == 0 && cntp != NULL)

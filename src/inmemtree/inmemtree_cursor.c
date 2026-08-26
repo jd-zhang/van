@@ -68,12 +68,18 @@ int _van_inmemtree_cursor_init(INMEM_TREE *im_tree,
 			ret = _van_calloc(NULL, 1, DEF_VAL_ULEN,
 			    &cursor->defretdata->data);
 		}
-		if (ret == 0)
+		if (ret == 0) {
 			ret = _van_calloc(NULL, 1, sizeof(VAN_DATUM),
 			    &cursor->reakey);
-		if (ret == 0)
+				cursor->reakey->data = NULL;
+				cursor->reakey->ulen = 0;
+		}
+		if (ret == 0) {
 			ret = _van_calloc(NULL, 1, sizeof(VAN_DATUM),
 			    &cursor->readata);
+				cursor->readata->data = NULL;
+				cursor->readata->ulen = 0;
+		}
 	}
 
 	if (ret == 0) {

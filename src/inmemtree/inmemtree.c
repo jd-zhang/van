@@ -91,12 +91,18 @@ int _van_inmemtree_create(VAN_TABLE *table, INMEM_TREE **treep) {
 		ret = _van_calloc(NULL, 1, DEF_VAL_ULEN,
 		    &tree->defretdata->data);
 	}
-	if (ret == 0)
+	if (ret == 0) {
 		ret = _van_calloc(NULL, 1, sizeof(VAN_DATUM),
 		    &tree->reakey);
-	if (ret == 0)
+			tree->reakey->data = NULL;
+			tree->reakey->ulen = 0;
+	}
+	if (ret == 0) {
 		ret = _van_calloc(NULL, 1, sizeof(VAN_DATUM),
 		    &tree->readata);
+			tree->readata->data = NULL;
+			tree->readata->ulen = 0;
+	}
 
 	child->gen = leaf->gen;
 	child->pointer = (INMEM_BNODE *)leaf;

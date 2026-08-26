@@ -34,8 +34,6 @@ static int populate_data(void *obj, char **keys, size_t *ksizes,
     char **values, size_t *vsizes, size_t cnt, int otype);
 static int delete_data_with_expected(void *obj, char **keys, size_t *ksizes,
     size_t cnt, int otype, int start, int step, int expected) ;
-static int verify_data(void *obj, char **keys, size_t *ksizes,
-    char **values, size_t *vsizes, size_t cnt, int otype);
 static int verify_data_withcursor(void *obj, char **keys, size_t *ksizes,
     char **values, size_t *vsizes, size_t cnt, int otype);
 static int verify_cursor_direction(void *obj, flags_t direction,
@@ -270,7 +268,7 @@ static int populate_data_with_expected(void *obj, char **keys, size_t *ksizes,
 		}
 		if (ret != expected) {
 			fprintf(stderr, "loop:%d Expected return: %d, got: %d\n",
-			    i, expected, ret);
+			    (int)i, expected, ret);
 			if(rret == 0)
 				rret = ret;
 		}

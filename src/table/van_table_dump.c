@@ -27,20 +27,19 @@ int _van_table_freeze(VAN_TABLE *table, unsigned long checkgen) {
 	ret = 0;
 	active = NULL;
 
-	if (atomic_load(&table->dumpgen) != checkgen)
+	if (atomic_fetch_add(&table->dumpgen, 1) != checkgen)
 		return (VAN_STALE);
 
-	atomic_fetch_add(&table->dumpgen, 1);
 	/* There is no active tree */
 	if (table->active == NULL) {
-		ret = _van_inmemtree_create(table, &active);
-		table->active = active;
-		active->threshold = table->inmem_threshold;
 		return (ret);
 	}
-
 	/* There are no records in the tree. */
 	im_tree = table->active;
+	table->active = NULL;
+	ret = _van_inmemtree_create(table, &table->active);
+	CHK_ERR(ret);
+	table->active->threshold = table->inmem_threshold;
 
 	if (im_tree->records == 0)
 		return (ret);
@@ -50,15 +49,10 @@ int _van_table_freeze(VAN_TABLE *table, unsigned long checkgen) {
 
 	/* There is a dump running, just waiting. */
 	while (table->frozen != NULL) {
-		/* Sleep for 1 seconds currently. */
-		_van_sleep(1, 0);
-	}
-
-	ret = _van_inmemtree_create(table, &active);
-	CHK_ERR(ret);
+ 		/* Sleep for 1 seconds currently. */
+ 		_van_sleep(1, 0);
+ 	}
 	table->frozen = im_tree;
-	table->active = active;
-	active->threshold = table->inmem_threshold;
 
 	ret = _van_table_dump_frozen_init(table);
 err:
@@ -86,7 +80,6 @@ int _van_table_dump_frozen_init(VAN_TABLE *table) {
 	VAN_MUTEX_LOCK(table, dump_mutex, ret);
 	TAILQ_INSERT_TAIL(&table->dump_jobs, dumpjob, links);
 	VAN_MUTEX_UNLOCK(table, dump_mutex, ret);
-
 	return (ret);
 }
 
@@ -123,9 +116,8 @@ void *_van_table_frozen_dump_thread(void *arg) {
 	VAN_MUTEX_UNLOCK(table, odt_mtx, ret);
 
 	table->frozen = NULL;
-	F_SET(frozen, INMEM_TREE_DUMPED);
-	ret = _van_table_curticks(table, &frozen->dumped_ticks);
-
+ 	F_SET(frozen, INMEM_TREE_DUMPED);
+ 	ret = _van_table_curticks(table, &frozen->dumped_ticks);
 	/*
 	 * Insert to the tail and later we will
 	 * check from head.

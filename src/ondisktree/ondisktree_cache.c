@@ -53,7 +53,7 @@ int _van_ondisk_cache_destroy(VAN_STORE *store) {
 			SET_RET(ret1, ret);
 		}
 		VAN_MUTEX_DESTROY(&store->cache_header[i],
-		    mtx_hash, ret);
+		    mtx_hash, ret1);
 		SET_RET(ret1, ret);
 	}
 	_van_free(NULL, store->cache_header);
