@@ -20,21 +20,28 @@
 #include "van_ondisk_tree.h"
 
 /* TODO: Check if this function will run concurrently ? */
-int _van_table_freeze(VAN_TABLE *table) {
+int _van_table_freeze(VAN_TABLE *table, unsigned long checkgen) {
 	int ret;
 	INMEM_TREE *im_tree, *active;
 
 	ret = 0;
 	active = NULL;
+
+	if (atomic_load(&table->dumpgen) != checkgen)
+		return (VAN_STALE);
+
+	atomic_fetch_add(&table->dumpgen, 1);
 	/* There is no active tree */
 	if (table->active == NULL) {
 		ret = _van_inmemtree_create(table, &active);
 		table->active = active;
+		active->threshold = table->inmem_threshold;
 		return (ret);
 	}
 
 	/* There are no records in the tree. */
 	im_tree = table->active;
+
 	if (im_tree->records == 0)
 		return (ret);
 	else {
@@ -51,6 +58,7 @@ int _van_table_freeze(VAN_TABLE *table) {
 	CHK_ERR(ret);
 	table->frozen = im_tree;
 	table->active = active;
+	active->threshold = table->inmem_threshold;
 
 	ret = _van_table_dump_frozen_init(table);
 err:

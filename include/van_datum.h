@@ -28,8 +28,6 @@ struct _van_datum {
 };
 /* Comparison function definition */
 typedef int (*VAN_DATUM_CMPFUNC)(const VAN_DATUM *dt1, const VAN_DATUM *dt2);
-typedef int (*VAN_TABLE_CMPFUNC)(const VAN_TABLE *table,
-    const VAN_DATUM *dt1, const VAN_DATUM *dt2);
 
 #ifdef __cplusplus
 }

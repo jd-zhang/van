@@ -27,7 +27,7 @@ int _van_ondisktree_key_docmp(ONDISK_TREECURSOR *cursor,
 
 	ret = 0;
 	isfile = 0;
-	datum_cmp = cursor->table->active->config->cmp_func;
+	datum_cmp = cursor->table->cmp_func;
 	memset(&datum, 0, sizeof(VAN_DATUM));
 
 	switch(k2->type) {

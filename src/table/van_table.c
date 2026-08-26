@@ -19,6 +19,12 @@
 #include "van_inmem_tree.h"
 #include "van_ondisk_tree.h"
 
+static void _van_table_set_functions(VAN_TABLE *table);
+static int _van_table_set_inmem_threshold(VAN_TABLE *table, size_t threshold);
+static int _van_table_set_merge_config(VAN_TABLE *table, size_t merge_min, size_t merge_max);
+static int _van_table_set_scan_interval(VAN_TABLE *table, size_t interval);
+static int _van_table_get_scan_interval(VAN_TABLE *table, size_t *interval);
+static int _van_set_compare_function(VAN_TABLE *table, VAN_DATUM_CMPFUNC cmp_func);
 int _van_table_create(VAN_STORE *store, VAN_TABLE **tablep) {
 	int ret;
 	VAN_TABLE *table;
@@ -44,17 +50,13 @@ int _van_table_init(VAN_TABLE *table) {
 	ret = 0;
 	odt_cnt = MAX_ONDISK_CNT;
 
-	table->put = _van_table_put_record;
-	table->get = _van_table_get_record;
-	table->del = _van_table_del_record;
-	table->open = _van_table_open;
-	table->close = _van_table_close;
-	table->cmp_func = _van_table_datum_defcmp;
+	_van_table_set_functions(table);
 
 	table->active = NULL;
 	table->frozen = NULL;
 	table->table_name = NULL;
 	table->table_dir = NULL;
+	atomic_store(&table->dumpgen, 0);
 	VAN_MUTEX_INIT(table, ticks_mtx, ret);
 	CHK_ERR(ret);
 	table->cur_ticks = 0;
@@ -138,6 +140,21 @@ err:
 	return (ret);
 }
 
+static void _van_table_set_functions(VAN_TABLE *table) {
+	table->put = _van_table_put_record;
+	table->get = _van_table_get_record;
+	table->del = _van_table_del_record;
+	table->open = _van_table_open;
+	table->close = _van_table_close;
+	table->start_threads = _van_table_start_threads;
+	table->cmp_func = _van_datum_defcmp;
+	table->set_inmem_threshold = _van_table_set_inmem_threshold;
+	table->set_merge_config = _van_table_set_merge_config;
+	table->set_scan_interval = _van_table_set_scan_interval;
+	table->get_scan_interval = _van_table_get_scan_interval;
+	table->set_compare_function = _van_set_compare_function;
+}
+
 int _van_table_open(VAN_TABLE *table, const char *tb_name, flags_t flags) {
 	int ret;
 	VAN_STORE *store;
@@ -162,6 +179,7 @@ int _van_table_open(VAN_TABLE *table, const char *tb_name, flags_t flags) {
 	table->frozen = NULL;
 	ret = _van_inmemtree_create(table, &table->active);
 	CHK_ERR(ret);
+	table->active->threshold = table->inmem_threshold;
 	ret = _van_table_read_odt_paths(table);
 	CHK_ERR(ret);
 
@@ -170,20 +188,7 @@ int _van_table_open(VAN_TABLE *table, const char *tb_name, flags_t flags) {
 
 	/* TODO: Create the scan job */
 	if (!LF_ISSET(VAN_TABLE_SKIP_THREAD_START)) {
-		ret = _van_table_merge_scan_init(table);
-		CHK_ERR(ret);
-
-		ret = _van_table_dump_join_init(table);
-		CHK_ERR(ret);
-
-		ret = _van_table_frozen_free_init(table);
-		CHK_ERR(ret);
-
-		/* NOT USED CURRENTLY */
-		/*
-		ret = _van_table_merge_join_init(table);
-		CHK_ERR(ret);
-		 */
+		ret = _van_table_start_threads(table);
 	}
 
 	table->open_flags = orig_oflags;
@@ -389,13 +394,6 @@ int _van_table_start_threads(VAN_TABLE *table) {
 		CHK_ERR(ret);
 	}
 
-	/* NOT USED CURRENTLY */
-	/*
-	if (table->merge_join_job == NULL) {
-		ret = _van_table_merge_join_init(table);
-		CHK_ERR(ret);
-	}
-	*/
 err:
 	return ret;
 
@@ -551,8 +549,12 @@ int _van_table_put_record(VAN_TABLE *table, VAN_DATUM *key,
     VAN_DATUM *data, flags_t flags) {
 	int ret, ret1;
 	VAN_OPERATION *op;
+	ticks_t tk;
 
-	ret = _van_table_op_create(table, &op, 0);
+	op = NULL;
+	ret = _van_table_curticks(table, &tk);
+	CHK_ERR(ret);
+	ret = _van_table_op_create(table, &op, 0, tk);
 	CHK_ERR(ret);
 
 	ret = _van_table_op_put(op, key, data, flags);
@@ -566,8 +568,11 @@ int _van_table_get_record(VAN_TABLE *table, VAN_DATUM *key,
     VAN_DATUM *data, flags_t flags) {
 	int ret, ret1;
 	VAN_OPERATION *op;
+	ticks_t tk;
 
-	ret = _van_table_op_create(table, &op, 0);
+	ret = _van_table_curticks(table, &tk);
+	CHK_ERR(ret);
+	ret = _van_table_op_create(table, &op, 0, tk);
 	CHK_ERR(ret);
 
 	ret = _van_table_op_get(op, key, data, flags);
@@ -583,8 +588,11 @@ err:
 int _van_table_del_record(VAN_TABLE *table, VAN_DATUM *key, flags_t flags) {
 	int ret, ret1;
 	VAN_OPERATION *op;
+	ticks_t tk;
 
-	ret = _van_table_op_create(table, &op, 0);
+	ret = _van_table_curticks(table, &tk);
+	CHK_ERR(ret);
+	ret = _van_table_op_create(table, &op, 0, tk);
 	CHK_ERR(ret);
 
 	ret = _van_table_op_del(op, key, flags);
@@ -1045,6 +1053,51 @@ err:
 	return (ret);
 }
 
+static int _van_table_set_inmem_threshold(VAN_TABLE *table, size_t threshold) {
+	table->inmem_threshold = threshold;
+	return 0;
+}
+
+static int _van_table_set_merge_config(VAN_TABLE *table, size_t merge_min, size_t merge_max) {
+	if (merge_min >0 && merge_max > 0 && merge_min > merge_max) {
+		merge_min = merge_max;
+	}
+	if (merge_min > 0) {
+		table->merge_cfg.merge_min = merge_min;
+	}
+	if (merge_max > 0) {
+		table->merge_cfg.merge_max = merge_max;
+	}
+	return 0;
+}
+
+static int _van_table_set_scan_interval(VAN_TABLE *table, size_t interval) {
+	if (interval > 0) {
+		table->nsleep = interval;
+	}
+	return 0;
+}
+
+static int _van_table_get_scan_interval(VAN_TABLE *table, size_t *interval) {
+	if (interval != NULL) {
+		*interval = table->nsleep;
+	}
+	return 0;
+}
+
+static int _van_set_compare_function(VAN_TABLE *table, VAN_DATUM_CMPFUNC cmp_func) {
+	if (F_ISSET(table, VAN_TABLE_OPENED)) {
+		return VAN_INVALID;
+	}
+	if (cmp_func != NULL) {
+		table->cmp_func = cmp_func;
+	}
+	return 0;
+}
+
+/* 
+Used for testing only. It will show the odt_items and odtpaths in the table.
+*/
 
 void _van_table_show_odt_items(VAN_TABLE *table, FILE *f) {
 	int i;

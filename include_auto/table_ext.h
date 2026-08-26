@@ -58,7 +58,7 @@ extern int _van_table_replace_odt_items(VAN_TABLE *table,
 extern void _van_table_show_odt_items(VAN_TABLE *table, FILE *f);
 
 /* src/table/van_table_dump.c */
-extern int _van_table_freeze(VAN_TABLE *table);
+extern int _van_table_freeze(VAN_TABLE *table, unsigned long checkgen);
 extern int _van_table_dump_frozen_init(VAN_TABLE *table);
 extern void *_van_table_frozen_dump_thread(void *arg);
 extern int _van_table_dump_join_init(VAN_TABLE *table);
@@ -80,7 +80,7 @@ extern void *_van_table_merge_job_run(void *arg);
 
 /* src/table/van_table_op.c */
 extern int _van_table_op_create(VAN_TABLE *table, VAN_OPERATION **tbopp,
-    flags_t cflag);
+    flags_t cflag, ticks_t tk);
 extern int _van_table_op_init(VAN_OPERATION *tbop);
 extern int _van_table_op_close(VAN_OPERATION *tbop);
 extern int _van_table_op_destory(VAN_OPERATION *tbop);

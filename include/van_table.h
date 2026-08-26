@@ -34,6 +34,10 @@ struct _van_table {
 	TAILQ_ENTRY(_van_table)	links;
 	VAN_STORE	*store;
 	uint32		tid;
+	/*
+	 this increases whenever a inmemtree is dumped 
+	*/
+	atomic_ulong	dumpgen;
 
 	INMEM_TREE	*active;
 	INMEM_TREE	*frozen;
@@ -103,13 +107,20 @@ struct _van_table {
 #define VAN_TABLE_SKIP_THREAD_START 0x01
 	flags_t		open_flags;
 
-	VAN_TABLE_CMPFUNC cmp_func;
+	VAN_DATUM_CMPFUNC cmp_func;
+	size_t inmem_threshold;
 	int (*open)(VAN_TABLE *, const char *, flags_t);
 	int (*close)(VAN_TABLE *, flags_t);
 	/* function handles */
 	int (*get)(VAN_TABLE *, VAN_DATUM *, VAN_DATUM *, flags_t);
 	int (*put)(VAN_TABLE *, VAN_DATUM *, VAN_DATUM *, flags_t);
 	int (*del)(VAN_TABLE *, VAN_DATUM *, flags_t);
+	int (*start_threads)(VAN_TABLE *);
+	int (*set_inmem_threshold)(VAN_TABLE *, size_t);
+	int (*set_merge_config)(VAN_TABLE *, size_t, size_t);
+	int (*set_scan_interval)(VAN_TABLE *, size_t);
+	int (*get_scan_interval)(VAN_TABLE *, size_t *);
+	int (*set_compare_function)(VAN_TABLE *, VAN_DATUM_CMPFUNC);
 };
 
 struct _van_table_odt_item {

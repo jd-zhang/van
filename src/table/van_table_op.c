@@ -20,7 +20,7 @@
 #include "van_ondisk_tree.h"
 
 int _van_table_op_create(VAN_TABLE *table, VAN_OPERATION **tbopp,
-    flags_t cflag) {
+    flags_t cflag, ticks_t tk) {
 	int ret;
 	VAN_OPERATION *tbop;
 
@@ -32,6 +32,7 @@ int _van_table_op_create(VAN_TABLE *table, VAN_OPERATION **tbopp,
 		return (ret);
 
 	tbop->table = table;
+	tbop->create_ticks = tk;
 	F_SET(tbop, cflag);
 	ret = _van_table_op_init(tbop);
 	if (ret == 0)
@@ -44,12 +45,8 @@ int _van_table_op_init(VAN_OPERATION *tbop) {
 	int ret;
 	VAN_TABLE *table;
 
-	/* create ticks */
-	ret = _van_table_curticks(tbop->table, &tbop->create_ticks);
-	if (ret != 0)
-		goto ret;
-
 	/* Member functions */
+	ret = 0;
 	tbop->get = _van_table_op_get;
 	tbop->put = _van_table_op_put;
 	tbop->del = _van_table_op_del;
@@ -62,7 +59,6 @@ int _van_table_op_init(VAN_OPERATION *tbop) {
 	VAN_MUTEX_UNLOCK(table, op_mtx, ret);
 
 	F_SET(tbop, VAN_OP_INITED);
-ret:
 	return (ret);
 }
 
@@ -99,18 +95,28 @@ int _van_table_op_del(VAN_OPERATION *tbop, VAN_DATUM *key, flags_t flags) {
 	int ret;
 	VAN_TABLE *table;
 	INMEM_TREE *active;
+	unsigned long expgen;
 
 	ret = 0;
 	table = tbop->table;
-	active = table->active;
 
 	/*
 	 * The active->del should return VAN_FROZEN after it is frozen,
 	 * before it is freed completely.
 	 */
-	while (active == NULL || (ret = active->del(active, key, flags)) == VAN_FROZEN) {
-		_van_yield();
-		active = table->active;
+	while (!table->closed) {
+		if (table->active == NULL) { 
+			_van_sleep(0, 1000);
+			continue;
+		}
+		expgen = atomic_load(&table->dumpgen);
+		ret = table->active->del(table->active, key, flags);
+		if	(ret == VAN_FROZEN || ret == VAN_INMEM_FULL) {
+			_van_table_freeze(table, expgen);
+			_van_sleep(0, 1000);
+			continue;
+		}
+		break;
 	}
 
 	return (ret);
@@ -121,17 +127,30 @@ int _van_table_op_put(VAN_OPERATION *tbop, VAN_DATUM *key,
 	int ret;
 	VAN_TABLE *table;
 	INMEM_TREE *active;
+	unsigned long expgen;
+	int loopcnt = 0;
 
 	ret = 0;
 	table = tbop->table;
-	active = table->active;
 	/*
 	 * The active->put should return VAN_FROZEN after it is frozen,
 	 * before it is freed completely.
 	 */
-	while (active == NULL || (ret = active->put(active, key, data, flags)) == VAN_FROZEN) {
-		_van_yield();
-		active = table->active;
+
+	while (!table->closed) {
+		loopcnt++;
+		if (table->active == NULL) { 
+			_van_sleep(0, 1000);
+			continue;
+		}
+		expgen = atomic_load(&table->dumpgen);
+		ret = table->active->put(table->active, key, data, flags);
+		if	(ret == VAN_FROZEN || ret == VAN_INMEM_FULL) {
+			_van_table_freeze(table, expgen);
+			_van_sleep(0, 1000);
+			continue;
+		}
+		break;
 	}
 
 	return (ret);

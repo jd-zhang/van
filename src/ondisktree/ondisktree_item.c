@@ -161,7 +161,7 @@ int _van_ondiskitem_cmp(const VAN_TABLE *table,
     const ONDISK_ITEM *item1, const ONDISK_ITEM *item2, int *cmp) {
 	VAN_DATUM dt1, dt2;
 	int ret, tofree1, tofree2;
-	VAN_TABLE_CMPFUNC cmp_func;
+	VAN_DATUM_CMPFUNC cmp_func;
 
 	tofree1 = 0;
 	tofree2 = 0;
@@ -170,7 +170,7 @@ int _van_ondiskitem_cmp(const VAN_TABLE *table,
 
 	ret = _van_datum_from_ondiskitem(table, item1, &dt1, &tofree1);
 	ret = _van_datum_from_ondiskitem(table, item2, &dt2, &tofree2);
-	*cmp = (*cmp_func)(table, &dt1, &dt2);
+	*cmp = (*cmp_func)(&dt1, &dt2);
 
 	return (ret);
 }

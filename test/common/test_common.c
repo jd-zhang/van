@@ -269,8 +269,8 @@ static int populate_data_with_expected(void *obj, char **keys, size_t *ksizes,
 				break;
 		}
 		if (ret != expected) {
-			fprintf(stderr, "Expected return: %d, got: %d\n",
-			    expected, ret);
+			fprintf(stderr, "loop:%d Expected return: %d, got: %d\n",
+			    i, expected, ret);
 			if(rret == 0)
 				rret = ret;
 		}
