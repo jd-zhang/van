@@ -113,6 +113,7 @@ void *_van_table_frozen_dump_thread(void *arg) {
 	item->trees[0] = odtree;
 	_van_table_curticks(table, &item->ticks);
 	F_SET(item, VAN_ITEM_INUSE);
+	F_CLR(item, VAN_ITEM_DUMPING);
 	VAN_MUTEX_UNLOCK(table, odt_mtx, ret);
 
 	table->frozen = NULL;

@@ -18,6 +18,7 @@
 extern int table_t1_1();
 extern int table_t1_1b();
 extern int table_t1_1c();
+extern int table_t1_1d();
 extern int table_t1_2();
 int main(int argc, char *argv[]) {
 	int ret;
@@ -36,6 +37,10 @@ int main(int argc, char *argv[]) {
 	}  else if (strcmp(argv[1], "table_t1_1c") == 0) {
 		fprintf(stderr, "============ table_t1_1c() ===========\n");
 		ret = table_t1_1c();
+		fprintf(stderr, "\n");
+	} else if (strcmp(argv[1], "table_t1_1d") == 0) {
+		fprintf(stderr, "============ table_t1_1d() ===========\n");
+		ret = table_t1_1d();
 		fprintf(stderr, "\n");
 	} else if (strcmp(argv[1], "table_t1_2") == 0) {
 		fprintf(stderr, "============ table_t1_2() ===========\n");

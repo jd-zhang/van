@@ -230,6 +230,89 @@ int table_t1_1c() {
 	return (ret);
 }
 
+/*
+ test populate_table using multi threads, 
+ but set inmem_threshold to a small value.
+ this will make dump/merge both happen.
+ */
+int table_t1_1d() {
+	VAN_TABLE *table;
+	VAN_STORE *store;
+	pthread_t threads[TB_T1_NUM];
+	POPULATE_DATA objs[TB_T1_NUM], *objp;
+	size_t each_cnt;
+	int i, ret, cnt;
+	void *rptr;
+	STRING_TESTDATA_DEFINE;
+
+	system("rm -fr test1*");
+	system("rm -fr vanlog.*");
+	ret = _van_store_create(&store);
+	CHK_RET(ret, "_van_store_create");
+	ret = store->open(store, ".", 0);
+	CHK_RET(ret, "_van_store_open");
+	ret = _van_table_create(store, &table);
+	CHK_RET(ret, "_van_table_create");
+	table->set_inmem_threshold(table, MEGABYTE);
+	table->set_merge_config(table, 4,6);
+	table->set_flags(table, VAN_TABLE_VERBOSE_MERGE);
+	ret = table->open(table, "test1", VAN_TABLE_SKIP_THREAD_START);
+	CHK_RET(ret, "_van_table_open");
+	ret = _van_table_start_threads(table);
+	CHK_RET(ret, "_van_table_start_threads");
+
+	memset(threads, 0, sizeof(threads));
+	if (is_cygwin()) {
+		cnt = 100000;
+	} else {
+		cnt = 1000000;
+	}
+	STRING_TESTDATA_INIT;
+	each_cnt = cnt / TB_T1_NUM;
+	memset(objs, 0, sizeof(objs));
+	for (i = 0; i < TB_T1_NUM; i++) {
+		objp = &objs[i];
+		objp->handle = table;
+		objp->keys = keys + i * each_cnt;
+		objp->ksizes = ksizes + i * each_cnt;
+		objp->values = values + i * each_cnt;
+		objp->vsizes = vsizes + i * each_cnt;
+		objp->cnt = each_cnt;
+	}
+
+	fprintf(stderr, "============ 1 generate %lu records =========\n",
+	    (unsigned long)cnt);
+	(void)generate_string_testdata(keys, ksizes, 20, 30, values, vsizes,
+	    50, 120, cnt);
+
+	fprintf(stderr, "============ 2 populate %lu records =========\n",
+	    (unsigned long)cnt);
+	for (i = 0; i < TB_T1_NUM; i++) {
+		ret = pthread_create(&threads[i], NULL,
+		    tb_t1_popthread, &objs[i]);
+	}
+
+	for (i = 0; i < TB_T1_NUM; i++) {
+		ret = pthread_join(threads[i], &rptr);
+	}
+
+	sleep(30);
+
+	fprintf(stderr, "============ 3 verify %lu records using table =========\n",
+	    (unsigned long)cnt);
+	ret = verify_table_data(table, keys, ksizes, values, vsizes, cnt);
+	CHK_RET(ret, "verify_table_data");
+
+	(void)free_string_testdata(keys, ksizes, values, vsizes, cnt);
+
+	ret = table->close(table, 0);
+	CHK_RET(ret, "table->close");
+	ret = store->close(store);
+	CHK_RET(ret, "store->close");
+
+	return (ret);
+}
+
 int table_t1_2() {
 	VAN_TABLE *table;
 	VAN_STORE *store;

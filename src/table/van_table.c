@@ -25,6 +25,9 @@ static int _van_table_set_merge_config(VAN_TABLE *table, size_t merge_min, size_
 static int _van_table_set_scan_interval(VAN_TABLE *table, size_t interval);
 static int _van_table_get_scan_interval(VAN_TABLE *table, size_t *interval);
 static int _van_set_compare_function(VAN_TABLE *table, VAN_DATUM_CMPFUNC cmp_func);
+static int _van_table_get_flags(VAN_TABLE *table, flags_t *flags);
+static int _van_table_set_flags(VAN_TABLE *table, flags_t flags);
+
 int _van_table_create(VAN_STORE *store, VAN_TABLE **tablep) {
 	int ret;
 	VAN_TABLE *table;
@@ -147,6 +150,8 @@ static void _van_table_set_functions(VAN_TABLE *table) {
 	table->open = _van_table_open;
 	table->close = _van_table_close;
 	table->start_threads = _van_table_start_threads;
+	table->set_flags = _van_table_set_flags;
+	table->get_flags = _van_table_get_flags;
 	table->cmp_func = _van_datum_defcmp;
 	table->set_inmem_threshold = _van_table_set_inmem_threshold;
 	table->set_merge_config = _van_table_set_merge_config;
@@ -399,11 +404,21 @@ err:
 
 }
 
-int _van_table_set_flags(VAN_TABLE *table, flags_t flags) {
+static int _van_table_set_flags(VAN_TABLE *table, flags_t flags) {
 	int ret;
 	ret = 0;
 
 	table->flags |= flags;
+
+	return ret;
+}
+
+static int _van_table_get_flags(VAN_TABLE *table, flags_t *flagsp) {
+	int ret;
+	ret = 0;
+
+	VAN_ASSERT(flagsp != NULL);
+	*flagsp = table->flags;
 
 	return ret;
 }

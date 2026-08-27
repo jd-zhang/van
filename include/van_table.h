@@ -101,6 +101,9 @@ struct _van_table {
 
 #define VAN_TABLE_INITED	0x01
 #define	VAN_TABLE_OPENED	0x02
+#define VAN_TABLE_VERBOSE_DUMP	0x04  /* verbose info for dump frozen */
+#define VAN_TABLE_VERBOSE_MERGE	0x08 /* verbose info for merge scan */
+#define VAN_TABLE_VERBOSE_FREE 0x10 /* verbose info for free frozen */
 	flags_t		flags;
 	int	closed;
 
@@ -116,6 +119,8 @@ struct _van_table {
 	int (*put)(VAN_TABLE *, VAN_DATUM *, VAN_DATUM *, flags_t);
 	int (*del)(VAN_TABLE *, VAN_DATUM *, flags_t);
 	int (*start_threads)(VAN_TABLE *);
+	int (*set_flags)(VAN_TABLE *, flags_t);
+	int (*get_flags)(VAN_TABLE *, flags_t *);
 	int (*set_inmem_threshold)(VAN_TABLE *, size_t);
 	int (*set_merge_config)(VAN_TABLE *, size_t, size_t);
 	int (*set_scan_interval)(VAN_TABLE *, size_t);

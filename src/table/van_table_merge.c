@@ -77,6 +77,10 @@ int _van_table_merge_scan(VAN_TABLE *table) {
 	low = 0;
 	cnt = 0;
 
+	if (F_ISSET(table, VAN_TABLE_VERBOSE_MERGE)) {
+		fprintf(stderr, "merge_cfg: %d %d\n", (int)merge_cfg->merge_min,
+			(int)merge_cfg->merge_max);
+	}
 	// fprintf(stderr, "_van_table_merge_scan\n");
 	VAN_ASSERT(atomic_load(&table->mergecnt) == 0);
 	while (cur_indx >= 0 && !table->closed) {
@@ -85,6 +89,9 @@ int _van_table_merge_scan(VAN_TABLE *table) {
 		clear = 0;
 		item = &table->odt_items[cur_indx];
 		VAN_MUTEX_LOCK(item, mutex, ret);
+		if (F_ISSET(table, VAN_TABLE_VERBOSE_MERGE)) {
+			fprintf(stderr, "checking: %s\n", item->trees[0]->meta->file_path);
+		}
 		if (F_ISSET(item,
 		    VAN_ITEM_MERGING | VAN_ITEM_MERGED | VAN_ITEM_DUMPING)) {
 			/* See a item that is not a candidate. */
@@ -119,7 +126,10 @@ int _van_table_merge_scan(VAN_TABLE *table) {
 			reset = 1;
 
 			atomic_fetch_add(&table->mergecnt, 1);
-
+			if (F_ISSET(table, VAN_TABLE_VERBOSE_MERGE)) {
+				fprintf(stderr, "_van_table_new_merge_job(%d,%d,%d)\n",
+					low,high, cnt);
+			}
 			ret = _van_table_new_merge_job(table, low,
 			    high, cnt);
 			if (ret != 0) {
