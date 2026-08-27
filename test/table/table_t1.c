@@ -296,12 +296,20 @@ int table_t1_1d() {
 		ret = pthread_join(threads[i], &rptr);
 	}
 
-	sleep(30);
-
-	fprintf(stderr, "============ 3 verify %lu records using table =========\n",
+	fprintf(stderr, "============ 3 verify %lu records using table during merging =========\n",
 	    (unsigned long)cnt);
+	for (i = 0; i < 30; i++) {
+		fprintf(stderr, "============ loop.%d verify %lu records using table =========\n",
+		    i, (unsigned long)cnt);
+		ret = verify_table_data(table, keys, ksizes, values, vsizes, cnt);
+		CHK_RET(ret, "verify_table_data");
+		_van_table_show_odt_items(table, stderr);
+
+	}
+	/*
 	ret = verify_table_data(table, keys, ksizes, values, vsizes, cnt);
 	CHK_RET(ret, "verify_table_data");
+	*/
 
 	(void)free_string_testdata(keys, ksizes, values, vsizes, cnt);
 
