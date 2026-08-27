@@ -153,6 +153,8 @@ int table_t1_1b() {
  test populate_table using multi threads, 
  but set inmem_threshold to a small value, and
  set merge_config to big values, to make dump but avoid merging.
+
+ also, verify records using table->get()
  */
 int table_t1_1c() {
 	VAN_TABLE *table;
@@ -234,6 +236,8 @@ int table_t1_1c() {
  test populate_table using multi threads, 
  but set inmem_threshold to a small value.
  this will make dump/merge both happen.
+
+ keep verifying records during the dumping and merging process.
  */
 int table_t1_1d() {
 	VAN_TABLE *table;
@@ -321,6 +325,14 @@ int table_t1_1d() {
 	return (ret);
 }
 
+/*
+ Test populate_table using multiple threads with a small inmem_threshold
+ (1MB), so that data is dumped to disk during populate.
+
+ Verify the records using the table interface right after populate, then
+ close and reopen the table with threads auto-started to verify the
+ records are restored from the ondisk files, then print the log names.
+ */
 int table_t1_2() {
 	VAN_TABLE *table;
 	VAN_STORE *store;
@@ -360,9 +372,13 @@ int table_t1_2() {
 		objp->cnt = each_cnt;
 	}
 
+	fprintf(stderr, "============ 1 generate %lu records =========\n",
+	    (unsigned long)cnt);
 	(void)generate_string_testdata(keys, ksizes, 20, 30, values, vsizes,
 	    50, 120, cnt);
 
+	fprintf(stderr, "============ 2 populate %lu records =========\n",
+	    (unsigned long)cnt);
 	for (i = 0; i < TB_T1_NUM; i++) {
 		ret = pthread_create(&threads[i], NULL,
 		    tb_t1_popthread, &objs[i]);
@@ -372,18 +388,40 @@ int table_t1_2() {
 		ret = pthread_join(threads[i], &rptr);
 	}
 
-	(void)free_string_testdata(keys, ksizes, values, vsizes, cnt);
+	fprintf(stderr, "============ 3 verify %lu records using table =========\n",
+	    (unsigned long)cnt);
+	ret = verify_table_data(table, keys, ksizes, values, vsizes, cnt);
+	CHK_RET(ret, "verify_table_data");
 
+	fprintf(stderr, "============ 4 close table =========\n");
 	ret = table->close(table, 0);
 	CHK_RET(ret, "table->close");
 	ret = store->close(store);
 	CHK_RET(ret, "store->close");
+	table = NULL;
+	store = NULL;
 
+	fprintf(stderr, "============ 5 reopen table from ondisk =========\n");
 	ret = _van_store_create(&store);
 	CHK_RET(ret, "_van_store_create");
 	ret = store->open(store, ".", 0);
 	CHK_RET(ret, "_van_store_open");
+	ret = _van_table_create(store, &table);
+	CHK_RET(ret, "_van_table_create");
+	ret = table->open(table, "test1", 0);
+	CHK_RET(ret, "_van_table_open");
+
+	fprintf(stderr, "============ 6 verify %lu records after reopen =========\n",
+	    (unsigned long)cnt);
+	ret = verify_table_data(table, keys, ksizes, values, vsizes, cnt);
+	CHK_RET(ret, "verify_table_data");
+
+	(void)free_string_testdata(keys, ksizes, values, vsizes, cnt);
+
+	fprintf(stderr, "============ 7 print log file names =========\n");
 	ret = _van_strarray_print(store->log_handle->lognames, stderr, "\n");
+	ret = table->close(table, 0);
+	CHK_RET(ret, "table->close");
 	ret = store->close(store);
 	CHK_RET(ret, "store->close");
 
