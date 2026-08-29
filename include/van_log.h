@@ -59,6 +59,28 @@ extern "C" {
 #define VAN_LOGPUT_ONE_EMPTY 2
 #define VAN_LOGPUT_TWO_EMPTY 3
 
+/*
+ * Log record types.
+ *
+ * These mirror the logspec definitions kept in the per-module .logspec
+ * files under src/. Since the logspec generator is not in-tree, the
+ * constants and the record specs are maintained by hand (see
+ * src/van_rec.c).
+ */
+#define VAN_INMEMTREE_PUT	1
+#define VAN_INMEMTREE_DEL	2
+
+#define VAN_STORE_TABOPEN	21
+#define VAN_STORE_TABIDS	22
+
+#define VAN_TXN_CKPT		41
+#define VAN_TXN_BEGIN		42
+#define VAN_TXN_END		43
+
+/* Transaction end record: the "op" field */
+#define VAN_OP_ABORT		1
+#define VAN_OP_COMMIT		2
+
 struct _van_logfile_header {
 	uint32 version;
 	uint32 logsize;

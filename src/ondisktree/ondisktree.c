@@ -186,6 +186,15 @@ int _van_ondisktree_close(ONDISK_TREE *tree, flags_t flags) {
 		return (ret);
 
 	store = tree->table->store;
+	/*
+	 * Wait for in-flight operations (e.g. table gets) that hold a
+	 * reference on this tree to finish before tearing the tree down.
+	 * The reference is taken by the operation while holding the
+	 * table odt item lock and released once the operation is done,
+	 * so the wait is short.
+	 */
+	while (atomic_load(&tree->refcount) > 0)
+		_van_sleep(1, 0);
 	/* Put the cache */
 	while ((block = TAILQ_FIRST(&tree->odfile.head)) != NULL) {
 		TAILQ_REMOVE(&tree->odfile.head, block, tree_links);

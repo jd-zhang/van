@@ -33,14 +33,14 @@ int _van_ondisktree_key_docmp(ONDISK_TREECURSOR *cursor,
 	switch(k2->type) {
 		case OD_VARCHAR:
 			datum.data = k2->data;
-			datum.size = k2->len;
+			datum.size = (int)k2->len;
 			break;
 		case OD_FILE:
 			ret = _van_file_openreadall(k2->data,
 			    &datum.data, &fsize);
 			if (ret != 0)
 				break;
-			datum.size = fsize;
+			datum.size = (int)fsize;
 			isfile = 1;
 			break;
 		default:

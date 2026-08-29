@@ -30,6 +30,7 @@ VAN_OBJS=\
 	 inmemtree_split.o inmemtree_stat.o inmemtree_traverse.o \
 	 lock.o \
 	 van_log_cursor.o van_log_file.o van_log_open.o van_log_record.o \
+	 van_rec.o \
 	 mutex_debug.o \
 	 ondisktree.o ondisktree_build.o ondisktree_cache.o \
 	 ondisktree_compare.o ondisktree_cursor.o ondisktree_debug.o \
@@ -111,6 +112,10 @@ van_log_file.o: src/log/van_log_file.c
 van_log_open.o: src/log/van_log_open.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $?
 van_log_record.o: src/log/van_log_record.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $?
+
+# src/van_rec.c
+van_rec.o: src/van_rec.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $?
 
 # src/mutex

@@ -22,6 +22,7 @@ extern "C" {
 
 struct _van_operation {
 	VAN_TABLE *table;
+	VAN_TXN *txn;	/* The owning transaction, NULL if non-transactional */
 	TAILQ_ENTRY(_van_operation) links;
 
 	ticks_t create_ticks;

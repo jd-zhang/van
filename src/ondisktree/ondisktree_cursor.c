@@ -33,7 +33,8 @@ int _van_ondisktree_cursor_init(ONDISK_TREE *tree,
 	cursor->tree = tree;
 	cursor->table = tree->table;
 	cursor->page = NULL;
-	cursor->indx = INVALID_CURSOR_INDX;
+	/* indx is uint32; make the unsigned -1 sentinel explicit. */
+	cursor->indx = (uint32)INVALID_CURSOR_INDX;
 	cursor->flags = flags;
 
 	/* Only support get function */

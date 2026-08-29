@@ -25,8 +25,21 @@ struct _van_txn {
 	VAN_LSN	first_lsn;
 	VAN_LSN	last_lsn;
 
+	VAN_TABLE *table;
 	INMEM_TREE *tree;
 };
+
+#define VAN_TXN_TRANSIENT	0x01	/* Do not write log records */
+
+/* Transaction interfaces */
+int van_txn_begin(VAN_TABLE *table, flags_t flags, VAN_TXN **txnpp);
+int van_txn_commit(VAN_TXN *txnp, flags_t flags);
+int van_txn_abort(VAN_TXN *txnp, flags_t flags);
+int van_txn_put(VAN_TXN *txnp, VAN_DATUM *key, VAN_DATUM *data,
+    flags_t flags);
+int van_txn_get(VAN_TXN *txnp, VAN_DATUM *key, VAN_DATUM *data,
+    flags_t flags);
+int van_txn_del(VAN_TXN *txnp, VAN_DATUM *key, flags_t flags);
 
 #ifdef __cplusplus
 }

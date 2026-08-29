@@ -277,7 +277,7 @@ void *_van_table_merge_job_run(void *arg) {
 	VAN_TABLE_MERGE_JOB *job;
 	VAN_TABLE *table;
 	VAN_TABLE_ODT_ITEM *item;
-	ONDISK_TREE *tree, *lowtree, **trees, *restree;
+	ONDISK_TREE *tree, **trees, *restree;
 	int i, ret, idx;
 	ticks_t minopticks, merged_ticks;
 
@@ -316,8 +316,6 @@ void *_van_table_merge_job_run(void *arg) {
 
 	ret = _van_ondisktree_merge(table, trees, job->cnt, &restree);
 	/* TODO: check error ret */
-	item = &table->odt_items[job->low];
-	item->trees[1] = restree;
 
 	/* Set the merged ticks to guide the search */
 	for (i = job->low; i<= job->high; i++) {
@@ -325,6 +323,13 @@ void *_van_table_merge_job_run(void *arg) {
 		if (!F_ISSET(item, VAN_ITEM_MERGING))
 			continue;
 		VAN_MUTEX_LOCK(item, mutex, ret);
+		/*
+		 * Attach the result tree under the item lock so that a
+		 * concurrent get that reads VAN_ITEM_MERGED also sees a
+		 * valid trees[1].
+		 */
+		if (i == job->low)
+			item->trees[1] = restree;
 		item->merged_ticks = job->max_ticks;
 		item->merged_indx = job->low;
 		F_SET(item, VAN_ITEM_MERGED);
@@ -344,9 +349,7 @@ void *_van_table_merge_job_run(void *arg) {
 		 * will not access the trees used for merging.
 		 */
 		if (minopticks > merged_ticks) {
-			/* Is this atomic ? */
 			item = &table->odt_items[job->low];
-			lowtree = item->trees[0];
 			VAN_MUTEX_LOCK(item, mutex, ret);
 			item->trees[0] = item->trees[1];
 			item->trees[1] = NULL;

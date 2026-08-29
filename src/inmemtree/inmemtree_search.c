@@ -52,8 +52,8 @@ int _van_inmemtree_search(INMEM_TREECURSOR *imc, VAN_DATUM *key,
 	INMEM_CHILD **childs;
 	INMEM_BINTERNAL *internal;
 	INMEM_BLEAF *leaf;
-	size_t sz, sp, ep, findx, mid;
-	size_t expgen, curgen;
+	int sp, ep, findex, mid;
+	size_t sz, expgen, curgen;
 	int cmp, clevel, wlock, use_old;
 
 	use_old = 0;

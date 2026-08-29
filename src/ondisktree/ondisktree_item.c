@@ -50,9 +50,9 @@ int _van_ondiskitem_from_inmemkey(ONDISK_TREE *tree, const INMEM_KEY *key,
 	else
 		item->type = OD_VARCHAR;
 	item->flags = key->flags;
-	item->len = datum.size;
+	item->len = (uint32)datum.size;
 	if (datum.size > 0)
-		memcpy(item->data, datum.data, datum.size);
+		memcpy(item->data, datum.data, (size_t)datum.size);
 
 	*itemp = item;
 
@@ -98,9 +98,9 @@ int _van_ondiskitem_from_inmemdata(ONDISK_TREE *tree, const INMEM_DATA *data,
 	else
 		item->type = OD_VARCHAR;
 	item->flags = data->flags;
-	item->len = datum.size;
+	item->len = (uint32)datum.size;
 	if (datum.size > 0)
-		memcpy(item->data, datum.data, datum.size);
+		memcpy(item->data, datum.data, (size_t)datum.size);
 
 	*itemp = item;
 

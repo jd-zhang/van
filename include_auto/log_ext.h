@@ -31,6 +31,7 @@ extern int _van_log_newfile(VAN_LOG *logp);
 extern int _van_log_openfile(VAN_LOG *logp, uint32 fnum,
     VAN_LOGFILE_INFO **infopp);
 extern int _van_logc_openfile(VAN_LOG_CURSOR *lgc, VAN_LSN *lsn);
+extern int _van_log_flush(VAN_LOG *logp);
 
 /* src/log/van_log_open.c */
 extern int _van_log_open(VAN_STORE *store);

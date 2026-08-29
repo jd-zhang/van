@@ -90,7 +90,6 @@ void *_van_table_frozen_dump_thread(void *arg) {
 	VAN_TABLE_ODT_ITEM *item;
 	ONDISK_TREE *odtree;
 	INMEM_TREE *frozen;
-	size_t indx;
 
 	item = NULL;
 	odtree = NULL;
@@ -107,13 +106,20 @@ void *_van_table_frozen_dump_thread(void *arg) {
 	ret = _van_table_write_odt_paths(table);
 	CHK_ERR(ret);
 
-	VAN_MUTEX_LOCK(table, odt_mtx, ret);
-	indx = table->odt_top - 1;
-	item = &table->odt_items[indx];
+	/*
+	 * Fully initialize the item under item->mutex (the same lock
+	 * readers use) and only then publish it by bumping odt_top, so
+	 * a concurrent get can never see trees[0] == NULL.
+	 */
+	VAN_MUTEX_LOCK(item, mutex, ret);
 	item->trees[0] = odtree;
 	_van_table_curticks(table, &item->ticks);
 	F_SET(item, VAN_ITEM_INUSE);
 	F_CLR(item, VAN_ITEM_DUMPING);
+	VAN_MUTEX_UNLOCK(item, mutex, ret);
+
+	VAN_MUTEX_LOCK(table, odt_mtx, ret);
+	table->odt_top++;
 	VAN_MUTEX_UNLOCK(table, odt_mtx, ret);
 
 	table->frozen = NULL;

@@ -61,6 +61,9 @@ struct _van_store {
 	/* log */
 	VAN_LOG		*log_handle;
 
+	/* Transaction id allocation, store-wide (unique across tables) */
+	atomic_uint	txnid;
+
 	/* Recovery */
 	VAN_DISTAB   recover_dtab;
 

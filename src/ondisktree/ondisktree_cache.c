@@ -22,9 +22,9 @@
 
 int _van_ondisk_cache_init(VAN_STORE *store) {
 	int ret, ret1;
-	size_t i;
+	int i;
 
-	ret = _van_calloc(NULL, store->cache_header_size,
+	ret = _van_calloc(NULL, (size_t)store->cache_header_size,
 	    sizeof(ONDISK_CACHE_HEADER), &store->cache_header);
 	if (ret != 0)
 		return (ret);
@@ -41,7 +41,7 @@ int _van_ondisk_cache_init(VAN_STORE *store) {
 int _van_ondisk_cache_destroy(VAN_STORE *store) {
 	int ret, ret1;
 	ONDISK_CACHE_BLOCK *block;
-	size_t i;
+	int i;
 
 	ret = 0;
 	for (i = 0; i < store->cache_header_size; i++) {

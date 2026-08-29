@@ -21,7 +21,7 @@
 int _van_inmemtree_dump_leaf(INMEM_TREE *im_tree,
     INMEM_BLEAF *leaf, FILE *f) {
 	int ret;
-	size_t i, n;
+	size_t i;
 	INMEM_KEY **keys;
 	INMEM_DATA **values;
 
@@ -46,7 +46,7 @@ int _van_inmemtree_dump_leaf(INMEM_TREE *im_tree,
 int _van_inmemtree_dump_internal(INMEM_TREE *im_tree,
     INMEM_BINTERNAL *internal, int recursive, FILE *f) {
 	int ret;
-	size_t i, n;
+	size_t i;
 	INMEM_KEY **keys;
 	INMEM_CHILD **childs;
 

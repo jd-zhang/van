@@ -79,7 +79,8 @@ int _van_ondisktree_buildinfo_clean(ONDISK_TREE *od_tree) {
 
 int _van_ondisktree_store_finalize(ONDISK_TREE *od_tree) {
 	int ret;
-	size_t i, toplevel, sumsize, sumtotal;
+	int i, toplevel;
+	size_t sumsize, sumtotal;
 	ONDISK_BUILDINFO *bi;
 	ONDISK_HEADER *page;
 	ONDISK_META *meta;
@@ -116,8 +117,8 @@ int _van_ondisktree_store_finalize(ONDISK_TREE *od_tree) {
 	}
 
 	/* Now write the meta */
-	meta->nlevel = bi->toplevel + 1;
-	meta->nrecs = bi->nrecs;
+	meta->nlevel = (uint32)(bi->toplevel + 1);
+	meta->nrecs = (uint64)bi->nrecs;
 	meta->root_blkid = bi->root_blkid;
 	meta->first_blkid = bi->first_blkid;
 	meta->last_blkid = bi->last_blkid;

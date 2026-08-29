@@ -899,8 +899,12 @@ int _van_table_new_dumpfile(VAN_TABLE *table,
 	indx = table->odt_top;
 	item = &table->odt_items[indx];
 	(void)_van_table_clear_odtitem(table, item);
-	F_SET(item, VAN_ITEM_DUMPING);
-	F_CLR(item, VAN_ITEM_UNUSED);
+	/*
+	 * Keep the item VAN_ITEM_UNUSED here.  The caller must fully
+	 * initialize the item (under item->mutex) and only then publish
+	 * it by bumping table->odt_top (under odt_mtx), so that readers
+	 * can never see a half-initialized item with trees[0] == NULL.
+	 */
 
 	odtree = NULL;
 	memset(filepath, 0, sizeof(filepath));
@@ -913,7 +917,6 @@ int _van_table_new_dumpfile(VAN_TABLE *table,
 	CHK_ERR(ret);
 	*itemp = item;
 	*odtreep = odtree;
-	table->odt_top++;
 
 	if (0) {
 err:
@@ -928,9 +931,12 @@ ret:
 int _van_table_dump_frozen(VAN_TABLE *table, ONDISK_TREE **odtreep) {
 	VAN_TABLE_ODT_ITEM *item;
 	ONDISK_TREE *odtree;
-	int ret;
+	int ret, ret1;
 
 	/* TODO: Mutex handling carefully. */
+
+	item = NULL;
+	odtree = NULL;
 
 	if (table->frozen == NULL)
 		return 0;
@@ -939,14 +945,27 @@ int _van_table_dump_frozen(VAN_TABLE *table, ONDISK_TREE **odtreep) {
 	CHK_ERR(ret);
 	VAN_MUTEX_LOCK(item, mutex, ret);
 	ret = _van_ondisktree_store_inmem(odtree, table->frozen);
-	CHK_ERR(ret);
+	if (ret != 0) {
+		VAN_MUTEX_UNLOCK(item, mutex, ret1);
+		goto err;
+	}
 	item->trees[0] = odtree;
 	F_CLR(item, VAN_ITEM_DUMPING);
 	F_SET(item, VAN_ITEM_INUSE);
 	ret =  _van_table_curticks(table, &item->ticks);
-	CHK_ERR(ret);
+	if (ret != 0) {
+		VAN_MUTEX_UNLOCK(item, mutex, ret1);
+		goto err;
+	}
 	*odtreep = odtree;
 	VAN_MUTEX_UNLOCK(item, mutex, ret);
+	/*
+	 * Publish the item only after it is fully initialized, so a
+	 * concurrent reader can never see trees[0] == NULL.
+	 */
+	VAN_MUTEX_LOCK(table, odt_mtx, ret);
+	table->odt_top++;
+	VAN_MUTEX_UNLOCK(table, odt_mtx, ret);
 err:
 	return (ret);
 

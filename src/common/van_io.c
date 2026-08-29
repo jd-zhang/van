@@ -430,8 +430,8 @@ int _van_iofile_set(VAN_IOFILE *iofile, off_t off, uint32 size, char c) {
 	off_t woff;
 
 	ret = 0;
-	memset(buf, (int)c, bufsz);
 	bufsz = sizeof(buf);
+	memset(buf, (int)c, bufsz);
 	left = size;
 	woff = off;
 

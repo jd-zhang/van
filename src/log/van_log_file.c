@@ -274,3 +274,34 @@ err:
 
 	return (ret);
 }
+
+/*
+ * _van_log_flush --
+ *	Flush (fsync) the current log file to stable storage.
+ *	Called at transaction commit to guarantee durability.
+ */
+int _van_log_flush(VAN_LOG *logp) {
+	int ret, locked;
+	VAN_IOFILE *logfile;
+
+	ret = 0;
+	locked = 0;
+	if (logp == NULL)
+		return (0);
+
+	VAN_MUTEX_LOCK(logp, mutex, ret);
+	CHK_ERR(ret);
+	locked = 1;
+
+	logfile = logp->cur_logfile;
+	if (logfile == NULL)
+		goto err;
+
+	ret = _van_file_fsync(logfile->fd);
+err:
+	if (locked) {
+		VAN_MUTEX_UNLOCK(logp, mutex, ret);
+		locked = 0;
+	}
+	return (ret);
+}

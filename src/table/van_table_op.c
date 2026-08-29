@@ -18,6 +18,7 @@
 
 #include "van_inmem_tree.h"
 #include "van_ondisk_tree.h"
+#include "van_rec.h"
 
 int _van_table_op_create(VAN_TABLE *table, VAN_OPERATION **tbopp,
     flags_t cflag, ticks_t tk) {
@@ -96,10 +97,28 @@ int _van_table_op_del(VAN_OPERATION *tbop, VAN_DATUM *key, flags_t flags) {
 	VAN_TABLE *table;
 	INMEM_TREE *active;
 	unsigned long expgen;
+	VAN_LSN lsn;
+	uint32 size;
 
 	ret = 0;
 	table = tbop->table;
+	INIT_LSN(&lsn);
 
+	/*
+	 * WAL: write the del log record before modifying the in-memory
+	 * tree so the change can be replayed on recovery. The txnid of
+	 * the owning transaction is attached by _van_put_logrecord
+	 * (0 for non-transactional operations). TRANSIENT operations
+	 * are not logged.
+	 */
+	if (!F_ISSET(tbop, VAN_OP_TRANSIENT)) {
+		size = _van_calc_logrec_size(_inmemtree_del_recspec, key);
+		ret = _van_put_logrecord(table->store, table, tbop->txn,
+		    &lsn, flags, VAN_INMEMTREE_DEL, size,
+		    _inmemtree_del_recspec, key);
+		if (ret != 0)
+			return (ret);
+	}
 	/*
 	 * The active->del should return VAN_FROZEN after it is frozen,
 	 * before it is freed completely.
@@ -129,9 +148,28 @@ int _van_table_op_put(VAN_OPERATION *tbop, VAN_DATUM *key,
 	INMEM_TREE *active;
 	unsigned long expgen;
 	int loopcnt = 0;
+	VAN_LSN lsn;
+	uint32 size;
 
 	ret = 0;
 	table = tbop->table;
+	INIT_LSN(&lsn);
+
+	/*
+	 * WAL: write the put log record before modifying the in-memory
+	 * tree so the change can be replayed on recovery. The txnid of
+	 * the owning transaction is attached by _van_put_logrecord
+	 * (0 for non-transactional operations). TRANSIENT operations
+	 * are not logged.
+	 */
+	if (!F_ISSET(tbop, VAN_OP_TRANSIENT)) {
+		size = _van_calc_logrec_size(_inmemtree_put_recspec, key, data);
+		ret = _van_put_logrecord(table->store, table, tbop->txn,
+		    &lsn, flags, VAN_INMEMTREE_PUT, size,
+		    _inmemtree_put_recspec, key, data);
+		if (ret != 0)
+			return (ret);
+	}
 	/*
 	 * The active->put should return VAN_FROZEN after it is frozen,
 	 * before it is freed completely.
@@ -266,19 +304,33 @@ int _van_table_op_get(VAN_OPERATION *tbop, VAN_DATUM *key,
 			}
 		}
 unlock_item:
+	if (gonext) {
 		VAN_MUTEX_UNLOCK(citem, mutex, ret);
-		if (gonext)
-			continue;
-
-		ret = odtree->getraw(odtree, key, data, flags);
-		if (ret == 0 || ret == VAN_DELETED)
-			break;
-
-		if (ret != VAN_NOTFOUND && ret != VAN_STALE)
-			break;
-
-		cur_indx--;
+		continue;
 	}
+
+	/*
+	 * Take a reference on the ondisk tree while holding the item
+	 * lock.  A concurrent merge job that has finished with this
+	 * tree will clear the item (under the same lock) and then close
+	 * and destroy the tree; the reference guarantees the tree stays
+	 * alive while we search it below.  The reference is released
+	 * right after the search returns.
+	 */
+	VAN_ASSERT(odtree != NULL);
+	atomic_fetch_add(&odtree->refcount, 1);
+	VAN_MUTEX_UNLOCK(citem, mutex, ret);
+
+	ret = odtree->getraw(odtree, key, data, flags);
+	atomic_fetch_sub(&odtree->refcount, 1);
+	if (ret == 0 || ret == VAN_DELETED)
+		break;
+
+	if (ret != VAN_NOTFOUND && ret != VAN_STALE)
+		break;
+
+	cur_indx--;
+}
 
 ret:
 	return (ret);
