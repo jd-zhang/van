@@ -138,9 +138,7 @@ extern int _van_inmemtree_ret(INMEM_TREECURSOR *cursor,
 
 /* src/inmemtree/inmemtree_search.c */
 extern int _van_inmemtree_search(INMEM_TREECURSOR *imc,
-    VAN_DATUM *key, int dest_level, flags_t flags);
-extern int _van_inmemtree_search_node(INMEM_TREECURSOR *imc,
-    VAN_DATUM *key, int dest_level, flags_t flags);
+    VAN_DATUM *key, size_t dest_level, flags_t flags);
 
 /* src/inmemtree/inmemtree_split.c */
 extern int _van_inmemtree_split_bleaf(INMEM_TREE *im_tree, INMEM_BLEAF *leaf,

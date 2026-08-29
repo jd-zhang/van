@@ -159,6 +159,7 @@ int _van_table_merge_scan(VAN_TABLE *table) {
 	while (atomic_load(&table->mergecnt) > 0) {
 		_van_sleep(2, 0);
 	}
+	VAN_ASSERT(atomic_load(&table->mergecnt) == 0);
 
 	/* Grape all the threads */
 	ret = _van_table_merge_clean(table);

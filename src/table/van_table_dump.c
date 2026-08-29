@@ -209,7 +209,7 @@ void *_van_table_dump_join_thread(void *arg) {
 			prejob = NULL;
 		}
 		VAN_MUTEX_UNLOCK(table, dump_mutex, ret);
-		if (table->closed && TAILQ_FIST(&table->dump_jobs) == NULL)
+		if (table->closed && TAILQ_FIRST(&table->dump_jobs) == NULL)
 			break;
 
 		/* Temporarily sleeping here. */

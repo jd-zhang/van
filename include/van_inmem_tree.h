@@ -81,7 +81,7 @@ struct _inmem_tree {
 
 	size_t		rootgen;
 	size_t		nlevel;
-	size_t		maxlevel;
+	size_t		maxlevel; // not used currently ?
 
 	/*
 	 * The life cycle of a in-memory tree:
@@ -197,7 +197,7 @@ struct _inmem_treecursor {
 struct _inmem_bnode {
 	TAILQ_ENTRY(_inmem_bnode) links;
 	int type;
-	int level;
+	size_t level;
 	size_t capacity;
 	size_t size;
 	size_t gen;
@@ -220,7 +220,7 @@ struct _inmem_bnode {
 struct _inmem_binternal {
 	TAILQ_ENTRY(_inmem_bnode) links;
 	int type;
-	int level;
+	size_t level;
 	size_t capacity;
 	size_t size;	/* size means the number of childs here. */
 	size_t gen;
@@ -234,7 +234,7 @@ struct _inmem_binternal {
 struct _inmem_bleaf {
 	TAILQ_ENTRY(_inmem_bnode) links;
 	int type;
-	int level;
+	size_t level;
 	size_t capacity;
 	size_t size;
 	size_t gen;

@@ -41,7 +41,7 @@
  *     VAN_SET_RANGE: return 0 (VAN_NOTFOUND, if out of indexes).
  */
 int _van_inmemtree_search(INMEM_TREECURSOR *imc, VAN_DATUM *key,
-    int dest_level, flags_t flags) {
+    size_t dest_level, flags_t flags) {
 	int ret, ret1;
 	INMEM_TREE *im_tree;
 	INMEM_CONFIG *im_config;
@@ -53,8 +53,8 @@ int _van_inmemtree_search(INMEM_TREECURSOR *imc, VAN_DATUM *key,
 	INMEM_BINTERNAL *internal;
 	INMEM_BLEAF *leaf;
 	int sp, ep, findx, mid;
-	size_t sz, expgen, curgen;
-	int cmp, clevel, wlock, use_old;
+	size_t sz, expgen, curgen, clevel;
+	int cmp, wlock, use_old;
 
 	use_old = 0;
 	if (imc->node != NULL) {
