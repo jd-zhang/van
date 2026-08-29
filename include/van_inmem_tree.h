@@ -37,7 +37,7 @@ typedef int (*INMEM_TRAVERSE_FUNC)(void *firstarg, const INMEM_KEY *key,
 #define IM_BASE_LEVEL	1
 struct _inmem_config {
 	size_t	node_capacity;
-	int	base_level;
+	size_t	base_level;
 #define IM_DEF_SPLIT_POINT	3
 	size_t	split_point;
 	VAN_DATUM_CMPFUNC	cmp_func;
@@ -80,8 +80,8 @@ struct _inmem_tree {
 	size_t		threshold;
 
 	size_t		rootgen;
-	int		nlevel;
-	int		maxlevel;
+	size_t		nlevel;
+	size_t		maxlevel;
 
 	/*
 	 * The life cycle of a in-memory tree:
