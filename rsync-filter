@@ -1,0 +1,10 @@
+# 排除编译产物和备份文件
+*.o
+*.exe
+*.out
+*.a
+*.so
+*.dll
+*~
+*.stackdump
+.git
