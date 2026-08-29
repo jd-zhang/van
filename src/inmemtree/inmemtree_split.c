@@ -97,7 +97,7 @@ int _van_inmemtree_split_bleaf(INMEM_TREE *im_tree, INMEM_BLEAF *leaf,
 	*splitp = split;
 	*thenewp = thenew;
 	/* Unlock the lock on the node. */
-	INMEM_RWLOCK_UNLOCK(leaf, rwlock, ret);
+	VAN_RWLOCK_UNLOCK(leaf, rwlock, ret);
 
 	return (ret);
 }
@@ -159,7 +159,7 @@ int _van_inmemtree_split_binternal(INMEM_TREE *im_tree,
 	internal->gen++;
 	*splitp = split;
 	*thenewp = thenew;
-	INMEM_RWLOCK_UNLOCK(internal, rwlock, ret);
+	VAN_RWLOCK_UNLOCK(internal, rwlock, ret);
 
 	return (ret);
 }

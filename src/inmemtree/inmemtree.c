@@ -52,11 +52,11 @@ int _van_inmemtree_create(VAN_TABLE *table, INMEM_TREE **treep) {
 	if (ret != 0)
 		goto err;
 
-	INMEM_MUTEX_INIT(tree, size_mutex, ret);
+	VAN_MUTEX_INIT(tree, size_mutex, ret);
 	if (ret != 0)
 		goto err;
 
-	INMEM_MUTEX_INIT(tree, mtx_nodelist, ret);
+	VAN_MUTEX_INIT(tree, mtx_nodelist, ret);
 	if (ret != 0)
 		goto err;
 	TAILQ_INIT(&tree->nodelist);
@@ -197,12 +197,12 @@ int _van_inmemtree_destory(INMEM_TREE *tree) {
 	if (tree->defretkey != NULL)
 		_van_datum_free(tree->defretkey);
 
-	INMEM_MUTEX_DESTROY(tree, size_mutex, ret1);
+	VAN_MUTEX_DESTROY(tree, size_mutex, ret1);
 	SET_RET(ret1, ret);
 
 	/* Free the INMEM_TREE structure itself */
 	TAILQ_INIT(&tree->nodelist);
-	INMEM_MUTEX_DESTROY(tree, mtx_nodelist, ret);
+	VAN_MUTEX_DESTROY(tree, mtx_nodelist, ret);
 	_van_free(NULL, tree);
 
 	return (ret);

@@ -40,7 +40,7 @@ int _van_inmemtree_alloc_bnode(INMEM_TREE *im_tree,
 	CHK_ERR(ret);
 
 	/* Use the default attribute currently */
-	INMEM_RWLOCK_INIT(node, rwlock, ret);
+	VAN_RWLOCK_INIT(node, rwlock, ret);
 	CHK_ERR(ret);
 	lock_init = 1;
 
@@ -50,11 +50,11 @@ int _van_inmemtree_alloc_bnode(INMEM_TREE *im_tree,
 	/* The addr just after node */
 	node->ptrarray1 = (void **)(node + 1);
 	node->ptrarray2 = node->ptrarray1 + capacity;
-	INMEM_MUTEX_LOCK(im_tree, mtx_nodelist, ret);
+	VAN_MUTEX_LOCK(im_tree, mtx_nodelist, ret);
 	CHK_ERR(ret);
 	im_tree->nodes_cnt++;
 	TAILQ_INSERT_TAIL(&im_tree->nodelist, node, links);
-	INMEM_MUTEX_UNLOCK(im_tree, mtx_nodelist, ret);
+	VAN_MUTEX_UNLOCK(im_tree, mtx_nodelist, ret);
 	CHK_ERR(ret);
 	_inmemtree_inc_nodes_cnt(im_tree);
 	*nodep = node;
@@ -62,7 +62,7 @@ int _van_inmemtree_alloc_bnode(INMEM_TREE *im_tree,
 	if (0) {
 err:
 		if (lock_init)
-			INMEM_RWLOCK_DESTROY(node, rwlock, ret1);
+			VAN_RWLOCK_DESTROY(node, rwlock, ret1);
 		if (node != NULL)
 			_van_free(NULL, node);
 	}

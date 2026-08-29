@@ -93,10 +93,10 @@ int imt_t1_2(int verbose) {
 	fprintf(stderr, "============ 1 Try to put %lu records =========\n",
 	    (unsigned long)cnt);
 	_van_alloc_stat_reset();
-	_van_inmemtree_rwlock_stat_reset();
+	_van_rwlock_stat_reset();
 	ret = populate_inmemtree(tree, keys, ksizes, values, vsizes, cnt);
 	CHK_RET(ret, "populate_inmemtree");
-	_van_inmemtree_rwlock_stat_print(stderr, " ");
+	_van_rwlock_stat_print(stderr, " ");
 	fprintf(stderr, "**** Malloc Statistics ****\n");
 	_van_alloc_stat_print(stderr, " ");
 	tree->statprint(tree, stderr, "inemtree stat: ");
@@ -109,20 +109,20 @@ int imt_t1_2(int verbose) {
 
 	fprintf(stderr, "========== 3 Get using tree->get() ============\n");
 	_van_alloc_stat_reset();
-	_van_inmemtree_rwlock_stat_reset();
+	_van_rwlock_stat_reset();
 	ret = verify_inmemtree_data(tree, keys, ksizes, values, vsizes, cnt);
 	CHK_RET(ret, "verify_inmemtree_data");
-	_van_inmemtree_rwlock_stat_print(stderr, " ");
+	_van_rwlock_stat_print(stderr, " ");
 	fprintf(stderr, "**** Malloc Statistics ****\n");
 	_van_alloc_stat_print(stderr, " ");
 
 	fprintf(stderr, "========== 4 Get using cursor->get(VAN_SET) ============\n");
 	_van_alloc_stat_reset();
-	_van_inmemtree_rwlock_stat_reset();
+	_van_rwlock_stat_reset();
 	ret = verify_inmemtree_data_withcursor(tree, keys, ksizes,
 	    values, vsizes, cnt);
 	CHK_RET(ret, "verify_inmemtree_data_withcursor");
-	_van_inmemtree_rwlock_stat_print(stderr, " ");
+	_van_rwlock_stat_print(stderr, " ");
 	fprintf(stderr, "**** Malloc Statistics ****\n");
 	_van_alloc_stat_print(stderr, " ");
 
@@ -130,11 +130,11 @@ int imt_t1_2(int verbose) {
 	fprintf(stderr, "========== 5 Get using VAN_NEXT ============\n");
 	rcnt = 0;
 	_van_alloc_stat_reset();
-	_van_inmemtree_rwlock_stat_reset();
+	_van_rwlock_stat_reset();
 	ret = verify_inmemtree_cursor_direction(tree, VAN_NEXT, 0, &rcnt);
 	CHK_RET(ret, "verify_inmemtree_cursor_direction(VAN_NEXT)");
 	TEST_ASSERT(cnt == rcnt);
-	_van_inmemtree_rwlock_stat_print(stderr, " ");
+	_van_rwlock_stat_print(stderr, " ");
 	fprintf(stderr, "**** Malloc Statistics ****\n");
 	_van_alloc_stat_print(stderr, " ");
 	fprintf(stderr, " -- Get %lu records --\n", (unsigned long)rcnt);
@@ -142,11 +142,11 @@ int imt_t1_2(int verbose) {
 	fprintf(stderr, "========== 6 Get using VAN_PREV ============\n");
 	rcnt = 0;
 	_van_alloc_stat_reset();
-	_van_inmemtree_rwlock_stat_reset();
+	_van_rwlock_stat_reset();
 	ret = verify_inmemtree_cursor_direction(tree, VAN_PREV, 0, &rcnt);
 	CHK_RET(ret, "verify_inmemtree_cursor_direction(VAN_PREV)");
 	TEST_ASSERT(cnt == rcnt);
-	_van_inmemtree_rwlock_stat_print(stderr, " ");
+	_van_rwlock_stat_print(stderr, " ");
 	fprintf(stderr, "**** Malloc Statistics ****\n");
 	_van_alloc_stat_print(stderr, " ");
 	fprintf(stderr, " -- Get %lu records --\n", (unsigned long)rcnt);
@@ -155,11 +155,11 @@ int imt_t1_2(int verbose) {
 	fprintf(stderr, "========== 7 Get using VAN_NEXT(VAN_WRITECURSOR) ============\n");
 	rcnt = 0;
 	_van_alloc_stat_reset();
-	_van_inmemtree_rwlock_stat_reset();
+	_van_rwlock_stat_reset();
 	ret = verify_inmemtree_cursor_direction(tree, VAN_NEXT, VAN_WRITECURSOR, &rcnt);
 	CHK_RET(ret, "verify_inmemtree_cursor_direction(VAN_NEXT, VAN_WRITECURSOR)");
 	TEST_ASSERT(cnt == rcnt);
-	_van_inmemtree_rwlock_stat_print(stderr, " ");
+	_van_rwlock_stat_print(stderr, " ");
 	fprintf(stderr, "**** Malloc Statistics ****\n");
 	_van_alloc_stat_print(stderr, " ");
 	fprintf(stderr, " -- Get %lu records --\n", (unsigned long)rcnt);
@@ -167,11 +167,11 @@ int imt_t1_2(int verbose) {
 	fprintf(stderr, "========== 8 Get using VAN_PREV(VAN_WRITECURSOR) ============\n");
 	rcnt = 0;
 	_van_alloc_stat_reset();
-	_van_inmemtree_rwlock_stat_reset();
+	_van_rwlock_stat_reset();
 	ret = verify_inmemtree_cursor_direction(tree, VAN_PREV, VAN_WRITECURSOR, &rcnt);
 	CHK_RET(ret, "verify_inmemtree_cursor_direction(VAN_PREV, VAN_WRITECURSOR)");
 	TEST_ASSERT(cnt == rcnt);
-	_van_inmemtree_rwlock_stat_print(stderr, " ");
+	_van_rwlock_stat_print(stderr, " ");
 	fprintf(stderr, "**** Malloc Statistics ****\n");
 	_van_alloc_stat_print(stderr, " ");
 	fprintf(stderr, " -- Get %lu records --\n", (unsigned long)rcnt);
@@ -196,7 +196,7 @@ int imt_t1_2(int verbose) {
 	ret = _van_inmemtree_destory(tree);
 	time(&t2);
 	fprintf(stderr, "time consuming: %g seconds\n", difftime(t2, t1));
-	_van_inmemtree_rwlock_stat_print(stderr, " ");
+	_van_rwlock_stat_print(stderr, " ");
 	fprintf(stderr, "**** Malloc Statistics ****\n");
 	_van_alloc_stat_print(stderr, " ");
 	CHK_RET(ret, "_van_inmemtree_destory");
@@ -236,10 +236,10 @@ int imt_t1_3() {
 	fprintf(stderr, "============ 1 Try to put %lu records =========\n",
 	    (unsigned long)cnt);
 	_van_alloc_stat_reset();
-	_van_inmemtree_rwlock_stat_reset();
+	_van_rwlock_stat_reset();
 	ret = populate_inmemtree(tree, keys, ksizes, values, vsizes, cnt);
 	CHK_RET(ret, "populate_inmemtree");
-	_van_inmemtree_rwlock_stat_print(stderr, " ");
+	_van_rwlock_stat_print(stderr, " ");
 	fprintf(stderr, "**** Malloc Statistics ****\n");
 	_van_alloc_stat_print(stderr, " ");
 	tree->statprint(tree, stderr, "inemtree stat: ");
@@ -248,20 +248,20 @@ int imt_t1_3() {
 
 	fprintf(stderr, "========== 3 Get using tree->get() ============\n");
 	_van_alloc_stat_reset();
-	_van_inmemtree_rwlock_stat_reset();
+	_van_rwlock_stat_reset();
 	ret = verify_inmemtree_data(tree, keys, ksizes, values, vsizes, cnt);
 	CHK_RET(ret, "verify_inmemtree_data");
-	_van_inmemtree_rwlock_stat_print(stderr, " ");
+	_van_rwlock_stat_print(stderr, " ");
 	fprintf(stderr, "**** Malloc Statistics ****\n");
 	_van_alloc_stat_print(stderr, " ");
 
 	fprintf(stderr, "========== 4 Get using cursor->get(VAN_SET) ============\n");
 	_van_alloc_stat_reset();
-	_van_inmemtree_rwlock_stat_reset();
+	_van_rwlock_stat_reset();
 	ret = verify_inmemtree_data_withcursor(tree, keys, ksizes,
 	    values, vsizes, cnt);
 	CHK_RET(ret, "verify_inmemtree_data_withcursor");
-	_van_inmemtree_rwlock_stat_print(stderr, " ");
+	_van_rwlock_stat_print(stderr, " ");
 	fprintf(stderr, "**** Malloc Statistics ****\n");
 	_van_alloc_stat_print(stderr, " ");
 
@@ -269,11 +269,11 @@ int imt_t1_3() {
 	fprintf(stderr, "========== 5 Get using VAN_NEXT ============\n");
 	rcnt = 0;
 	_van_alloc_stat_reset();
-	_van_inmemtree_rwlock_stat_reset();
+	_van_rwlock_stat_reset();
 	ret = verify_inmemtree_cursor_direction(tree, VAN_NEXT, 0, &rcnt);
 	CHK_RET(ret, "verify_inmemtree_cursor_direction(VAN_NEXT)");
 	TEST_ASSERT(cnt == rcnt);
-	_van_inmemtree_rwlock_stat_print(stderr, " ");
+	_van_rwlock_stat_print(stderr, " ");
 	fprintf(stderr, "**** Malloc Statistics ****\n");
 	_van_alloc_stat_print(stderr, " ");
 	fprintf(stderr, " -- Get %lu records --\n", (unsigned long)rcnt);
@@ -281,11 +281,11 @@ int imt_t1_3() {
 	fprintf(stderr, "========== 6 Get using VAN_PREV ============\n");
 	rcnt = 0;
 	_van_alloc_stat_reset();
-	_van_inmemtree_rwlock_stat_reset();
+	_van_rwlock_stat_reset();
 	ret = verify_inmemtree_cursor_direction(tree, VAN_PREV, 0, &rcnt);
 	CHK_RET(ret, "verify_inmemtree_cursor_direction(VAN_PREV)");
 	TEST_ASSERT(cnt == rcnt);
-	_van_inmemtree_rwlock_stat_print(stderr, " ");
+	_van_rwlock_stat_print(stderr, " ");
 	fprintf(stderr, "**** Malloc Statistics ****\n");
 	_van_alloc_stat_print(stderr, " ");
 	fprintf(stderr, " -- Get %lu records --\n", (unsigned long)rcnt);
@@ -294,11 +294,11 @@ int imt_t1_3() {
 	fprintf(stderr, "========== 7 Get using VAN_NEXT(VAN_WRITECURSOR) ============\n");
 	rcnt = 0;
 	_van_alloc_stat_reset();
-	_van_inmemtree_rwlock_stat_reset();
+	_van_rwlock_stat_reset();
 	ret = verify_inmemtree_cursor_direction(tree, VAN_NEXT, VAN_WRITECURSOR, &rcnt);
 	CHK_RET(ret, "verify_inmemtree_cursor_direction(VAN_NEXT, VAN_WRITECURSOR)");
 	TEST_ASSERT(cnt == rcnt);
-	_van_inmemtree_rwlock_stat_print(stderr, " ");
+	_van_rwlock_stat_print(stderr, " ");
 	fprintf(stderr, "**** Malloc Statistics ****\n");
 	_van_alloc_stat_print(stderr, " ");
 	fprintf(stderr, " -- Get %lu records --\n", (unsigned long)rcnt);
@@ -306,11 +306,11 @@ int imt_t1_3() {
 	fprintf(stderr, "========== 8 Get using VAN_PREV(VAN_WRITECURSOR) ============\n");
 	rcnt = 0;
 	_van_alloc_stat_reset();
-	_van_inmemtree_rwlock_stat_reset();
+	_van_rwlock_stat_reset();
 	ret = verify_inmemtree_cursor_direction(tree, VAN_PREV, VAN_WRITECURSOR, &rcnt);
 	CHK_RET(ret, "verify_inmemtree_cursor_direction(VAN_PREV, VAN_WRITECURSOR)");
 	TEST_ASSERT(cnt == rcnt);
-	_van_inmemtree_rwlock_stat_print(stderr, " ");
+	_van_rwlock_stat_print(stderr, " ");
 	fprintf(stderr, "**** Malloc Statistics ****\n");
 	_van_alloc_stat_print(stderr, " ");
 	fprintf(stderr, " -- Get %lu records --\n", (unsigned long)rcnt);
@@ -331,7 +331,7 @@ int imt_t1_3() {
 	ret = _van_inmemtree_destory(tree);
 	time(&t2);
 	fprintf(stderr, "time consuming: %g seconds\n", difftime(t2, t1));
-	_van_inmemtree_rwlock_stat_print(stderr, " ");
+	_van_rwlock_stat_print(stderr, " ");
 	fprintf(stderr, "**** Malloc Statistics ****\n");
 	_van_alloc_stat_print(stderr, " ");
 	CHK_RET(ret, "_van_inmemtree_destory");

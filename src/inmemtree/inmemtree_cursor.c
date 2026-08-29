@@ -151,7 +151,7 @@ int _van_inmemtree_cursor_cleanup(INMEM_TREECURSOR *src) {
 	 * We need to unlock the node.
 	 */
 	if (src->node != NULL) {
-		INMEM_RWLOCK_UNLOCK(src->node, rwlock, ret);
+		VAN_RWLOCK_UNLOCK(src->node, rwlock, ret);
 		/* TODO: panic handling */
 		VAN_ASSERT(ret == 0);
 	}
@@ -235,7 +235,7 @@ int _van_inmemtree_cursor_locate(INMEM_TREECURSOR *cursor, VAN_DATUM *key,
 				 * pair is in this node.
 				 */
 				if (cursor->node != NULL) {
-					INMEM_RWLOCK_UNLOCK(cursor->node,
+					VAN_RWLOCK_UNLOCK(cursor->node,
 					    rwlock, ret1);
 					/* TODO: panic handling */
 					VAN_ASSERT(ret1 == 0);
@@ -295,7 +295,7 @@ int _van_inmemtree_cursor_next(INMEM_TREECURSOR *cursor, flags_t flags) {
 
 		leaf = cur->next;
 		/* Unlock the node */
-		INMEM_RWLOCK_UNLOCK(cur, rwlock, ret1);
+		VAN_RWLOCK_UNLOCK(cur, rwlock, ret1);
 		/* TODO: panic handling */
 		VAN_ASSERT(ret1 == 0);
 
@@ -367,7 +367,7 @@ int _van_inmemtree_cursor_prev(INMEM_TREECURSOR *cursor, flags_t flags) {
 		 * current page to avoid deadlock, and then we
 		 * check if previous is still previous.
 		 */
-		INMEM_RWLOCK_UNLOCK(cur, rwlock, ret1);
+		VAN_RWLOCK_UNLOCK(cur, rwlock, ret1);
 		/* TODO: panic handling */
 		VAN_ASSERT(ret1 == 0);
 recheck:
@@ -380,7 +380,7 @@ recheck:
 			VAN_ASSERT(ret1 == 0);
 
 			if (leaf->next != cur) {
-				INMEM_RWLOCK_UNLOCK(leaf, rwlock, ret1);
+				VAN_RWLOCK_UNLOCK(leaf, rwlock, ret1);
 				/* TODO: panic handling */
 				VAN_ASSERT(ret1 == 0);
 				goto recheck;
@@ -486,7 +486,7 @@ again:
 		 * sicne the last node can change.
 		 */
 		if (leaf != im_tree->last) {
-			INMEM_RWLOCK_UNLOCK(leaf, rwlock, ret);
+			VAN_RWLOCK_UNLOCK(leaf, rwlock, ret);
 			/* TODO: panic handling */
 			VAN_ASSERT(ret == 0);
 			goto again;
@@ -562,7 +562,7 @@ int _van_inmemtree_cursor_insert(INMEM_TREECURSOR *cursor,
 	leaf->values[indx] = id;
 	leaf->size += 1;
 
-	INMEM_MUTEX_LOCK(im_tree, size_mutex, ret);
+	VAN_MUTEX_LOCK(im_tree, size_mutex, ret);
 	CHK_ERR(ret);
 	im_tree->records++;
 	isize += _van_inmemtree_key_size(ik);
@@ -573,7 +573,7 @@ int _van_inmemtree_cursor_insert(INMEM_TREECURSOR *cursor,
 		(void)_van_inmemtree_freeze(im_tree);
 		exp_ret = VAN_INMEM_FULL;
 	}
-	INMEM_MUTEX_UNLOCK(im_tree, size_mutex, ret);
+	VAN_MUTEX_UNLOCK(im_tree, size_mutex, ret);
 	CHK_ERR(ret);
 
 	/*
@@ -655,7 +655,7 @@ int _van_inmemtree_cursor_update(INMEM_TREECURSOR *cursor,
 	/* Always clear the IM_DEL flag. */
 	F_CLR(leaf->keys[indx], IM_DEL);
 
-	INMEM_MUTEX_LOCK(im_tree, size_mutex, ret);
+	VAN_MUTEX_LOCK(im_tree, size_mutex, ret);
 	CHK_ERR(ret);
 	im_tree->size += csize;
 	if (im_tree->size >= im_tree->threshold &&
@@ -663,7 +663,7 @@ int _van_inmemtree_cursor_update(INMEM_TREECURSOR *cursor,
 		(void)_van_inmemtree_freeze(im_tree);
 		exp_ret = VAN_INMEM_FULL;
 	}
-	INMEM_MUTEX_UNLOCK(im_tree, size_mutex, ret);
+	VAN_MUTEX_UNLOCK(im_tree, size_mutex, ret);
 	CHK_ERR(ret);
 
 	if (0) { /* Free the necessary resources on error here */
@@ -730,7 +730,7 @@ int _van_inmemtree_cursor_putfordel(INMEM_TREECURSOR *cursor,
 	leaf->values[indx] = NULL;
 	leaf->size += 1;
 
-	INMEM_MUTEX_LOCK(im_tree, size_mutex, ret);
+	VAN_MUTEX_LOCK(im_tree, size_mutex, ret);
 	CHK_ERR(ret);
 	im_tree->records++;
 	isize += _van_inmemtree_key_size(ik);
@@ -740,7 +740,7 @@ int _van_inmemtree_cursor_putfordel(INMEM_TREECURSOR *cursor,
 		(void)_van_inmemtree_freeze(im_tree);
 		exp_ret = VAN_INMEM_FULL;
 	}
-	INMEM_MUTEX_UNLOCK(im_tree, size_mutex, ret);
+	VAN_MUTEX_UNLOCK(im_tree, size_mutex, ret);
 	CHK_ERR(ret);
 
 	/*
@@ -820,10 +820,10 @@ int _van_inmemtree_cursor_justdel(INMEM_TREECURSOR *cursor, flags_t flags) {
 		dsize = _van_inmemtree_data_size(id);
 		_van_inmemtree_free_data(id);
 		leaf->values[indx] = NULL;
-		INMEM_MUTEX_LOCK(im_tree, size_mutex, ret);
+		VAN_MUTEX_LOCK(im_tree, size_mutex, ret);
 		CHK_ERR(ret);
 		im_tree->size -= dsize;
-		INMEM_MUTEX_UNLOCK(im_tree, size_mutex, ret);
+		VAN_MUTEX_UNLOCK(im_tree, size_mutex, ret);
 		CHK_ERR(ret);
 	}
 

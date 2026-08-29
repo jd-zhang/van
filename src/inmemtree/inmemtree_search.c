@@ -84,7 +84,7 @@ again:
 			 * Always free prev.
 			 */
 			if (prev != NULL) {
-				INMEM_RWLOCK_UNLOCK(prev, rwlock, ret1);
+				VAN_RWLOCK_UNLOCK(prev, rwlock, ret1);
 				VAN_ASSERT(ret1 == 0);
 				prev = NULL;
 			}
@@ -105,16 +105,16 @@ again:
 		 * Try locking the item.
 		 */
 		if (wlock) {
-			INMEM_RWLOCK_TRYWRLOCK(current, rwlock, ret);
+			VAN_RWLOCK_TRYWRLOCK(current, rwlock, ret);
 		} else {
-			INMEM_RWLOCK_TRYRDLOCK(current, rwlock, ret);
+			VAN_RWLOCK_TRYRDLOCK(current, rwlock, ret);
 		}
 
 		/*
 		 * Always free prev.
 		 */
 		if (prev != NULL) {
-			INMEM_RWLOCK_UNLOCK(prev, rwlock, ret1);
+			VAN_RWLOCK_UNLOCK(prev, rwlock, ret1);
 			VAN_ASSERT(ret1 == 0);
 			prev = NULL;
 		}
@@ -124,9 +124,9 @@ again:
 			 * to wait here to get the lock.
 			 */
 			if (wlock) {
-				INMEM_RWLOCK_WRLOCK(current, rwlock, ret);
+				VAN_RWLOCK_WRLOCK(current, rwlock, ret);
 			} else {
-				INMEM_RWLOCK_RDLOCK(current, rwlock, ret);
+				VAN_RWLOCK_RDLOCK(current, rwlock, ret);
 			}
 		} else if (ret != 0)
 			goto err;
@@ -141,7 +141,7 @@ again:
 			 * TODO: Start from last unchanged node instead
 			 *       of the root node.
 			 */
-			INMEM_RWLOCK_UNLOCK(current, rwlock, ret1);
+			VAN_RWLOCK_UNLOCK(current, rwlock, ret1);
 			VAN_ASSERT(ret1 == 0);
 			goto again;
 		}
@@ -165,12 +165,12 @@ again:
 			 * Need to change our lock.
 			 */
 			if (wlock == 0) {
-				INMEM_RWLOCK_UNLOCK(current, rwlock, ret1);
+				VAN_RWLOCK_UNLOCK(current, rwlock, ret1);
 				VAN_ASSERT(ret1 == 0);
-				INMEM_RWLOCK_WRLOCK(current, rwlock, ret);
+				VAN_RWLOCK_WRLOCK(current, rwlock, ret);
 				/* It may be splitted by other thread */
 				if (current->gen != expgen) {
-					INMEM_RWLOCK_UNLOCK(current,
+					VAN_RWLOCK_UNLOCK(current,
 					    rwlock, ret1);
 					VAN_ASSERT(ret1 == 0);
 					goto again;
@@ -316,7 +316,7 @@ have_node:
 err:
 		if (use_old && imc->node != NULL) {
 			/* TODO: special handling of failure */
-			INMEM_RWLOCK_UNLOCK(imc->node, rwlock, ret1);
+			VAN_RWLOCK_UNLOCK(imc->node, rwlock, ret1);
 			imc->node = NULL;
 		}
 		/* We only retry if we get the expected error */

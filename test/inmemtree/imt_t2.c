@@ -83,20 +83,20 @@ int imt_t2_1() {
 
 	fprintf(stderr, "========== 2 Get using tree->get() ============\n");
 	_van_alloc_stat_reset();
-	_van_inmemtree_rwlock_stat_reset();
+	_van_rwlock_stat_reset();
 	ret = verify_inmemtree_data(tree, keys, ksizes, values, vsizes, cnt);
 	CHK_RET(ret, "verify_inmemtree_data");
-	_van_inmemtree_rwlock_stat_print(stderr, " ");
+	_van_rwlock_stat_print(stderr, " ");
 	fprintf(stderr, "**** Malloc Statistics ****\n");
 	_van_alloc_stat_print(stderr, " ");
 
 	fprintf(stderr, "========== 3 Get using cursor->get(VAN_SET) ============\n");
 	_van_alloc_stat_reset();
-	_van_inmemtree_rwlock_stat_reset();
+	_van_rwlock_stat_reset();
 	ret = verify_inmemtree_data_withcursor(tree, keys, ksizes,
 	    values, vsizes, cnt);
 	CHK_RET(ret, "verify_inmemtree_data_withcursor");
-	_van_inmemtree_rwlock_stat_print(stderr, " ");
+	_van_rwlock_stat_print(stderr, " ");
 	fprintf(stderr, "**** Malloc Statistics ****\n");
 	_van_alloc_stat_print(stderr, " ");
 

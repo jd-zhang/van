@@ -93,13 +93,6 @@ extern int _van_inmemtree_dump_all_leaves(INMEM_TREE *im_tree, FILE *f);
 extern int _van_inmemtree_dump_tree(INMEM_TREE *im_tree, FILE *f);
 extern int _van_inmemtree_dump_node(INMEM_TREE *im_tree,
     INMEM_BNODE *node, int recursive, FILE *f);
-extern int _van_inmemtree_rwlock_stat_reset();
-extern INMEM_RWLOCK_STAT _van_inmemtree_rwlock_stat_ret();
-extern int _van_inmemtree_rwlock_stat_print(FILE *f, const char *prefix);
-extern int _van_inmemtree_mutex_stat_reset();
-extern INMEM_MUTEX_STAT _van_inmemtree_mutex_stat_ret();
-extern int _van_inmemtree_mutex_stat_print(FILE *f,
-    const char *prefix);
 
 /* src/inmemtree/inmemtree_init.c */
 extern int _van_inmemtree_alloc_bnode(INMEM_TREE *im_tree,

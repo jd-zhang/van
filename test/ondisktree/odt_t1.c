@@ -49,10 +49,10 @@ int odt_t1_1() {
 	fprintf(stderr, "============ 1 Try to put %lu records =========\n",
 	    (unsigned long)cnt);
 	_van_alloc_stat_reset();
-	_van_inmemtree_rwlock_stat_reset();
+	_van_rwlock_stat_reset();
 	ret = populate_inmemtree(tree, keys, ksizes, values, vsizes, cnt);
 	CHK_RET(ret, "populate_inmemtree");
-	_van_inmemtree_rwlock_stat_print(stderr, " ");
+	_van_rwlock_stat_print(stderr, " ");
 	fprintf(stderr, "**** Malloc Statistics ****\n");
 	_van_alloc_stat_print(stderr, " ");
 
@@ -152,7 +152,7 @@ int odt_t1_1() {
 	CHK_RET(ret, "store->close");
 	time(&t2);
 	fprintf(stderr, "time consuming: %g seconds\n", difftime(t2, t1));
-	_van_inmemtree_rwlock_stat_print(stderr, " ");
+	_van_rwlock_stat_print(stderr, " ");
 
 
 	return (ret);
@@ -195,12 +195,12 @@ int odt_t1_2() {
 	"============ %d.1 Try to put %lu records to inmemtree-%d =========\n",
 		    j, (unsigned long)record_cnt, j);
 		_van_alloc_stat_reset();
-		_van_inmemtree_rwlock_stat_reset();
+		_van_rwlock_stat_reset();
 		i = j * record_cnt;
 		ret = populate_table(table, keys+i, ksizes+i,
 		    values+i, vsizes+i, record_cnt);
 		CHK_RET(ret, "populate_table");
-		_van_inmemtree_rwlock_stat_print(stderr, " ");
+		_van_rwlock_stat_print(stderr, " ");
 		fprintf(stderr, "**** Malloc Statistics ****\n");
 		_van_alloc_stat_print(stderr, " ");
 
@@ -314,9 +314,9 @@ int odt_t1_3() {
 	fprintf(stderr, "============ 1 Intial put %lu records =========\n",
 	    (unsigned long)record_cnt);
 	_van_alloc_stat_reset();
-	_van_inmemtree_rwlock_stat_reset();
+	_van_rwlock_stat_reset();
 	ret = populate_table(table, keys, ksizes, values, vsizes, cnt);
-	_van_inmemtree_rwlock_stat_print(stderr, " ");
+	_van_rwlock_stat_print(stderr, " ");
 	fprintf(stderr, "**** Malloc Statistics ****\n");
 	_van_alloc_stat_print(stderr, " ");
 

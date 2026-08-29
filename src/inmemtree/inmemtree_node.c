@@ -254,13 +254,13 @@ int _van_inmemtree_free_node(INMEM_TREE *tree, INMEM_BNODE *node,
 		return (ret);
 
 	/* Destroy the rwlock member. */
-	INMEM_RWLOCK_DESTROY(node, rwlock, ret);
+	VAN_RWLOCK_DESTROY(node, rwlock, ret);
 	if (lock)
-		INMEM_MUTEX_LOCK(tree, mtx_nodelist, ret);
+		VAN_MUTEX_LOCK(tree, mtx_nodelist, ret);
 	TAILQ_REMOVE(&tree->nodelist, node, links);
 	tree->nodes_cnt--;
 	if (lock)
-		INMEM_MUTEX_UNLOCK(tree, mtx_nodelist, ret);
+		VAN_MUTEX_UNLOCK(tree, mtx_nodelist, ret);
 	if (node->type == NT_IM_BINTERNAL)
 		ret = _van_inmemtree_free_internal(tree,
 		    (INMEM_BINTERNAL *)node, recursive, lock);
@@ -370,19 +370,19 @@ int _van_inmemtree_node_rwlock_action(INMEM_BNODE *node, int action) {
 	/* Only lock/unlock actions are valid. */
 	switch (action) {
 		case RWLOCK_RDLOCK:
-			INMEM_RWLOCK_RDLOCK(node, rwlock, ret);
+			VAN_RWLOCK_RDLOCK(node, rwlock, ret);
 			break;
 		case RWLOCK_TRYRDLOCK:
-			INMEM_RWLOCK_TRYRDLOCK(node, rwlock, ret);
+			VAN_RWLOCK_TRYRDLOCK(node, rwlock, ret);
 			break;
 		case RWLOCK_WRLOCK:
-			INMEM_RWLOCK_WRLOCK(node, rwlock, ret);
+			VAN_RWLOCK_WRLOCK(node, rwlock, ret);
 			break;
 		case RWLOCK_TRYWRLOCK:
-			INMEM_RWLOCK_TRYWRLOCK(node, rwlock, ret);
+			VAN_RWLOCK_TRYWRLOCK(node, rwlock, ret);
 			break;
 		case RWLOCK_UNLOCK:
-			INMEM_RWLOCK_UNLOCK(node, rwlock, ret);
+			VAN_RWLOCK_UNLOCK(node, rwlock, ret);
 			break;
 		default:
 			ret = _van_error_print(

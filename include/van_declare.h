@@ -40,8 +40,6 @@ typedef struct _inmem_stat		INMEM_STAT;
 typedef struct _inmem_key		INMEM_KEY;
 typedef struct _inmem_data		INMEM_DATA;
 typedef struct _inmem_child		INMEM_CHILD;
-typedef struct _inmem_rwlock_stat	INMEM_RWLOCK_STAT;
-typedef struct _inmem_mutex_stat	INMEM_MUTEX_STAT;
 
 /* From van_io.h */
 typedef struct _van_iofile	VAN_IOFILE;
