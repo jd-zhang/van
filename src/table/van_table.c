@@ -59,6 +59,7 @@ int _van_table_init(VAN_TABLE *table) {
 	table->frozen = NULL;
 	table->table_name = NULL;
 	table->table_dir = NULL;
+	table->inmem_threshold = IM_DEF_THRESHOLD;
 	atomic_store(&table->dumpgen, 0);
 	VAN_MUTEX_INIT(table, ticks_mtx, ret);
 	CHK_ERR(ret);
@@ -521,6 +522,9 @@ int _van_table_write_odt_paths(VAN_TABLE *table) {
 	int i, ret, ret1, locked;
 	FILE *f;
 	char *odtlist, *tmplist;
+	VAN_TABLE_ODT_ITEM *item;
+	ONDISK_TREE *odtree;
+	size_t odt_top;
 
 	locked = 0;
 	odtlist = NULL;
@@ -530,15 +534,40 @@ int _van_table_write_odt_paths(VAN_TABLE *table) {
 	ret = _van_table_path(table, table->table_odlist_tmp, &tmplist);
 	CHK_ERR(ret);
 
+	/*
+	 * Hold odtpath_mtx across the WHOLE write (tmp file + rename).
+	 * All callers (dump thread, merge jobs) share the same tmp file;
+	 * without the serialization a concurrent caller could rename the
+	 * tmp file away and make this rename() fail with ENOENT.
+	 *
+	 * The odlist is derived from odt_items[] because odtpaths[] can
+	 * drift out of sync with odt_items[] after merges/compactions and
+	 * contain NULL holes; deriving from odt_items[] guarantees the
+	 * odlist never contains "(null)" lines, otherwise reopen would
+	 * stop at the first bad line and silently lose every later tree.
+	 */
 	VAN_MUTEX_LOCK(table, odtpath_mtx, ret);
 	CHK_ERR(ret);
 	locked = 1;
 
+	VAN_MUTEX_LOCK(table, odt_mtx, ret);
+	CHK_ERR(ret);
+	odt_top = table->odt_top;
+	VAN_MUTEX_UNLOCK(table, odt_mtx, ret);
+
 	ret = _van_file_fopen(tmplist, "w", &f);
 	CHK_ERR(ret);
 
-	for (i = 0; i < table->odtpath_cnt; i++) {
-		ret = _van_file_fwriteline(f, table->odtpaths[i], 0);
+	for (i = 0; i < (int)odt_top; i++) {
+		item = &table->odt_items[i];
+		if (F_ISSET(item, VAN_ITEM_UNUSED))
+			continue;
+		VAN_MUTEX_LOCK(item, mutex, ret);
+		odtree = item->trees[0];
+		VAN_MUTEX_UNLOCK(item, mutex, ret);
+		if (odtree == NULL || odtree->file_path == NULL)
+			continue;
+		ret = _van_file_fwriteline(f, odtree->file_path, 0);
 		CHK_ERR(ret);
 	}
 	ret = _van_file_fclose(f);
@@ -690,7 +719,8 @@ int _van_table_replace_odtpath(VAN_TABLE *table, ONDISK_TREE *odlow,
 
 	/* Find the low index */
 	for (i = 0; i <= idxtop; i++) {
-		if (strcmp(pathlow, table->odtpaths[i]) == 0) {
+		if (table->odtpaths[i] != NULL &&
+		    strcmp(pathlow, table->odtpaths[i]) == 0) {
 			idxlow = i;
 			break;
 		}
@@ -699,7 +729,8 @@ int _van_table_replace_odtpath(VAN_TABLE *table, ONDISK_TREE *odlow,
 
 	/* Find the high index */
 	for (; i <= idxtop; i++) {
-		if (strcmp(pathhigh, table->odtpaths[i]) == 0) {
+		if (table->odtpaths[i] != NULL &&
+		    strcmp(pathhigh, table->odtpaths[i]) == 0) {
 			idxhigh = i;
 			break;
 		}
@@ -950,6 +981,7 @@ int _van_table_dump_frozen(VAN_TABLE *table, ONDISK_TREE **odtreep) {
 		goto err;
 	}
 	item->trees[0] = odtree;
+	F_CLR(item, VAN_ITEM_UNUSED);
 	F_CLR(item, VAN_ITEM_DUMPING);
 	F_SET(item, VAN_ITEM_INUSE);
 	ret =  _van_table_curticks(table, &item->ticks);
@@ -982,6 +1014,7 @@ int _van_table_dump_inmem(VAN_TABLE *table) {
 
 	if (table->active == NULL) {
 		ret = _van_inmemtree_create(table, &active);
+		active->threshold = table->inmem_threshold;
 		table->active = active;
 		return (ret);
 	} else if (table->active->size == 0)
@@ -993,6 +1026,7 @@ int _van_table_dump_inmem(VAN_TABLE *table) {
 
 	ret = _van_inmemtree_create(table, &active);
 	CHK_ERR(ret);
+	active->threshold = table->inmem_threshold;
 	table->active = active;
 
 	ret = _van_table_dump_frozen(table, &odtree);

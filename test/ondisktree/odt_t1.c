@@ -28,6 +28,7 @@ int odt_t1_1() {
 
 	odtpath = "test1.ondisk.odt_t1";
 	system("rm -rf test1.ondisk.odt_t1*");
+	system("rm -fr vanlog.*");
 	ret = _van_store_create(&store);
 	CHK_RET(ret, "_van_store_create");
 	ret = store->open(store, ".", 0);
@@ -181,12 +182,14 @@ int odt_t1_2() {
 
 	system("rm -f od_table.ondisk*");
 	system("rm -f od_table.odlist*");
+	system("rm -fr vanlog.*");
 	ret = _van_store_create(&store);
 	CHK_RET(ret, "_van_store_create");
 	ret = store->open(store, ".", 0);
 	CHK_RET(ret, "_van_store_open");
 	ret = _van_table_create(store, &table);
 	CHK_RET(ret, "_van_table_create");
+	table->set_inmem_threshold(table, GIGABYTE);
 	ret = table->open(table, "od_table", VAN_TABLE_SKIP_THREAD_START);
 	CHK_RET(ret, "_van_table_open");
 
@@ -302,12 +305,14 @@ int odt_t1_3() {
 	    values, vsizes, 50, 120, cnt);
 	system("rm -f od_table.ondisk*");
 	system("rm -f od_table.odlist*");
+	system("rm -fr vanlog.*");
 	ret = _van_store_create(&store);
 	CHK_RET(ret, "_van_store_create");
 	ret = store->open(store, ".", 0);
 	CHK_RET(ret, "_van_store_open");
 	ret = _van_table_create(store, &table);
 	CHK_RET(ret, "_van_table_create");
+	table->set_inmem_threshold(table, GIGABYTE);
 	ret = table->open(table, "od_table", VAN_TABLE_SKIP_THREAD_START);
 	CHK_RET(ret, "_van_table_open");
 

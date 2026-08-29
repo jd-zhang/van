@@ -114,6 +114,7 @@ void *_van_table_frozen_dump_thread(void *arg) {
 	VAN_MUTEX_LOCK(item, mutex, ret);
 	item->trees[0] = odtree;
 	_van_table_curticks(table, &item->ticks);
+	F_CLR(item, VAN_ITEM_UNUSED);
 	F_SET(item, VAN_ITEM_INUSE);
 	F_CLR(item, VAN_ITEM_DUMPING);
 	VAN_MUTEX_UNLOCK(item, mutex, ret);
@@ -178,14 +179,15 @@ void *_van_table_dump_join_thread(void *arg) {
 	joinjob = (VAN_TABLE_DUMP_JOIN_JOB *)arg;
 	table = joinjob->table;
 
-	while (!table->closed) {
+	while (1) {
 		VAN_MUTEX_LOCK(table, dump_mutex, ret);
 		/* 
 		fprintf(stderr, "VAN_COND_WAIT(table, dump_join_cond, &table->dump_mutex, ret)\n"); 
 		we use prejob here, because we can not remove the dumpjob from the list
 		when we are iterating it.
 		*/
-		VAN_COND_WAIT(table, dump_join_cond, &table->dump_mutex, ret);
+		if (!table->closed)
+			VAN_COND_WAIT(table, dump_join_cond, &table->dump_mutex, ret);
 		prejob = NULL;
 		for (dumpjob = TAILQ_FIRST(&table->dump_jobs); dumpjob != NULL;
 		    dumpjob = TAILQ_NEXT(dumpjob, links)) {
@@ -207,6 +209,8 @@ void *_van_table_dump_join_thread(void *arg) {
 			prejob = NULL;
 		}
 		VAN_MUTEX_UNLOCK(table, dump_mutex, ret);
+		if (table->closed && TAILQ_FIST(&table->dump_jobs) == NULL)
+			break;
 
 		/* Temporarily sleeping here. */
 		_van_sleep(2, 0);
@@ -249,7 +253,7 @@ void *_van_table_frozen_free_thread(void *arg) {
 	freejob = (VAN_TABLE_FROZEN_FREE_JOB *)arg;
 	table = freejob->table;
 
-	while (!table->closed) {
+	while (1) {
 
 		VAN_MUTEX_LOCK(table, im_dump_mtx, ret);
 		frozen = TAILQ_FIRST(&table->im_dump_trees);
@@ -267,6 +271,9 @@ void *_van_table_frozen_free_thread(void *arg) {
 			VAN_MUTEX_UNLOCK(table, im_dump_mtx, ret);
 			ret = _van_inmemtree_destory(tofree);
 		}
+
+		if (table->closed && TAILQ_FIRST(&table->im_dump_trees) == NULL)
+			break;
 
 		/* Temporarily sleeping here. */
 		_van_sleep(2, 0);

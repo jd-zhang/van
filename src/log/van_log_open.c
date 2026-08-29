@@ -62,11 +62,19 @@ err:
 }
 
 int _van_log_init(VAN_LOG *logp) {
-	int ret, fcnt;
+	int ret, fcnt, oflag;
+	mode_t omode;
+	uint32 fnum;
+	VAN_IOFILE *logfile;
+	char fname[VAN_MAXPATHLEN];
+	char lgpath[VAN_MAXPATHLEN];
+	struct stat st;
 
 	VAN_ASSERT(logp != NULL);
 	ret = 0;
 	fcnt = 0;
+	fnum = 0;
+	logfile = NULL;
 
 	INIT_LSN(&logp->cur_lsn);
 	logp->prev_offset = 0;
@@ -87,8 +95,44 @@ int _van_log_init(VAN_LOG *logp) {
 	ret = _van_log_listfiles(logp, &fcnt);
 	CHK_ERR(ret);
 
-	if (fcnt == 0)
+	if (fcnt == 0) {
 		ret = _van_log_newfile(logp);
+	} else {
+		/*
+		 * There are existing log files, open the latest one
+		 * and continue to write after its tail. The log file
+		 * names are sorted by the file number, so the latest
+		 * one is the last element of the array.
+		 */
+		fnum = (uint32)atol(
+		    logp->lognames->array[logp->lognames->size - 1] +
+		    strlen(VAN_LFPFX));
+
+		memset(fname, 0, sizeof(fname));
+		memset(lgpath, 0, sizeof(lgpath));
+		sprintf(fname, VAN_LFNAME, fnum);
+		ret = _van_store_path_noalloc(logp->store, lgpath,
+		    sizeof(lgpath), fname);
+		CHK_ERR(ret);
+
+		/* Open without truncation to keep the old records */
+		oflag = O_RDWR;
+		omode = DEF_FILE_MODE;
+		ret = _van_iofile_open(lgpath, oflag, omode, &logfile);
+		CHK_ERR(ret);
+
+		ret = _van_iofile_stat(logfile, &st);
+		if (ret != 0) {
+			(void)_van_iofile_close(logfile);
+			logfile = NULL;
+			goto err;
+		}
+
+		logp->cur_logfile = logfile;
+		logp->cur_lsn.file = fnum;
+		logp->cur_lsn.offset = (uint32)st.st_size;
+		logp->prev_offset = 0;
+	}
 err:
 	return (ret);
 }

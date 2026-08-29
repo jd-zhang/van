@@ -159,7 +159,6 @@ int _van_table_merge_scan(VAN_TABLE *table) {
 	while (atomic_load(&table->mergecnt) > 0) {
 		_van_sleep(2, 0);
 	}
-	VAN_ASSERT(atomic_load(&table->mergecnt) == 0);
 
 	/* Grape all the threads */
 	ret = _van_table_merge_clean(table);
@@ -298,7 +297,7 @@ void *_van_table_merge_job_run(void *arg) {
 	ret = _van_calloc(NULL, (job->high - job->low + 1),
 	    sizeof(ONDISK_TREE *), &trees);
 	if (ret != 0)
-		return (void *)(uintmax_t)ret;
+		goto err;
 
 	idx = 0;
 	for (i = job->low; i <= job->high; i++) {
@@ -341,6 +340,10 @@ void *_van_table_merge_job_run(void *arg) {
 
 	/* Now we check if the trees can be freed */
 	while (1) {
+		if (table->closed) {
+			ret = 0;
+			goto out;
+		}
 		VAN_MUTEX_LOCK(table, op_mtx, ret);
 		minopticks = table->min_op_ticks;
 		VAN_MUTEX_UNLOCK(table, op_mtx, ret);
@@ -368,6 +371,7 @@ void *_van_table_merge_job_run(void *arg) {
 					F_CLR(item, VAN_ITEM_INUSE);
 					F_SET(item, VAN_ITEM_UNUSED);
 				} else {
+					F_CLR(item, VAN_ITEM_UNUSED);
 					F_SET(item, VAN_ITEM_INUSE);
 				}
 				F_CLR(item, VAN_ITEM_MERGED);
@@ -403,11 +407,14 @@ void *_van_table_merge_job_run(void *arg) {
 out:
 	/* Set finished */
 	job->finished = VAN_TRUE;
-	atomic_fetch_sub(&table->mergecnt, 1);
 
 err:
-	if(trees != NULL)
+	if (trees != NULL)
 		_van_free(NULL, trees);
+	/* Decrement mergecnt exactly once, also on the error path.
+	 * Otherwise _van_table_merge_scan may wait for a counter that
+	 * never reaches zero and _van_table_close would hang forever. */
+	atomic_fetch_sub(&table->mergecnt, 1);
 	return (void *)(uintmax_t)ret;
 }
 
