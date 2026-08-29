@@ -157,9 +157,10 @@ struct _van_log_cursor {
 	VAN_LOG *logp;
 	VAN_IOFILE *logfile;		/* The logfile */
 	VAN_LOGFILE_HEADER filehdr;	/* File header */
-	VAN_LSN	lastlsn;		/* Last lsn */
+	VAN_LSN	lastlsn;		/* Last lsn (record returned) */
 	VAN_LOGREC_HEADER rechdr;	/* Last lsn's record header */
 	VAN_LOGREC_HEADER tailhdr;	/* The file's last record header */
+	uint32 filesize;		/* Current logfile size */
 };
 
 #ifdef __cplusplus

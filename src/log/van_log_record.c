@@ -300,6 +300,13 @@ int _van_logrec_write(VAN_STORE *store, const char *buf,
 			    "_van_logrec_write: Invalid type !");
 	}
 
+	/*
+	 * Track the LSN of the record just written so a log cursor can
+	 * find the end of the log (VAN_LAST/VAN_PREV).
+	 */
+	if (ret == 0)
+		logp->last_lsn = lsn;
+
 	return (ret);
 }
 

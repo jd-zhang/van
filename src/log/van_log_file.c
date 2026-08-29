@@ -221,9 +221,18 @@ int _van_logc_openfile(VAN_LOG_CURSOR *lgc, VAN_LSN *lsn) {
 	fnum = lsn->file;
 	logp = lgc->logp;
 
-	/* The file does not change */
-	if (lgc->logfile != NULL && lgc->lastlsn.file == fnum)
+	/*
+	 * The file does not change: just refresh the file size (the
+	 * last, still active log file keeps growing).
+	 */
+	if (lgc->logfile != NULL && lgc->lastlsn.file == fnum) {
+		ret = _van_iofile_stat(lgc->logfile, &st);
+		CHK_ERR(ret);
+		lgc->filesize = (uint32)st.st_size;
+		lgc->completed =
+		    (st.st_size == lgc->filehdr.logsize) ? 1 : 0;
 		return (ret);
+	}
 
 	if (lgc->logfile != NULL) {
 		ret = _van_iofile_close(lgc->logfile);
@@ -242,8 +251,15 @@ int _van_logc_openfile(VAN_LOG_CURSOR *lgc, VAN_LSN *lsn) {
 	oflag = O_RDONLY; /* O_APPEND ? */
 	omode = DEF_FILE_MODE;
 	ret = _van_iofile_open(lgpath, oflag, omode, &lgc->logfile);
-	/* TODO: The error needs conversion for file not found ! */
-	CHK_ERR(ret);
+	if (ret != 0) {
+		/*
+		 * The file does not exist: this is the end of the log.
+		 * Any other error is a real problem.
+		 */
+		if (ret == ENOENT)
+			ret = VAN_NOTFOUND;
+		goto err;
+	}
 
 	ret = _van_iofile_read(lgc->logfile, 0, buf, VAN_LOGFILE_HDRSIZE);
 	CHK_ERR(ret);
@@ -251,6 +267,7 @@ int _van_logc_openfile(VAN_LOG_CURSOR *lgc, VAN_LSN *lsn) {
 
 	ret = _van_iofile_stat(lgc->logfile, &st);
 	CHK_ERR(ret);
+	lgc->filesize = (uint32)st.st_size;
 
 	if (st.st_size == lgc->filehdr.logsize)
 		lgc->completed = 1;
@@ -265,6 +282,8 @@ int _van_logc_openfile(VAN_LOG_CURSOR *lgc, VAN_LSN *lsn) {
 		CHK_ERR(ret);
 		memcpy(&lgc->tailhdr, buf, VAN_LOGREC_HDRSIZE);
 	}
+
+	lgc->lastlsn.file = fnum;
 
 err:
 	if (ret != 0 && lgc->logfile != NULL) {

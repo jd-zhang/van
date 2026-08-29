@@ -10,7 +10,7 @@ CLIBS=	../libvan.a -lpthread
 CXXLIBS=	-lpthread 
 
 
-programs=  imt_tmain misc_tmain odt_tmain table_tmain
+programs=  imt_tmain log_tmain misc_tmain odt_tmain table_tmain
 
 smalltests=  imtree1
 
@@ -27,6 +27,8 @@ db_common_objs=   flags_common.o test_common.o van_flags_common.o
 
 imt_tmain_objs=  imt_t1.o imt_t2.o imt_tmain.o
 
+log_tmain_objs=  log_t1.o log_tmain.o
+
 misc_tmain_objs=  misc_t1.o misc_tmain.o
 
 odt_tmain_objs=  odt_t1.o odt_tmain.o
@@ -39,6 +41,9 @@ imtree1_objs= imtree1.o
 
 imt_tmain: $(db_common_objs) $(imt_tmain_objs)
 	$(CC) -o $@ $(LDFLAGS) $(db_common_objs) $(imt_tmain_objs) $(CLIBS)
+
+log_tmain: $(db_common_objs) $(log_tmain_objs)
+	$(CC) -o $@ $(LDFLAGS) $(db_common_objs) $(log_tmain_objs) $(CLIBS)
 
 misc_tmain: $(db_common_objs) $(misc_tmain_objs)
 	$(CC) -o $@ $(LDFLAGS) $(db_common_objs) $(misc_tmain_objs) $(CLIBS)
@@ -72,6 +77,12 @@ imt_tmain.o: ./inmemtree/imt_tmain.c
 	$(CC) -c -o $@ $(CPPFLAGS) $(CFLAGS) $?
 
 imtree1.o: ./inmemtree/small/imtree1.c
+	$(CC) -c -o $@ $(CPPFLAGS) $(CFLAGS) $?
+
+log_t1.o: ./log/log_t1.c
+	$(CC) -c -o $@ $(CPPFLAGS) $(CFLAGS) $?
+
+log_tmain.o: ./log/log_tmain.c
 	$(CC) -c -o $@ $(CPPFLAGS) $(CFLAGS) $?
 
 misc_t1.o: ./misc/misc_t1.c

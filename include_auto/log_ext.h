@@ -21,6 +21,8 @@ extern "C" {
 #endif
 
 /* src/log/van_log_cursor.c */
+extern int _van_log_cursor_alloc(VAN_LOG *logp, VAN_LOG_CURSOR **lgcpp);
+extern int _van_log_cursor_close(VAN_LOG_CURSOR *lgc);
 extern int _van_logrec_cget(VAN_LOG_CURSOR *lgc, VAN_LSN *lsn,
     VAN_DATUM *datum, flags_t flags);
 
