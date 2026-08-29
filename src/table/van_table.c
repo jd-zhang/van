@@ -1138,7 +1138,7 @@ void _van_table_show_odt_items(VAN_TABLE *table, FILE *f) {
 	/*
 	it is just used for testing, so no mutex is locked/unlocked.
 	*/
-	fprintf(f, "odt_top: %d\n", table->odt_top);
+	fprintf(f, "odt_top: %zu\n", table->odt_top);
 	for (i = 0; i < table->odtpath_cnt; i++) {
 		fprintf(f, "odtpath[%d]: %s\n", i, table->odtpaths[i]);
 	}

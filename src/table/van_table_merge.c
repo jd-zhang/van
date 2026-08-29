@@ -127,7 +127,7 @@ int _van_table_merge_scan(VAN_TABLE *table) {
 
 			atomic_fetch_add(&table->mergecnt, 1);
 			if (F_ISSET(table, VAN_TABLE_VERBOSE_MERGE)) {
-				fprintf(stderr, "_van_table_new_merge_job(%d,%d,%d)\n",
+				fprintf(stderr, "_van_table_new_merge_job(%zu,%zu,%zu)\n",
 					low,high, cnt);
 			}
 			ret = _van_table_new_merge_job(table, low,
