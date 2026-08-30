@@ -88,8 +88,17 @@ struct _inmem_tree {
 	 * active -> frozen -> dumped ->destroyed.
 	 */
 /*	ticks_t		created_ticks; */
-	ticks_t		frozen_ticks; // actually not used.
-	ticks_t		dumped_ticks; // actually not used.
+	/*
+	 * Recorded when the tree is frozen.  Used as the odt item ticks
+	 * when the tree is dumped, so that a get operation created after
+	 * the freeze can see the dumped records.
+	 */
+	ticks_t		frozen_ticks;
+	/*
+	 * Recorded after the dump is finished.  Used by the frozen free
+	 * thread to decide when it is safe to destroy the frozen tree.
+	 */
+	ticks_t		dumped_ticks;
 /*	ticks_t		freed_ticks; */
 /* #define INMEM_TREE_ACTIVE	0x01 */
 #define INMEM_TREE_FROZEN	0x02

@@ -963,11 +963,12 @@ int _van_table_dump_frozen(VAN_TABLE *table, ONDISK_TREE **odtreep) {
 	F_CLR(item, VAN_ITEM_UNUSED);
 	F_CLR(item, VAN_ITEM_DUMPING);
 	F_SET(item, VAN_ITEM_INUSE);
-	ret =  _van_table_curticks(table, &item->ticks);
-	if (ret != 0) {
-		VAN_MUTEX_UNLOCK(item, mutex, ret1);
-		goto err;
-	}
+	/*
+	 * Use the ticks recorded when the tree was frozen, not the dump
+	 * completion ticks, so that operations created between the freeze
+	 * and the publication of this item can still see its records.
+	 */
+	item->ticks = table->frozen->frozen_ticks;
 	*odtreep = odtree;
 	VAN_MUTEX_UNLOCK(item, mutex, ret);
 	/*
@@ -999,6 +1000,8 @@ int _van_table_dump_inmem(VAN_TABLE *table) {
 	} else if (table->active->size == 0)
 		return (0);
 
+	ret = _van_table_curticks(table, &table->active->frozen_ticks);
+	CHK_ERR(ret);
 	F_SET(table->active, INMEM_TREE_FROZEN);
 	frozen = table->active;
 	table->frozen = frozen;

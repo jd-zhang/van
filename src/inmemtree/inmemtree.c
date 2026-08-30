@@ -218,6 +218,17 @@ int _van_inmemtree_freeze(INMEM_TREE *tree) {
 	if (F_ISSET(tree, INMEM_TREE_FROZEN)) {
 		return ret;
 	}	
+	/*
+	 * Record the ticks at the moment the tree is frozen, i.e. the
+	 * latest time at which a record could have been inserted into
+	 * this tree.  The dump thread uses this value as the odt item
+	 * ticks (instead of the dump completion ticks), so that a get
+	 * operation created after the freeze but before the dump is
+	 * published can still see the records of this tree.
+	 */
+	ret = _van_table_curticks(tree->table, &tree->frozen_ticks);
+	if (ret != 0)
+		return (ret);
 	F_SET(tree, INMEM_TREE_FROZEN);
 	tree->put = _van_inmemtree_put_frozen;
 	tree->del = _van_inmemtree_del_frozen;

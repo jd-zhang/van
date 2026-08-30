@@ -113,7 +113,14 @@ void *_van_table_frozen_dump_thread(void *arg) {
 	 */
 	VAN_MUTEX_LOCK(item, mutex, ret);
 	item->trees[0] = odtree;
-	_van_table_curticks(table, &item->ticks);
+	/*
+	 * Use the ticks recorded when the tree was frozen, not the dump
+	 * completion ticks.  Otherwise a get operation created after the
+	 * freeze but before this item is published would skip the item
+	 * (item->ticks > create_ticks) and miss records that were already
+	 * committed before the get operation started.
+	 */
+	item->ticks = frozen->frozen_ticks;
 	F_CLR(item, VAN_ITEM_UNUSED);
 	F_SET(item, VAN_ITEM_INUSE);
 	F_CLR(item, VAN_ITEM_DUMPING);
