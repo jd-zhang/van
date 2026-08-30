@@ -160,6 +160,7 @@ static void _van_table_set_functions(VAN_TABLE *table) {
 	table->get_scan_interval = _van_table_get_scan_interval;
 	table->set_compare_function = _van_set_compare_function;
 	table->show_odt_items = _van_table_show_odt_items;
+	table->test_get = _van_table_test_get;
 	table->dump_inmem = _van_table_dump_inmem;
 	table->write_odt_paths = _van_table_write_odt_paths;
 	table->replace_odt_items = _van_table_replace_odt_items;
@@ -1146,12 +1147,113 @@ Used for testing only. It will show the odt_items and odtpaths in the table.
 */
 
 void _van_table_show_odt_items(VAN_TABLE *table, FILE *f) {
-	int i;
+	int i, start;
 	/*
 	it is just used for testing, so no mutex is locked/unlocked.
 	*/
 	fprintf(f, "odt_top: %zu\n", table->odt_top);
-	for (i = 0; i < table->odtpath_cnt; i++) {
-		fprintf(f, "odtpath[%d]: %s\n", i, table->odtpaths[i]);
+	for (i = 0; i < (int)table->odtpath_cnt; ) {
+		if (table->odtpaths[i] != NULL) {
+			fprintf(f, "odtpath[%d]: %s\n", i,
+			    table->odtpaths[i]);
+			i++;
+			continue;
+		}
+		/*
+		 * odtpaths[i] is NULL.  Find the maximal run of
+		 * consecutive NULLs starting at i, and show it as
+		 * a single range.
+		 */
+		start = i;
+		while (i < (int)table->odtpath_cnt &&
+		    table->odtpaths[i] == NULL)
+			i++;
+		if (i - 1 == start)
+			fprintf(f, "odtpath[%d]: (null)\n", start);
+		else
+			fprintf(f, "odtpath[%d-%d]: (null)\n", start, i - 1);
 	}
+}
+
+/*
+ * Used for testing only.
+ *
+ * Search a key in the order active -> frozen -> ondisk trees,
+ * using the underlying tree getraw() calls instead of table->get(),
+ * and report where the key is found (or that it is deleted / not
+ * found anywhere).
+ *
+ * It is only used by the test programs, so the locking is simplified:
+ * no item mutex / odt_mtx is taken, and a reference is not taken on
+ * the ondisk tree.  Do not use it in production paths.
+ */
+int _van_table_test_get(VAN_TABLE *table, VAN_DATUM *key, VAN_DATUM *data,
+    flags_t flags, char *wherebuf, size_t wherelen) {
+	INMEM_TREE *active, *frozen;
+	ONDISK_TREE *odtree;
+	VAN_TABLE_ODT_ITEM *item;
+	int ret;
+	size_t i;
+
+	if (wherebuf != NULL && wherelen > 0)
+		wherebuf[0] = '\0';
+
+	active = table->active;
+	frozen = table->frozen;
+
+	/* 1. Search the active in-memory tree. */
+	if (active != NULL) {
+		ret = active->getraw(active, key, data, flags);
+		if (ret == 0 || ret == VAN_DELETED) {
+			if (wherebuf != NULL && wherelen > 0)
+				(void)snprintf(wherebuf, wherelen, "%s",
+				    (ret == 0) ? "active" : "active(deleted)");
+			return (ret);
+		}
+	}
+
+	/* 2. Search the frozen in-memory tree. */
+	if (frozen != NULL) {
+		ret = frozen->getraw(frozen, key, data, flags);
+		if (ret == 0 || ret == VAN_DELETED) {
+			if (wherebuf != NULL && wherelen > 0)
+				(void)snprintf(wherebuf, wherelen, "%s",
+				    (ret == 0) ? "frozen" : "frozen(deleted)");
+			return (ret);
+		}
+	}
+
+	/*
+	 * 3. Search the ondisk trees from the newest (highest index)
+	 * to the oldest, which is the same order as table->get().
+	 */
+	for (i = table->odt_top; i > 0; i--) {
+		item = &table->odt_items[i - 1];
+		if (F_ISSET(item, VAN_ITEM_UNUSED))
+			continue;
+		odtree = item->trees[0];
+		if (odtree == NULL)
+			continue;
+		/* During merging, trees[1] holds the merged tree. */
+		if (F_ISSET(item, VAN_ITEM_MERGED) && item->trees[1] != NULL)
+			odtree = item->trees[1];
+
+		ret = odtree->getraw(odtree, key, data, flags);
+		if (ret == 0 || ret == VAN_DELETED) {
+			if (wherebuf != NULL && wherelen > 0) {
+				if (odtree->file_path != NULL)
+					(void)snprintf(wherebuf, wherelen,
+					    "odt[%zu] %s", i - 1,
+					    odtree->file_path);
+				else
+					(void)snprintf(wherebuf, wherelen,
+					    "odt[%zu]", i - 1);
+			}
+			return (ret);
+		}
+	}
+
+	if (wherebuf != NULL && wherelen > 0)
+		(void)snprintf(wherebuf, wherelen, "not found");
+	return (VAN_NOTFOUND);
 }

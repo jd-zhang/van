@@ -127,6 +127,24 @@ struct _van_table {
 	int (*get_scan_interval)(VAN_TABLE *, size_t *);
 	int (*set_compare_function)(VAN_TABLE *, VAN_DATUM_CMPFUNC);
 	void (*show_odt_items)(VAN_TABLE *, FILE *);
+	/*
+	 * Used for testing only.
+	 *
+	 * Search a key in the order active -> frozen -> ondisk trees,
+	 * using the underlying tree getraw() calls instead of
+	 * table->get(), and report where the key is found.
+	 *
+	 * Return values:
+	 *   0:          found, data is filled with the value.
+	 *   VAN_DELETED: found, but marked as deleted.
+	 *   VAN_NOTFOUND: not found anywhere.
+	 *
+	 * wherebuf (if not NULL) receives a description of where the
+	 * key is located, e.g. "active", "frozen", "odt[3] <path>",
+	 * "active(deleted)", or "not found".
+	 */
+	int (*test_get)(VAN_TABLE *, VAN_DATUM *, VAN_DATUM *,
+	    flags_t, char *, size_t);
 	int (*dump_inmem)(VAN_TABLE *);
 	int (*write_odt_paths)(VAN_TABLE *);
 	int (*replace_odt_items)(VAN_TABLE *, size_t, size_t, ONDISK_TREE *);

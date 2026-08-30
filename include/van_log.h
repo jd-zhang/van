@@ -136,7 +136,7 @@ struct _van_log {
 	VAN_STRING_ARRAY *lognames;
 
 	/* function handles */
-	int (*cursor_alloc)(VAN_LOG *, VAN_LOG_CURSOR **);
+	int (*cursor)(VAN_LOG *, VAN_LOG_CURSOR **);
 };
 
 /* Used for log cursor */

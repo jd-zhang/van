@@ -132,7 +132,7 @@ int _van_inmemtree_create(VAN_TABLE *table, INMEM_TREE **treep) {
 	tree->destroy = _van_inmemtree_destory;
 	tree->freeze = _van_inmemtree_freeze;
 	tree->dump_all_leaves = _van_inmemtree_dump_all_leaves;
-	tree->cursor_init = _van_inmemtree_cursor_init;
+	tree->cursor = _van_inmemtree_cursor_init;
 	tree->statprint = _inmemtree_statprint;
 
 	*treep = tree;

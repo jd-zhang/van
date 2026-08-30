@@ -134,10 +134,10 @@ static int check_duplicate(void *obj, size_t maxksz, size_t *totalp,
 
 	switch (otype) {
 		case OP_INMEMTREE:
-			ret = imtree->cursor_init(imtree, &imcursor, 0);
+			ret = imtree->cursor(imtree, &imcursor, 0);
 			break;
 		case OP_ONDISKTREE:
-			ret = odtree->cursor_init(odtree, &odcursor, 0);
+			ret = odtree->cursor(odtree, &odcursor, 0);
 			break;
 		case OP_TABLE:
 			ret = 0; /* TODO: Add table cursor test here */
@@ -384,6 +384,38 @@ int delete_table(VAN_TABLE *table, char **keys, size_t *ksizes,
 }
 
 /*
+ * Print a datum in a readable way:
+ * - If it looks like a string (NUL-terminated), print it as a string.
+ * - Otherwise, print the bytes in hex.
+ */
+static void print_datum(FILE *f, const char *label, const VAN_DATUM *datum) {
+	size_t i;
+	const unsigned char *p;
+
+	fprintf(f, "%s", label);
+	if (datum == NULL || datum->data == NULL) {
+		fprintf(f, "= (null)\n");
+		return;
+	}
+	if (datum->size == 0) {
+		fprintf(f, "= (empty, size=0)\n");
+		return;
+	}
+	p = (const unsigned char *)datum->data;
+	if (p[datum->size - 1] == '\0') {
+		fprintf(f, "= \"%.*s\" (str, size=%zu)\n",
+		    (int)datum->size - 1, (const char *)datum->data,
+		    datum->size);
+	} else {
+		fprintf(f, "= hex[%zu]: ", datum->size);
+		for (i = 0; i < datum->size; i++)
+			fprintf(f, "%02x%s", p[i],
+			    (i + 1 < datum->size) ? " " : "");
+		fprintf(f, "\n");
+	}
+}
+
+/*
 verify the records using the inmemtree/odisktree/table get function,
 and verify the records are the same as the input data.
 */
@@ -432,8 +464,78 @@ static int verify_data_with_expected(void *obj, char **keys, size_t *ksizes,
 			VAN_ASSERT((memcmp(value.data, values[i], value.size) == 0));
 		}
 		if (ret != expected) {
-			fprintf(stderr, "Expected return: %d, got: %d\n",
-			    expected, ret);
+			VAN_DATUM expval, retval;
+			char wherebuf[MAX_BUF_LEN];
+
+			fprintf(stderr,
+			    "==== verify_data_with_expected mismatch ====\n");
+			fprintf(stderr,
+			    "record indx: %zu, expected return: %d, got: %d (%s)\n",
+			    i, expected, ret, info);
+
+			memset(&expval, 0, sizeof(expval));
+			if (expected == 0) {
+				expval.data = values[i];
+				expval.size = vsizes[i];
+				print_datum(stderr, "key", &key);
+				print_datum(stderr, "expected value", &expval);
+			} else {
+				print_datum(stderr, "key", &key);
+				fprintf(stderr, "expected value: (none, expected=%d)\n",
+				    expected);
+			}
+
+			memset(&retval, 0, sizeof(retval));
+			if (ret == 0) {
+				retval.data = value.data;
+				retval.size = value.size;
+				print_datum(stderr, "returned value", &retval);
+			} else {
+				fprintf(stderr, "returned value: (none, ret=%d)\n",
+				    ret);
+			}
+
+			switch (otype) {
+				case OP_ONDISKTREE:
+					if (odtree->file_path != NULL)
+						fprintf(stderr, "odtree file: %s\n",
+						    odtree->file_path);
+					else
+						fprintf(stderr,
+						    "odtree file: (unknown)\n");
+					break;
+				case OP_TABLE:
+					/*
+					 * Re-search the key in the order
+					 * active -> frozen -> ondisk trees,
+					 * using table->test_get, and show
+					 * where it is found (or not).
+					 */
+					if (table->test_get != NULL) {
+						int ret2;
+
+						memset(&retval, 0, sizeof(retval));
+						wherebuf[0] = '\0';
+						ret2 = table->test_get(table, &key,
+						    &retval, 0, wherebuf,
+						    sizeof(wherebuf));
+						fprintf(stderr,
+						    "second lookup(table->test_get): ret=%d, where=%s\n",
+						    ret2, wherebuf);
+						if (ret2 == 0)
+							print_datum(stderr,
+							    "value found at second lookup",
+							    &retval);
+					} else {
+						fprintf(stderr,
+						    "second lookup: table->test_get is NULL\n");
+					}
+					break;
+				default:
+					break;
+			}
+			fprintf(stderr,
+			    "==== end of mismatch info ====\n");
 		}
 		CHK_RET(ret != expected, info);
 	}
@@ -502,10 +604,10 @@ static int verify_data_withcursor(void *obj, char **keys, size_t *ksizes,
 
 	switch (otype) {
 		case OP_INMEMTREE:
-			ret = imtree->cursor_init(imtree, &imcursor, 0);
+			ret = imtree->cursor(imtree, &imcursor, 0);
 			break;
 		case OP_ONDISKTREE:
-			ret = odtree->cursor_init(odtree, &odcursor, 0);
+			ret = odtree->cursor(odtree, &odcursor, 0);
 			break;
 		case OP_TABLE:
 			ret = 0; /* TODO: Add table cursor test here */
@@ -613,10 +715,10 @@ int verify_ondisktreecursor_with_inmemtreecursor(INMEM_TREE *imtree,
 
 	time(&t1);
 	rcnt = 0;
-	ret = odtree->cursor_init(odtree, &odc, 0);
-	CHK_RET(ret, "odtree->cursor_init");
-	ret = imtree->cursor_init(imtree, &imc, 0);
-	CHK_RET(ret, "imtree->cursor_init");
+	ret = odtree->cursor(odtree, &odc, 0);
+	CHK_RET(ret, "odtree->cursor");
+	ret = imtree->cursor(imtree, &imc, 0);
+	CHK_RET(ret, "imtree->cursor");
 	for (ret = 0; ret == 0;) {
 		memset(&key, 0, sizeof(key));
 		memset(&value, 0, sizeof(value));
@@ -694,10 +796,10 @@ static int verify_cursor_direction(void *obj, flags_t direction,
 	odcursor = NULL;
 	switch (otype) {
 		case OP_INMEMTREE:
-			ret = imtree->cursor_init(imtree, &imcursor, cflags);
+			ret = imtree->cursor(imtree, &imcursor, cflags);
 			break;
 		case OP_ONDISKTREE:
-			ret = odtree->cursor_init(odtree, &odcursor, cflags);
+			ret = odtree->cursor(odtree, &odcursor, cflags);
 			break;
 		case OP_TABLE:
 			ret = 0; /* TODO: Add table cursor test here */
@@ -840,8 +942,8 @@ static int verify_cursor_border(void *obj, flags_t direction,
 	odcursor1 = odcursor2 = NULL;
 	switch (otype) {
 		case OP_INMEMTREE:
-			ret = imtree->cursor_init(imtree, &imcursor1, cflags);
-			CHK_RET(ret, "imtree->cursor_init(imcursor1)");
+			ret = imtree->cursor(imtree, &imcursor1, cflags);
+			CHK_RET(ret, "imtree->cursor(imcursor1)");
 
 			ret1 = imcursor1->get(imcursor1, &key1, &value1, direction);
 			if (ret1 == 0) {
@@ -852,8 +954,8 @@ static int verify_cursor_border(void *obj, flags_t direction,
 			ret = imcursor1->cleanup(imcursor1);
 			CHK_RET(ret, "imcursor1->cleanup(imcursor1)");
 
-			ret = imtree->cursor_init(imtree, &imcursor2, cflags);
-			CHK_RET(ret, "imtree->cursor_init(imcursor2)");
+			ret = imtree->cursor(imtree, &imcursor2, cflags);
+			CHK_RET(ret, "imtree->cursor(imcursor2)");
 
 			ret2 = imcursor2->get(imcursor2, &key2, &value2, direction2);
 			if (ret2 == 0) {
@@ -870,8 +972,8 @@ static int verify_cursor_border(void *obj, flags_t direction,
 			SET_RET(ret1, ret);
 			break;
 		case OP_ONDISKTREE:
-			ret = odtree->cursor_init(odtree, &odcursor1, cflags);
-			CHK_RET(ret, "odtree->cursor_init(odcursor1)");
+			ret = odtree->cursor(odtree, &odcursor1, cflags);
+			CHK_RET(ret, "odtree->cursor(odcursor1)");
 
 			ret1 = odcursor1->get(odcursor1, &key1, &value1, direction);
 			if (ret1 == 0) {
@@ -882,8 +984,8 @@ static int verify_cursor_border(void *obj, flags_t direction,
 			ret = odcursor1->cleanup(odcursor1);
 			CHK_RET(ret, "odcursor1->cleanup(odcursor1)");
 
-			ret = odtree->cursor_init(odtree, &odcursor2, cflags);
-			CHK_RET(ret, "odtree->cursor_init(odcursor2)");
+			ret = odtree->cursor(odtree, &odcursor2, cflags);
+			CHK_RET(ret, "odtree->cursor(odcursor2)");
 
 			ret2 = odcursor2->get(odcursor2, &key2, &value2, direction2);
 			if (ret2 == 0) {

@@ -97,8 +97,8 @@ int log_t1_1() {
 	CHK_RET(ret, "store->open");
 	logp = store->log_handle;
 
-	ret = logp->cursor_alloc(logp, &lgc);
-	CHK_RET(ret, "logp->cursor_alloc");
+	ret = logp->cursor(logp, &lgc);
+	CHK_RET(ret, "logp->cursor");
 
 	memset(&rec, 0, sizeof(rec));
 	ret = lgc->get(lgc, &lsn, &rec, VAN_FIRST);
@@ -237,8 +237,8 @@ int log_t1_2() {
 	CHK_RET(ret, "store->open");
 	logp = store->log_handle;
 
-	ret = logp->cursor_alloc(logp, &lgc);
-	CHK_RET(ret, "logp->cursor_alloc");
+	ret = logp->cursor(logp, &lgc);
+	CHK_RET(ret, "logp->cursor");
 
 	memset(&rec, 0, sizeof(rec));
 	ret = lgc->get(lgc, &lsn, &rec, VAN_FIRST);

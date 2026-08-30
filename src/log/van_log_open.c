@@ -88,7 +88,7 @@ int _van_log_init(VAN_LOG *logp) {
 	logp->header.logsize = VAN_DEF_LOGSIZE;
 	logp->header.unused = 0;
 	logp->firstfnum = 1;
-	logp->cursor_alloc = _van_log_cursor_alloc;
+	logp->cursor = _van_log_cursor_alloc;
 
 	ret = _van_strarray_alloc(&logp->lognames, 0);
 	CHK_ERR(ret);

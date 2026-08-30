@@ -56,6 +56,8 @@ extern int _van_table_dump_inmem(VAN_TABLE *table);
 extern int _van_table_replace_odt_items(VAN_TABLE *table,
     size_t st, size_t et, ONDISK_TREE *newodtree);
 extern void _van_table_show_odt_items(VAN_TABLE *table, FILE *f);
+extern int _van_table_test_get(VAN_TABLE *table, VAN_DATUM *key,
+    VAN_DATUM *data, flags_t flags, char *wherebuf, size_t wherelen);
 
 /* src/table/van_table_dump.c */
 extern int _van_table_freeze(VAN_TABLE *table, unsigned long checkgen);

@@ -70,7 +70,7 @@ int _van_ondisktree_init(ONDISK_TREE *tree) {
 	tree->close = _van_ondisktree_close;
 	tree->store_inmem = _van_ondisktree_store_inmem;
 	tree->dump = _van_ondisktree_dump;
-	tree->cursor_init = _van_ondisktree_cursor_init;
+	tree->cursor = _van_ondisktree_cursor_init;
 
 	return (ret);
 }

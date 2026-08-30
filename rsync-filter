@@ -8,3 +8,6 @@
 *~
 *.stackdump
 .git
+vanlog.0*
+test/*.odlist*
+test/*.ondisk.*

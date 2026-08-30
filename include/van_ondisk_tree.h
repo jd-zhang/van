@@ -163,7 +163,7 @@ struct _ondisk_tree {
 	VAN_DATUM *readata;
 
 	/* function handles */
-	int (*cursor_init)(ONDISK_TREE *, ONDISK_TREECURSOR **, flags_t);
+	int (*cursor)(ONDISK_TREE *, ONDISK_TREECURSOR **, flags_t);
 	int (*get)(ONDISK_TREE *,
 	    VAN_DATUM *, VAN_DATUM *, flags_t);
 	int (*getraw)(ONDISK_TREE *,
