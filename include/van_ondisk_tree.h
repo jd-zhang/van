@@ -163,6 +163,7 @@ struct _ondisk_tree {
 	VAN_DATUM *readata;
 
 	/* function handles */
+	int (*cursor_init)(ONDISK_TREE *, ONDISK_TREECURSOR **, flags_t);
 	int (*get)(ONDISK_TREE *,
 	    VAN_DATUM *, VAN_DATUM *, flags_t);
 	int (*getraw)(ONDISK_TREE *,
@@ -207,6 +208,7 @@ struct _ondisk_treecursor {
 	    VAN_DATUM *, VAN_DATUM *, flags_t);
 	int (*getraw)(ONDISK_TREECURSOR *,
 	    VAN_DATUM *, VAN_DATUM *, flags_t);
+	int (*cleanup)(ONDISK_TREECURSOR *);
 
 };
 

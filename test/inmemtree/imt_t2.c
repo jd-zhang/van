@@ -105,10 +105,10 @@ int imt_t2_1() {
 	fprintf(stderr, "========== 4 Destroy the tree ============\n");
 	time(&t1);
 	van_alloc_stat_reset();
-	ret = _van_inmemtree_destory(tree);
+	ret = tree->destroy(tree);
 	time(&t2);
 	fprintf(stderr, "time consuming: %g seconds\n", difftime(t2, t1));
-	CHK_RET(ret, "_van_inmemtree_destory");
+	CHK_RET(ret, "tree->destroy");
 	fprintf(stderr, "**** Malloc Statistics ****\n");
 	van_alloc_stat_print(stderr, " ");
 

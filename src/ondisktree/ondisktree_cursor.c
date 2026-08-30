@@ -40,6 +40,7 @@ int _van_ondisktree_cursor_init(ONDISK_TREE *tree,
 	/* Only support get function */
 	cursor->get = _van_ondisktree_cursor_get;
 	cursor->getraw = _van_ondisktree_cursor_getraw;
+	cursor->cleanup = _van_ondisktree_cursor_cleanup;
 
 	/*
 	 * TEMP cursor is created by invoking an

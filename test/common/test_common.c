@@ -134,17 +134,17 @@ static int check_duplicate(void *obj, size_t maxksz, size_t *totalp,
 
 	switch (otype) {
 		case OP_INMEMTREE:
-			ret = _van_inmemtree_cursor_init(imtree, &imcursor, 0);
+			ret = imtree->cursor_init(imtree, &imcursor, 0);
 			break;
 		case OP_ONDISKTREE:
-			ret = _van_ondisktree_cursor_init(odtree, &odcursor, 0);
+			ret = odtree->cursor_init(odtree, &odcursor, 0);
 			break;
 		case OP_TABLE:
 			ret = 0; /* TODO: Add table cursor test here */
 			table = table;
 			break;
 		default:
-			ret = _van_error_print("BAD OP_TYPE");
+			ret = van_error_print("BAD OP_TYPE");
 			break;
 	}
 	if (ret != 0)
@@ -156,11 +156,11 @@ static int check_duplicate(void *obj, size_t maxksz, size_t *totalp,
 		memset(&value, 0, sizeof(VAN_DATUM));
 		switch (otype) {
 			case OP_INMEMTREE:
-				ret = _van_inmemtree_cursor_getraw(imcursor,
+				ret = imcursor->getraw(imcursor,
 				    &key, &value, VAN_NEXT);
 				break;
 			case OP_ONDISKTREE:
-				ret = _van_ondisktree_cursor_getraw(odcursor,
+				ret = odcursor->getraw(odcursor,
 				    &key, &value, VAN_NEXT);
 				break;
 			case OP_TABLE:
@@ -196,10 +196,10 @@ err:
 	if (imcursor != NULL || odcursor != NULL) {
 		switch (otype) {
 			case OP_INMEMTREE:
-				ret1 = _van_inmemtree_cursor_cleanup(imcursor);
+				ret1 = imcursor->cleanup(imcursor);
 				break;
 			case OP_ONDISKTREE:
-				ret1 = _van_ondisktree_cursor_cleanup(odcursor);
+				ret1 = odcursor->cleanup(odcursor);
 				break;
 			case OP_TABLE:
 				ret1 = 0; /* TODO: For table */
@@ -263,7 +263,7 @@ static int populate_data_with_expected(void *obj, char **keys, size_t *ksizes,
 				break;
 			default:
 				info = "Unknown op_type";
-				ret = _van_error_print("BAD OP_TYPE");
+				ret = van_error_print("BAD OP_TYPE");
 				break;
 		}
 		if (ret != expected) {
@@ -342,7 +342,7 @@ static int delete_data_with_expected(void *obj, char **keys, size_t *ksizes,
 				break;
 			default:
 				info = "Unknown op_type";
-				ret = _van_error_print("BAD OP_TYPE");
+				ret = van_error_print("BAD OP_TYPE");
 				break;
 		}
 		if (ret != expected) {
@@ -425,7 +425,7 @@ static int verify_data_with_expected(void *obj, char **keys, size_t *ksizes,
 			default:
 				/* ERROR */
 				info = "bad otype";
-				ret = _van_error_print("BAD OP_TYPE");
+				ret = van_error_print("BAD OP_TYPE");
 		}
 		if (ret == 0) {
 			VAN_ASSERT(value.size == vsizes[i]);
@@ -502,17 +502,17 @@ static int verify_data_withcursor(void *obj, char **keys, size_t *ksizes,
 
 	switch (otype) {
 		case OP_INMEMTREE:
-			ret = _van_inmemtree_cursor_init(imtree, &imcursor, 0);
+			ret = imtree->cursor_init(imtree, &imcursor, 0);
 			break;
 		case OP_ONDISKTREE:
-			ret = _van_ondisktree_cursor_init(odtree, &odcursor, 0);
+			ret = odtree->cursor_init(odtree, &odcursor, 0);
 			break;
 		case OP_TABLE:
 			ret = 0; /* TODO: Add table cursor test here */
 			table = table;
 			break;
 		default:
-			ret = _van_error_print("BAD OP_TYPE");
+			ret = van_error_print("BAD OP_TYPE");
 			break;
 	}
 	if (ret != 0)
@@ -542,7 +542,7 @@ static int verify_data_withcursor(void *obj, char **keys, size_t *ksizes,
 			default:
 				/* ERROR */
 				info = "bad otype";
-				ret = _van_error_print("BAD OP_TYPE");
+				ret = van_error_print("BAD OP_TYPE");
 		}
 		CHK_RET(ret, info);
 		VAN_ASSERT(value.size == vsizes[i]);
@@ -555,10 +555,10 @@ err:
 	if (imcursor != NULL || odcursor != NULL) {
 		switch (otype) {
 			case OP_INMEMTREE:
-				ret1 = _van_inmemtree_cursor_cleanup(imcursor);
+				ret1 = imcursor->cleanup(imcursor);
 				break;
 			case OP_ONDISKTREE:
-				ret1 = _van_ondisktree_cursor_cleanup(odcursor);
+				ret1 = odcursor->cleanup(odcursor);
 				break;
 			case OP_TABLE:
 				ret1 = 0; /* TODO: For table */
@@ -613,10 +613,10 @@ int verify_ondisktreecursor_with_inmemtreecursor(INMEM_TREE *imtree,
 
 	time(&t1);
 	rcnt = 0;
-	ret = _van_ondisktree_cursor_init(odtree, &odc, 0);
-	CHK_RET(ret, "_van_ondisktree_cursor_init");
-	ret = _van_inmemtree_cursor_init(imtree, &imc, 0);
-	CHK_RET(ret, "_van_inmemtree_cursor_init");
+	ret = odtree->cursor_init(odtree, &odc, 0);
+	CHK_RET(ret, "odtree->cursor_init");
+	ret = imtree->cursor_init(imtree, &imc, 0);
+	CHK_RET(ret, "imtree->cursor_init");
 	for (ret = 0; ret == 0;) {
 		memset(&key, 0, sizeof(key));
 		memset(&value, 0, sizeof(value));
@@ -649,10 +649,10 @@ int verify_ondisktreecursor_with_inmemtreecursor(INMEM_TREE *imtree,
 	fprintf(stderr, "time consuming: %g seconds, get %lu records\n",
 	    difftime(t2, t1), (unsigned long)rcnt);
 
-	ret1 = _van_ondisktree_cursor_cleanup(odc);
-	CHK_RET(ret1, "_van_ondisktree_cursor_cleanup");
-	ret1 = _van_inmemtree_cursor_cleanup(imc);
-	CHK_RET(ret1, "_van_inmemtree_cursor_cleanup");
+	ret1 = odc->cleanup(odc);
+	CHK_RET(ret1, "odc->cleanup");
+	ret1 = imc->cleanup(imc);
+	CHK_RET(ret1, "imc->cleanup");
 
 	if (rcntp != NULL)
 		*rcntp = rcnt;
@@ -694,17 +694,17 @@ static int verify_cursor_direction(void *obj, flags_t direction,
 	odcursor = NULL;
 	switch (otype) {
 		case OP_INMEMTREE:
-			ret = _van_inmemtree_cursor_init(imtree, &imcursor, cflags);
+			ret = imtree->cursor_init(imtree, &imcursor, cflags);
 			break;
 		case OP_ONDISKTREE:
-			ret = _van_ondisktree_cursor_init(odtree, &odcursor, cflags);
+			ret = odtree->cursor_init(odtree, &odcursor, cflags);
 			break;
 		case OP_TABLE:
 			ret = 0; /* TODO: Add table cursor test here */
 			table = table;
 			break;
 		default:
-			ret = _van_error_print("BAD OP_TYPE");
+			ret = van_error_print("BAD OP_TYPE");
 			break;
 	}
 	if (ret != 0)
@@ -735,7 +735,7 @@ static int verify_cursor_direction(void *obj, flags_t direction,
 		if (ret == 0) {
 			rcnt++;
 			if (haspre) {
-				cmp = _van_datum_defcmp(&key, &prekey);
+				cmp = van_datum_defcmp(&key, &prekey);
 				if (direction == VAN_NEXT) {
 					TEST_ASSERT(cmp > 0);
 				} else {
@@ -759,10 +759,10 @@ err:
 	if (imcursor != NULL || odcursor != NULL) {
 		switch (otype) {
 			case OP_INMEMTREE:
-				ret1 = _van_inmemtree_cursor_cleanup(imcursor);
+				ret1 = imcursor->cleanup(imcursor);
 				break;
 			case OP_ONDISKTREE:
-				ret1 = _van_ondisktree_cursor_cleanup(odcursor);
+				ret1 = odcursor->cleanup(odcursor);
 				break;
 			case OP_TABLE:
 				ret1 = 0; /* TODO: For table */
@@ -825,7 +825,7 @@ static int verify_cursor_border(void *obj, flags_t direction,
 			direction2 = VAN_NEXT;
 			break;
 		default:
-			ret = _van_error_print("BAD direction");
+			ret = van_error_print("BAD direction");
 			break;
 	}
 	if (ret != 0)
@@ -840,8 +840,8 @@ static int verify_cursor_border(void *obj, flags_t direction,
 	odcursor1 = odcursor2 = NULL;
 	switch (otype) {
 		case OP_INMEMTREE:
-			ret = _van_inmemtree_cursor_init(imtree, &imcursor1, cflags);
-			CHK_RET(ret, "_van_inmemtree_cursor_init(imcursor1)");
+			ret = imtree->cursor_init(imtree, &imcursor1, cflags);
+			CHK_RET(ret, "imtree->cursor_init(imcursor1)");
 
 			ret1 = imcursor1->get(imcursor1, &key1, &value1, direction);
 			if (ret1 == 0) {
@@ -849,11 +849,11 @@ static int verify_cursor_border(void *obj, flags_t direction,
 				memcpy(vbuf1, value1.data, value1.size);
 			}
 
-			ret = _van_inmemtree_cursor_cleanup(imcursor1);
-			CHK_RET(ret, "_van_inmemtree_cursor_cleanup(imcursor1)");
+			ret = imcursor1->cleanup(imcursor1);
+			CHK_RET(ret, "imcursor1->cleanup(imcursor1)");
 
-			ret = _van_inmemtree_cursor_init(imtree, &imcursor2, cflags);
-			CHK_RET(ret, "_van_inmemtree_cursor_init(imcursor2)");
+			ret = imtree->cursor_init(imtree, &imcursor2, cflags);
+			CHK_RET(ret, "imtree->cursor_init(imcursor2)");
 
 			ret2 = imcursor2->get(imcursor2, &key2, &value2, direction2);
 			if (ret2 == 0) {
@@ -861,8 +861,8 @@ static int verify_cursor_border(void *obj, flags_t direction,
 				memcpy(vbuf2, value2.data, value2.size);
 			}
 
-			ret = _van_inmemtree_cursor_cleanup(imcursor2);
-			CHK_RET(ret, "_van_inmemtree_cursor_cleanup(imcursor2)");
+			ret = imcursor2->cleanup(imcursor2);
+			CHK_RET(ret, "imcursor2->cleanup(imcursor2)");
 
 			TEST_ASSERT(ret1 == ret2);
 			if (ret1 == VAN_NOTFOUND)
@@ -870,8 +870,8 @@ static int verify_cursor_border(void *obj, flags_t direction,
 			SET_RET(ret1, ret);
 			break;
 		case OP_ONDISKTREE:
-			ret = _van_ondisktree_cursor_init(odtree, &odcursor1, cflags);
-			CHK_RET(ret, "_van_ondisktree_cursor_init(odcursor1)");
+			ret = odtree->cursor_init(odtree, &odcursor1, cflags);
+			CHK_RET(ret, "odtree->cursor_init(odcursor1)");
 
 			ret1 = odcursor1->get(odcursor1, &key1, &value1, direction);
 			if (ret1 == 0) {
@@ -879,11 +879,11 @@ static int verify_cursor_border(void *obj, flags_t direction,
 				memcpy(vbuf1, value1.data, value1.size);
 			}
 
-			ret = _van_ondisktree_cursor_cleanup(odcursor1);
-			CHK_RET(ret, "_van_inmemtree_cursor_cleanup(imcursor1)");
+			ret = odcursor1->cleanup(odcursor1);
+			CHK_RET(ret, "odcursor1->cleanup(odcursor1)");
 
-			ret = _van_ondisktree_cursor_init(odtree, &odcursor2, cflags);
-			CHK_RET(ret, "_van_ondisktree_cursor_init(odcursor2)");
+			ret = odtree->cursor_init(odtree, &odcursor2, cflags);
+			CHK_RET(ret, "odtree->cursor_init(odcursor2)");
 
 			ret2 = odcursor2->get(odcursor2, &key2, &value2, direction2);
 			if (ret2 == 0) {
@@ -891,8 +891,8 @@ static int verify_cursor_border(void *obj, flags_t direction,
 				memcpy(vbuf2, value2.data, value2.size);
 			}
 
-			ret = _van_ondisktree_cursor_cleanup(odcursor2);
-			CHK_RET(ret, "_van_inmemtree_cursor_cleanup(imcursor1)");
+			ret = odcursor2->cleanup(odcursor2);
+			CHK_RET(ret, "odcursor2->cleanup(odcursor2)");
 
 			TEST_ASSERT(ret1 == ret2);
 			if (ret1 == VAN_NOTFOUND)
@@ -904,15 +904,15 @@ static int verify_cursor_border(void *obj, flags_t direction,
 			table = table;
 			break;
 		default:
-			ret = _van_error_print("BAD OP_TYPE");
+			ret = van_error_print("BAD OP_TYPE");
 			break;
 	}
 	if (ret != 0 && ret != VAN_NOTFOUND)
 		goto err;
 
-	cmp = _van_datum_defcmp(&key1, &key2);
+	cmp = van_datum_defcmp(&key1, &key2);
 	TEST_ASSERT(cmp == 0);
-	cmp = _van_datum_defcmp(&value1, &value2);
+	cmp = van_datum_defcmp(&value1, &value2);
 	TEST_ASSERT(cmp == 0);
 err:
 	return (ret);

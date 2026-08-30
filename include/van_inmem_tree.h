@@ -112,6 +112,7 @@ struct _inmem_tree {
 	VAN_DATUM *readata;
 
 	/* function handles */
+	int (*cursor_init)(INMEM_TREE *, INMEM_TREECURSOR **, flags_t);
 	int (*get)(INMEM_TREE *, VAN_DATUM *, VAN_DATUM *, flags_t);
 	int (*getraw)(INMEM_TREE *, VAN_DATUM *, VAN_DATUM *, flags_t);
 	int (*put)(INMEM_TREE *, VAN_DATUM *, VAN_DATUM *, flags_t);
@@ -183,6 +184,7 @@ struct _inmem_treecursor {
 	int (*getraw)(INMEM_TREECURSOR *, VAN_DATUM *, VAN_DATUM *, flags_t);
 	int (*put)(INMEM_TREECURSOR *, VAN_DATUM *, flags_t);
 	int (*del)(INMEM_TREECURSOR *, flags_t);
+	int (*cleanup)(INMEM_TREECURSOR *);
 };
 
 #define INMEM_NT(p) (*((int *)p))

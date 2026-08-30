@@ -25,7 +25,7 @@ int imt_t1_1() {
 	STRING_TESTDATA_DEFINE;
 
 	memset(&table, 0, sizeof(VAN_TABLE));
-	ret = _van_inmemtree_create(&table, &table.active);
+	ret = van_inmemtree_create(&table, &table.active);
 	CHK_RET(ret, "van_inmemtree_create");
 	tree = table.active;
 
@@ -59,7 +59,7 @@ int imt_t1_2(int verbose) {
 	STRING_TESTDATA_DEFINE;
 
 	memset(&table, 0, sizeof(VAN_TABLE));
-	ret = _van_inmemtree_create(&table, &table.active);
+	ret = van_inmemtree_create(&table, &table.active);
 	CHK_RET(ret, "van_inmemtree_create");
 	tree = table.active;
 	tree->threshold = 1*GIGABYTE;
@@ -103,7 +103,7 @@ int imt_t1_2(int verbose) {
 
 	fprintf(stderr, "========== 2 Dump leaves after putting ========\n");
 	if (verbose) {
-		(void)_van_inmemtree_dump_all_leaves(tree, outf);
+		(void)tree->dump_all_leaves(tree, outf);
 		van_alloc_stat_print(stderr, " ");
 	}
 
@@ -220,7 +220,7 @@ int imt_t1_3() {
 	STRING_TESTDATA_DEFINE;
 
 	memset(&table, 0, sizeof(VAN_TABLE));
-	ret = _van_inmemtree_create(&table, &table.active);
+	ret = van_inmemtree_create(&table, &table.active);
 	CHK_RET(ret, "van_inmemtree_create");
 	tree = table.active;
 	/* we set this to avoid inmemtree to dump leaves,
@@ -350,7 +350,7 @@ int imt_t1_4() {
 	STRING_TESTDATA_DEFINE;
 
 	memset(&table, 0, sizeof(VAN_TABLE));
-	ret = _van_inmemtree_create(&table, &table.active);
+	ret = van_inmemtree_create(&table, &table.active);
 	CHK_RET(ret, "van_inmemtree_create");
 	tree = table.active;
 

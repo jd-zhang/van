@@ -123,6 +123,13 @@ struct _van_distab {
 #define van_rwlock_stat_reset	_van_rwlock_stat_reset
 
 #define van_strarray_print	_van_strarray_print
+#define van_strarray_alloc	_van_strarray_alloc
+#define van_strarray_free	_van_strarray_free
+#define van_strarray_add	_van_strarray_add
+#define van_strarray_sort	_van_strarray_sort
+
+#define van_error_print		_van_error_print
+#define van_datum_defcmp	_van_datum_defcmp
 
 #ifdef __cplusplus
 }

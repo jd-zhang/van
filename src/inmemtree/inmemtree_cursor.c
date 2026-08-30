@@ -42,6 +42,7 @@ int _van_inmemtree_cursor_init(INMEM_TREE *im_tree,
 	 */
 	cursor->put = _van_inmemtree_cursor_update;
 	cursor->del = _van_inmemtree_cursor_justdel;
+	cursor->cleanup = _van_inmemtree_cursor_cleanup;
 	/*
 	 * TEMP cursor is created by invoking an
 	 * operation using the tree handle. So

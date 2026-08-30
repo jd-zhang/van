@@ -34,20 +34,20 @@ int misc_t1_1() {
 	len = 15;
 	cnt = 10;
 
-	ret = _van_strarray_alloc(&arr, 20);
+	ret = van_strarray_alloc(&arr, 20);
 	for (i = 0; i < cnt; i++) {
 		memset(strbuf, 0, sizeof(strbuf));
 		getrandomstring(strbuf, len);
 		fprintf(stderr, "%s\n", strbuf);
-		ret = _van_strarray_add(arr, strbuf);
+		ret = van_strarray_add(arr, strbuf);
 	}
 	fprintf(stderr, "========= before sort ========\n");
-	ret = _van_strarray_print(arr, stderr, "\n");
+	ret = van_strarray_print(arr, stderr, "\n");
 
-	ret = _van_strarray_sort(arr, misc_t1_1_cmp);
+	ret = van_strarray_sort(arr, misc_t1_1_cmp);
 	fprintf(stderr, "========= after sort ========\n");
-	ret = _van_strarray_print(arr, stderr, "\n");
+	ret = van_strarray_print(arr, stderr, "\n");
 
-	ret = _van_strarray_free(arr);
+	ret = van_strarray_free(arr);
 	return (ret);
 }
