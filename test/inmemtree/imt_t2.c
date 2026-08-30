@@ -43,8 +43,8 @@ int imt_t2_1() {
 	STRING_TESTDATA_DEFINE;
 
 	memset(&table, 0, sizeof(VAN_TABLE));
-	ret = _van_inmemtree_create(&table, &table.active);
-	CHK_RET(ret, "_van_inmemtree_create");
+	ret = van_inmemtree_create(&table, &table.active);
+	CHK_RET(ret, "van_inmemtree_create");
 	tree = table.active;
 	/* we set this to avoid inmemtree to dump leaves,
 	 since we don't want to test that here */
@@ -82,35 +82,35 @@ int imt_t2_1() {
 	tree->statprint(tree, stderr, "inemtree stat: ");
 
 	fprintf(stderr, "========== 2 Get using tree->get() ============\n");
-	_van_alloc_stat_reset();
-	_van_rwlock_stat_reset();
+	van_alloc_stat_reset();
+	van_rwlock_stat_reset();
 	ret = verify_inmemtree_data(tree, keys, ksizes, values, vsizes, cnt);
 	CHK_RET(ret, "verify_inmemtree_data");
-	_van_rwlock_stat_print(stderr, " ");
+	van_rwlock_stat_print(stderr, " ");
 	fprintf(stderr, "**** Malloc Statistics ****\n");
-	_van_alloc_stat_print(stderr, " ");
+	van_alloc_stat_print(stderr, " ");
 
 	fprintf(stderr, "========== 3 Get using cursor->get(VAN_SET) ============\n");
-	_van_alloc_stat_reset();
-	_van_rwlock_stat_reset();
+	van_alloc_stat_reset();
+	van_rwlock_stat_reset();
 	ret = verify_inmemtree_data_withcursor(tree, keys, ksizes,
 	    values, vsizes, cnt);
 	CHK_RET(ret, "verify_inmemtree_data_withcursor");
-	_van_rwlock_stat_print(stderr, " ");
+	van_rwlock_stat_print(stderr, " ");
 	fprintf(stderr, "**** Malloc Statistics ****\n");
-	_van_alloc_stat_print(stderr, " ");
+	van_alloc_stat_print(stderr, " ");
 
 	(void)free_string_testdata(keys, ksizes, values, vsizes, cnt);
 
 	fprintf(stderr, "========== 4 Destroy the tree ============\n");
 	time(&t1);
-	_van_alloc_stat_reset();
+	van_alloc_stat_reset();
 	ret = _van_inmemtree_destory(tree);
 	time(&t2);
 	fprintf(stderr, "time consuming: %g seconds\n", difftime(t2, t1));
 	CHK_RET(ret, "_van_inmemtree_destory");
 	fprintf(stderr, "**** Malloc Statistics ****\n");
-	_van_alloc_stat_print(stderr, " ");
+	van_alloc_stat_print(stderr, " ");
 
 	return (ret);
 }

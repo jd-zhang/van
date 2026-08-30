@@ -116,6 +116,9 @@ struct _inmem_tree {
 	int (*getraw)(INMEM_TREE *, VAN_DATUM *, VAN_DATUM *, flags_t);
 	int (*put)(INMEM_TREE *, VAN_DATUM *, VAN_DATUM *, flags_t);
 	int (*del)(INMEM_TREE *, VAN_DATUM *, flags_t);
+	int (*destroy)(INMEM_TREE *);
+	int (*freeze)(INMEM_TREE *);
+	int (*dump_all_leaves)(INMEM_TREE *, FILE *);
 	void (*statprint)(INMEM_TREE *imtree, FILE *f, const char *prefix);
 };
 

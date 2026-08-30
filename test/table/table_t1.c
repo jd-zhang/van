@@ -44,17 +44,17 @@ int table_t1_1() {
 
 	system("rm -fr test1*");
 	system("rm -fr vanlog.*");
-	ret = _van_store_create(&store);
-	CHK_RET(ret, "_van_store_create");
+	ret = van_store_create(&store);
+	CHK_RET(ret, "van_store_create");
 	ret = store->open(store, ".", 0);
-	CHK_RET(ret, "_van_store_open");
-	ret = _van_table_create(store, &table);
-	CHK_RET(ret, "_van_table_create");
+	CHK_RET(ret, "store->open");
+	ret = van_table_create(store, &table);
+	CHK_RET(ret, "van_table_create");
 	table->set_inmem_threshold(table, GIGABYTE);
 	ret = table->open(table, "test1", VAN_TABLE_SKIP_THREAD_START);
-	CHK_RET(ret, "_van_table_open");
-	ret = _van_table_start_threads(table);
-	CHK_RET(ret, "_van_table_start_threads");
+	CHK_RET(ret, "table->open");
+	ret = table->start_threads(table);
+	CHK_RET(ret, "table->start_threads");
 
 	memset(threads, 0, sizeof(threads));
 	cnt = 1000000;
@@ -90,11 +90,11 @@ int table_t1_1() {
 	ret = store->close(store);
 	CHK_RET(ret, "store->close");
 
-	ret = _van_store_create(&store);
-	CHK_RET(ret, "_van_store_create");
+	ret = van_store_create(&store);
+	CHK_RET(ret, "van_store_create");
 	ret = store->open(store, ".", 0);
-	CHK_RET(ret, "_van_store_open");
-	ret = _van_strarray_print(store->log_handle->lognames, stderr, "\n");
+	CHK_RET(ret, "store->open");
+	ret = van_strarray_print(store->log_handle->lognames, stderr, "\n");
 	ret = store->close(store);
 	CHK_RET(ret, "store->close");
 
@@ -116,18 +116,18 @@ int table_t1_1b() {
 
 	system("rm -fr test1*");
 	system("rm -fr vanlog.*");
-	ret = _van_store_create(&store);
-	CHK_RET(ret, "_van_store_create");
+	ret = van_store_create(&store);
+	CHK_RET(ret, "van_store_create");
 	ret = store->open(store, ".", 0);
-	CHK_RET(ret, "_van_store_open");
-	ret = _van_table_create(store, &table);
-	CHK_RET(ret, "_van_table_create");
+	CHK_RET(ret, "store->open");
+	ret = van_table_create(store, &table);
+	CHK_RET(ret, "van_table_create");
 	table->set_inmem_threshold(table, MEGABYTE);
 	table->set_merge_config(table, 100000,200000);
 	ret = table->open(table, "test1", VAN_TABLE_SKIP_THREAD_START);
-	CHK_RET(ret, "_van_table_open");
-	ret = _van_table_start_threads(table);
-	CHK_RET(ret, "_van_table_start_threads");
+	CHK_RET(ret, "table->open");
+	ret = table->start_threads(table);
+	CHK_RET(ret, "table->start_threads");
 
 	cnt = 200000;
 	STRING_TESTDATA_INIT;
@@ -168,19 +168,19 @@ int table_t1_1c() {
 
 	system("rm -fr test1*");
 	system("rm -fr vanlog.*");
-	ret = _van_store_create(&store);
-	CHK_RET(ret, "_van_store_create");
+	ret = van_store_create(&store);
+	CHK_RET(ret, "van_store_create");
 	ret = store->open(store, ".", 0);
-	CHK_RET(ret, "_van_store_open");
-	ret = _van_table_create(store, &table);
-	CHK_RET(ret, "_van_table_create");
+	CHK_RET(ret, "store->open");
+	ret = van_table_create(store, &table);
+	CHK_RET(ret, "van_table_create");
 	table->set_inmem_threshold(table, MEGABYTE);
 	
 	table->set_merge_config(table, 100000,200000);
 	ret = table->open(table, "test1", VAN_TABLE_SKIP_THREAD_START);
-	CHK_RET(ret, "_van_table_open");
-	ret = _van_table_start_threads(table);
-	CHK_RET(ret, "_van_table_start_threads");
+	CHK_RET(ret, "table->open");
+	ret = table->start_threads(table);
+	CHK_RET(ret, "table->start_threads");
 
 	memset(threads, 0, sizeof(threads));
 	if (is_cygwin()) {
@@ -251,19 +251,19 @@ int table_t1_1d() {
 
 	system("rm -fr test1*");
 	system("rm -fr vanlog.*");
-	ret = _van_store_create(&store);
-	CHK_RET(ret, "_van_store_create");
+	ret = van_store_create(&store);
+	CHK_RET(ret, "van_store_create");
 	ret = store->open(store, ".", 0);
-	CHK_RET(ret, "_van_store_open");
-	ret = _van_table_create(store, &table);
-	CHK_RET(ret, "_van_table_create");
+	CHK_RET(ret, "store->open");
+	ret = van_table_create(store, &table);
+	CHK_RET(ret, "van_table_create");
 	table->set_inmem_threshold(table, MEGABYTE);
 	table->set_merge_config(table, 4,6);
 	table->set_flags(table, VAN_TABLE_VERBOSE_MERGE);
 	ret = table->open(table, "test1", VAN_TABLE_SKIP_THREAD_START);
-	CHK_RET(ret, "_van_table_open");
-	ret = _van_table_start_threads(table);
-	CHK_RET(ret, "_van_table_start_threads");
+	CHK_RET(ret, "table->open");
+	ret = table->start_threads(table);
+	CHK_RET(ret, "table->start_threads");
 
 	memset(threads, 0, sizeof(threads));
 	if (is_cygwin()) {
@@ -307,7 +307,7 @@ int table_t1_1d() {
 		    i, (unsigned long)cnt);
 		ret = verify_table_data(table, keys, ksizes, values, vsizes, cnt);
 		CHK_RET(ret, "verify_table_data");
-		_van_table_show_odt_items(table, stderr);
+		table->show_odt_items(table, stderr);
 
 	}
 	/*
@@ -345,17 +345,17 @@ int table_t1_2() {
 
 	system("rm -fr test1*");
 	system("rm -fr vanlog.*");
-	ret = _van_store_create(&store);
-	CHK_RET(ret, "_van_store_create");
+	ret = van_store_create(&store);
+	CHK_RET(ret, "van_store_create");
 	ret = store->open(store, ".", 0);
-	CHK_RET(ret, "_van_store_open");
-	ret = _van_table_create(store, &table);
-	CHK_RET(ret, "_van_table_create");
+	CHK_RET(ret, "store->open");
+	ret = van_table_create(store, &table);
+	CHK_RET(ret, "van_table_create");
 	table->set_inmem_threshold(table, MEGABYTE);
 	ret = table->open(table, "test1", VAN_TABLE_SKIP_THREAD_START);
-	CHK_RET(ret, "_van_table_open");
-	ret = _van_table_start_threads(table);
-	CHK_RET(ret, "_van_table_start_threads");
+	CHK_RET(ret, "table->open");
+	ret = table->start_threads(table);
+	CHK_RET(ret, "table->start_threads");
 
 	memset(threads, 0, sizeof(threads));
 	cnt = 200000;
@@ -402,14 +402,14 @@ int table_t1_2() {
 	store = NULL;
 
 	fprintf(stderr, "============ 5 reopen table from ondisk =========\n");
-	ret = _van_store_create(&store);
-	CHK_RET(ret, "_van_store_create");
+	ret = van_store_create(&store);
+	CHK_RET(ret, "van_store_create");
 	ret = store->open(store, ".", 0);
-	CHK_RET(ret, "_van_store_open");
-	ret = _van_table_create(store, &table);
-	CHK_RET(ret, "_van_table_create");
+	CHK_RET(ret, "store->open");
+	ret = van_table_create(store, &table);
+	CHK_RET(ret, "van_table_create");
 	ret = table->open(table, "test1", 0);
-	CHK_RET(ret, "_van_table_open");
+	CHK_RET(ret, "table->open");
 
 	fprintf(stderr, "============ 6 verify %lu records after reopen =========\n",
 	    (unsigned long)cnt);
@@ -419,7 +419,7 @@ int table_t1_2() {
 	(void)free_string_testdata(keys, ksizes, values, vsizes, cnt);
 
 	fprintf(stderr, "============ 7 print log file names =========\n");
-	ret = _van_strarray_print(store->log_handle->lognames, stderr, "\n");
+	ret = van_strarray_print(store->log_handle->lognames, stderr, "\n");
 	ret = table->close(table, 0);
 	CHK_RET(ret, "table->close");
 	ret = store->close(store);

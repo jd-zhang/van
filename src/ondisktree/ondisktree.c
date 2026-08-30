@@ -66,6 +66,10 @@ int _van_ondisktree_init(ONDISK_TREE *tree) {
 
 	tree->get = _van_ondisktree_get;
 	tree->getraw = _van_ondisktree_getraw;
+	tree->open = _van_ondisktree_open;
+	tree->close = _van_ondisktree_close;
+	tree->store_inmem = _van_ondisktree_store_inmem;
+	tree->dump = _van_ondisktree_dump;
 
 	return (ret);
 }

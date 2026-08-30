@@ -126,6 +126,12 @@ struct _van_table {
 	int (*set_scan_interval)(VAN_TABLE *, size_t);
 	int (*get_scan_interval)(VAN_TABLE *, size_t *);
 	int (*set_compare_function)(VAN_TABLE *, VAN_DATUM_CMPFUNC);
+	void (*show_odt_items)(VAN_TABLE *, FILE *);
+	int (*dump_inmem)(VAN_TABLE *);
+	int (*write_odt_paths)(VAN_TABLE *);
+	int (*replace_odt_items)(VAN_TABLE *, size_t, size_t, ONDISK_TREE *);
+	int (*merge_ondisktrees)(VAN_TABLE *, ONDISK_TREE **, size_t,
+	    ONDISK_TREE **);
 };
 
 struct _van_table_odt_item {

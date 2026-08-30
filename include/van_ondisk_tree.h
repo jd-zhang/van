@@ -167,6 +167,10 @@ struct _ondisk_tree {
 	    VAN_DATUM *, VAN_DATUM *, flags_t);
 	int (*getraw)(ONDISK_TREE *,
 	    VAN_DATUM *, VAN_DATUM *, flags_t);
+	int (*open)(ONDISK_TREE *, const char *, flags_t);
+	int (*close)(ONDISK_TREE *, flags_t);
+	int (*store_inmem)(ONDISK_TREE *, INMEM_TREE *);
+	int (*dump)(ONDISK_TREE *, FILE *);
 
 };
 

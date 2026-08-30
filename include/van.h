@@ -105,6 +105,25 @@ struct _van_distab {
 #define	VAN_FROZEN		(-30980)
 #define VAN_INMEM_FULL		(-30979)
 
+/*
+ * Public API aliases.
+ *
+ * The underscore-prefixed functions are the internal names, they are
+ * exposed to the outside without the underscore via these macros so
+ * that the public API reads cleanly.
+ */
+#define van_store_create	_van_store_create
+#define van_table_create	_van_table_create
+#define van_inmemtree_create	_van_inmemtree_create
+#define van_ondisktree_create	_van_ondisktree_create
+
+#define van_alloc_stat_print	_van_alloc_stat_print
+#define van_alloc_stat_reset	_van_alloc_stat_reset
+#define van_rwlock_stat_print	_van_rwlock_stat_print
+#define van_rwlock_stat_reset	_van_rwlock_stat_reset
+
+#define van_strarray_print	_van_strarray_print
+
 #ifdef __cplusplus
 }
 #endif

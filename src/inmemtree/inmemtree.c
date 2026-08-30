@@ -129,6 +129,9 @@ int _van_inmemtree_create(VAN_TABLE *table, INMEM_TREE **treep) {
 	tree->getraw = _van_inmemtree_getraw;
 	tree->put = _van_inmemtree_put;
 	tree->del = _van_inmemtree_del;
+	tree->destroy = _van_inmemtree_destory;
+	tree->freeze = _van_inmemtree_freeze;
+	tree->dump_all_leaves = _van_inmemtree_dump_all_leaves;
 	tree->statprint = _inmemtree_statprint;
 
 	*treep = tree;

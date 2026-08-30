@@ -42,6 +42,8 @@ int _van_log_cursor_alloc(VAN_LOG *logp, VAN_LOG_CURSOR **lgcpp) {
 		return (ret);
 
 	lgc->logp = logp;
+	lgc->get = _van_logrec_cget;
+	lgc->close = _van_log_cursor_close;
 	*lgcpp = lgc;
 
 	return (0);

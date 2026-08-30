@@ -50,15 +50,15 @@ int log_t1_1() {
 	othercnt = 0;
 
 	fprintf(stderr, "============ 1 open table and do puts/dels =========\n");
-	ret = _van_store_create(&store);
-	CHK_RET(ret, "_van_store_create");
+	ret = van_store_create(&store);
+	CHK_RET(ret, "van_store_create");
 	ret = store->open(store, ".", 0);
-	CHK_RET(ret, "_van_store_open");
-	ret = _van_table_create(store, &table);
-	CHK_RET(ret, "_van_table_create");
+	CHK_RET(ret, "store->open");
+	ret = van_table_create(store, &table);
+	CHK_RET(ret, "van_table_create");
 	table->set_inmem_threshold(table, GIGABYTE);
 	ret = table->open(table, "test1", VAN_TABLE_SKIP_THREAD_START);
-	CHK_RET(ret, "_van_table_open");
+	CHK_RET(ret, "table->open");
 
 	for (i = 0; i < LOG_T1_PUTS; i++) {
 		char kbuf[64], vbuf[64];
@@ -91,17 +91,17 @@ int log_t1_1() {
 	store = NULL;
 
 	fprintf(stderr, "============ 2 reopen and read log with cursor =========\n");
-	ret = _van_store_create(&store);
-	CHK_RET(ret, "_van_store_create");
+	ret = van_store_create(&store);
+	CHK_RET(ret, "van_store_create");
 	ret = store->open(store, ".", 0);
-	CHK_RET(ret, "_van_store_open");
+	CHK_RET(ret, "store->open");
 	logp = store->log_handle;
 
-	ret = _van_log_cursor_alloc(logp, &lgc);
-	CHK_RET(ret, "_van_log_cursor_alloc");
+	ret = logp->cursor_alloc(logp, &lgc);
+	CHK_RET(ret, "logp->cursor_alloc");
 
 	memset(&rec, 0, sizeof(rec));
-	ret = _van_logrec_cget(lgc, &lsn, &rec, VAN_FIRST);
+	ret = lgc->get(lgc, &lsn, &rec, VAN_FIRST);
 	while (ret == 0) {
 		/*
 		 * The record bytes: log record header, then the common
@@ -121,10 +121,10 @@ int log_t1_1() {
 		}
 		_van_free(NULL, rec.data);
 		memset(&rec, 0, sizeof(rec));
-		ret = _van_logrec_cget(lgc, &lsn, &rec, VAN_NEXT);
+		ret = lgc->get(lgc, &lsn, &rec, VAN_NEXT);
 	}
 	if (ret != VAN_NOTFOUND)
-		CHK_RET(ret, "_van_logrec_cget");
+		CHK_RET(ret, "lgc->get");
 	if (rec.data != NULL)
 		_van_free(NULL, rec.data);
 
@@ -134,8 +134,8 @@ int log_t1_1() {
 	TEST_ASSERT(delcnt == LOG_T1_DELS);
 	TEST_ASSERT(othercnt == 0);
 
-	ret = _van_log_cursor_close(lgc);
-	CHK_RET(ret, "_van_log_cursor_close");
+	ret = lgc->close(lgc);
+	CHK_RET(ret, "lgc->close");
 	lgc = NULL;
 	ret = store->close(store);
 	CHK_RET(ret, "store->close");
@@ -193,15 +193,15 @@ int log_t1_2() {
 	memset(del_seen, 0, sizeof(del_seen));
 
 	fprintf(stderr, "============ 1 open table and do puts/dels =========\n");
-	ret = _van_store_create(&store);
-	CHK_RET(ret, "_van_store_create");
+	ret = van_store_create(&store);
+	CHK_RET(ret, "van_store_create");
 	ret = store->open(store, ".", 0);
-	CHK_RET(ret, "_van_store_open");
-	ret = _van_table_create(store, &table);
-	CHK_RET(ret, "_van_table_create");
+	CHK_RET(ret, "store->open");
+	ret = van_table_create(store, &table);
+	CHK_RET(ret, "van_table_create");
 	table->set_inmem_threshold(table, GIGABYTE);
 	ret = table->open(table, "test1", VAN_TABLE_SKIP_THREAD_START);
-	CHK_RET(ret, "_van_table_open");
+	CHK_RET(ret, "table->open");
 	tid_expected = table->tid;
 
 	for (i = 0; i < LOG_T1_2_PUTS; i++) {
@@ -231,17 +231,17 @@ int log_t1_2() {
 	store = NULL;
 
 	fprintf(stderr, "============ 2 reopen and verify record contents =========\n");
-	ret = _van_store_create(&store);
-	CHK_RET(ret, "_van_store_create");
+	ret = van_store_create(&store);
+	CHK_RET(ret, "van_store_create");
 	ret = store->open(store, ".", 0);
-	CHK_RET(ret, "_van_store_open");
+	CHK_RET(ret, "store->open");
 	logp = store->log_handle;
 
-	ret = _van_log_cursor_alloc(logp, &lgc);
-	CHK_RET(ret, "_van_log_cursor_alloc");
+	ret = logp->cursor_alloc(logp, &lgc);
+	CHK_RET(ret, "logp->cursor_alloc");
 
 	memset(&rec, 0, sizeof(rec));
-	ret = _van_logrec_cget(lgc, &lsn, &rec, VAN_FIRST);
+	ret = lgc->get(lgc, &lsn, &rec, VAN_FIRST);
 	while (ret == 0) {
 		/* Common: type at [HDRSIZE], txnid, prev_lsn. */
 		memcpy(&type, (char *)rec.data + VAN_LOGREC_HDRSIZE,
@@ -310,10 +310,10 @@ int log_t1_2() {
 		recno++;
 		_van_free(NULL, rec.data);
 		memset(&rec, 0, sizeof(rec));
-		ret = _van_logrec_cget(lgc, &lsn, &rec, VAN_NEXT);
+		ret = lgc->get(lgc, &lsn, &rec, VAN_NEXT);
 	}
 	if (ret != VAN_NOTFOUND)
-		CHK_RET(ret, "_van_logrec_cget");
+		CHK_RET(ret, "lgc->get");
 	if (rec.data != NULL)
 		_van_free(NULL, rec.data);
 
@@ -327,8 +327,8 @@ int log_t1_2() {
 	for (k = 0; k < LOG_T1_2_DELS; k++)
 		TEST_ASSERT(del_seen[k] == 1);
 
-	ret = _van_log_cursor_close(lgc);
-	CHK_RET(ret, "_van_log_cursor_close");
+	ret = lgc->close(lgc);
+	CHK_RET(ret, "lgc->close");
 	lgc = NULL;
 	ret = store->close(store);
 	CHK_RET(ret, "store->close");

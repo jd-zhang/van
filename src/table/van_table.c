@@ -159,6 +159,11 @@ static void _van_table_set_functions(VAN_TABLE *table) {
 	table->set_scan_interval = _van_table_set_scan_interval;
 	table->get_scan_interval = _van_table_get_scan_interval;
 	table->set_compare_function = _van_set_compare_function;
+	table->show_odt_items = _van_table_show_odt_items;
+	table->dump_inmem = _van_table_dump_inmem;
+	table->write_odt_paths = _van_table_write_odt_paths;
+	table->replace_odt_items = _van_table_replace_odt_items;
+	table->merge_ondisktrees = _van_ondisktree_merge;
 }
 
 int _van_table_open(VAN_TABLE *table, const char *tb_name, flags_t flags) {

@@ -134,6 +134,9 @@ struct _van_log {
 	VAN_LOGFILE_HEADER header;
 	/* Configurations */
 	VAN_STRING_ARRAY *lognames;
+
+	/* function handles */
+	int (*cursor_alloc)(VAN_LOG *, VAN_LOG_CURSOR **);
 };
 
 /* Used for log cursor */
@@ -161,6 +164,10 @@ struct _van_log_cursor {
 	VAN_LOGREC_HEADER rechdr;	/* Last lsn's record header */
 	VAN_LOGREC_HEADER tailhdr;	/* The file's last record header */
 	uint32 filesize;		/* Current logfile size */
+
+	/* function handles */
+	int (*get)(VAN_LOG_CURSOR *, VAN_LSN *, VAN_DATUM *, flags_t);
+	int (*close)(VAN_LOG_CURSOR *);
 };
 
 #ifdef __cplusplus
