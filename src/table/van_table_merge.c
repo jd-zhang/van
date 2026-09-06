@@ -357,6 +357,7 @@ void *_van_table_merge_job_run(void *arg) {
 			VAN_MUTEX_LOCK(item, mutex, ret);
 			item->trees[0] = item->trees[1];
 			item->trees[1] = NULL;
+			F_CLR(item, VAN_ITEM_MERGED);
 			VAN_MUTEX_UNLOCK(item, mutex, ret);
 			for (i = (int)job->high; i >= (int)job->low; i--) {
 				item = &table->odt_items[i];

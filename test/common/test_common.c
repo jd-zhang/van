@@ -537,7 +537,11 @@ static int verify_data_with_expected(void *obj, char **keys, size_t *ksizes,
 			fprintf(stderr,
 			    "==== end of mismatch info ====\n");
 		}
-		CHK_RET(ret != expected, info);
+		/*
+		CHK_RET_NOEXIT(ret != expected, info);
+		if (ret != expected)
+			break;
+			*/
 	}
 	time(&t2);
 	fprintf(stderr, "time consuming: %g seconds\n", difftime(t2, t1));

@@ -207,8 +207,6 @@ int _van_table_op_get(VAN_OPERATION *tbop, VAN_DATUM *key,
 	ret = 0;
 	table = tbop->table;
 	active = table->active;
-	frozen = table->frozen;
-
 	/*
 	 * When it is found in the active (exists or deleted),
 	 * We get the item. Otherwise, it will return VAN_NOTFOUND
@@ -222,7 +220,6 @@ int _van_table_op_get(VAN_OPERATION *tbop, VAN_DATUM *key,
 	ret = active->getraw(active, key, data, flags);
 	if (ret == 0 || ret == VAN_DELETED)
 		goto ret;
-
 	if (ret != VAN_NOTFOUND && ret != VAN_STALE)
 		goto ret;
 	/*
@@ -231,6 +228,7 @@ int _van_table_op_get(VAN_OPERATION *tbop, VAN_DATUM *key,
 	 *
 	 * TODO: VAN_STALE is not used currently, need to check more.
 	 */
+	frozen = table->frozen;
 	if (frozen != NULL) {
 		ret = frozen->getraw(frozen, key, data, flags);
 		if (ret == 0 || ret == VAN_DELETED)
@@ -292,10 +290,10 @@ int _van_table_op_get(VAN_OPERATION *tbop, VAN_DATUM *key,
 			if (citem->merged_ticks <= tbop->create_ticks) {
 				VAN_ASSERT(citem->ticks <= citem->merged_ticks);
 				if (changed) {
-					VAN_MUTEX_UNLOCK(citem, mutex, ret);
-					citem = &table->odt_items[citem->merged_indx];
-					VAN_MUTEX_LOCK(citem, mutex, ret);
 					cur_indx = citem->merged_indx;
+					VAN_MUTEX_UNLOCK(citem, mutex, ret);
+					citem = &table->odt_items[cur_indx];
+					VAN_MUTEX_LOCK(citem, mutex, ret);
 				}
 				odtree = citem->trees[1];
 				 /* The item may have been changed. */

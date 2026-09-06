@@ -84,6 +84,15 @@
 	} \
 } while(0)
 
+#define CHK_RET_NOEXIT(ret, str) do { \
+	int _ret = (ret); \
+	if (_ret) { \
+		fprintf(stderr, "[%lu][%lu] %s:%d Error(%d, %s)\n", \
+		    (unsigned long)getpid(), (unsigned long)pthread_self(), \
+		    __FILE__, __LINE__, _ret, (str)); \
+	} \
+} while(0)
+
 #define TEST_ASSERT(expr) do { \
 	if(!(expr)) { \
 		printf("Assert Failure(%s:%d): "#expr"\n", __FILE__, __LINE__); \

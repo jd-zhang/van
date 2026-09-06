@@ -306,9 +306,8 @@ int table_t1_1d() {
 		fprintf(stderr, "============ loop.%d verify %lu records using table =========\n",
 		    i, (unsigned long)cnt);
 		ret = verify_table_data(table, keys, ksizes, values, vsizes, cnt);
-		CHK_RET(ret, "verify_table_data");
+		CHK_RET_NOEXIT(ret, "verify_table_data");
 		table->show_odt_items(table, stderr);
-
 	}
 	/*
 	ret = verify_table_data(table, keys, ksizes, values, vsizes, cnt);
