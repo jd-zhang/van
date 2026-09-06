@@ -172,3 +172,22 @@ gradle-app.setting
 *.tmp
 *.temp
 *.test
+
+# ============================================
+# 本地调试/临时脚本与测试产物（不入库）
+# 若需要重新跟踪其中某个文件，删除对应行
+# ============================================
+/.warnlist.txt
+/.warnscan.sh
+/chk_1d*.sh
+/chk_t12*.sh
+/diag_t12.sh
+/gdb_*.sh
+/gdb_*.cmd
+/kill_t.sh
+/launch_all.sh
+/poll_all.sh
+/run*.sh
+/show_all.sh
+/syncto*.sh
+/test/*.ondisk.*

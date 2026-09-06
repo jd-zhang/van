@@ -20,6 +20,8 @@ extern int table_t1_1b();
 extern int table_t1_1c();
 extern int table_t1_1d();
 extern int table_t1_2();
+extern int table_t1_3();
+extern int table_t1_4();
 int main(int argc, char *argv[]) {
 	int ret;
 	ret = 0;
@@ -45,6 +47,14 @@ int main(int argc, char *argv[]) {
 	} else if (strcmp(argv[1], "table_t1_2") == 0) {
 		fprintf(stderr, "============ table_t1_2() ===========\n");
 		ret = table_t1_2();
+		fprintf(stderr, "\n");
+	} else if (strcmp(argv[1], "table_t1_3") == 0) {
+		fprintf(stderr, "============ table_t1_3() ===========\n");
+		ret = table_t1_3();
+		fprintf(stderr, "\n");
+	} else if (strcmp(argv[1], "table_t1_4") == 0) {
+		fprintf(stderr, "============ table_t1_4() ===========\n");
+		ret = table_t1_4();
 		fprintf(stderr, "\n");
 	} else {
 		fprintf(stderr, "Unknown test case: %s\n", argv[1]);
