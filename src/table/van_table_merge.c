@@ -89,7 +89,7 @@ int _van_table_merge_scan(VAN_TABLE *table) {
 		clear = 0;
 		item = &table->odt_items[cur_indx];
 		VAN_MUTEX_LOCK(item, mutex, ret);
-		if (F_ISSET(table, VAN_TABLE_VERBOSE_MERGE)) {
+		if (F_ISSET(table, VAN_TABLE_VERBOSE_MERGE) && item->trees[0] != NULL) {
 			fprintf(stderr, "checking: %s\n", item->trees[0]->meta->file_path);
 		}
 		if (F_ISSET(item,
@@ -358,24 +358,23 @@ void *_van_table_merge_job_run(void *arg) {
 			item->trees[0] = item->trees[1];
 			item->trees[1] = NULL;
 			F_CLR(item, VAN_ITEM_MERGED);
+			F_CLR(item, VAN_ITEM_UNUSED);
+			F_SET(item, VAN_ITEM_INUSE);
+			item->merged_indx = 0;
+			item->merged_ticks = 0;
 			VAN_MUTEX_UNLOCK(item, mutex, ret);
-			for (i = (int)job->high; i >= (int)job->low; i--) {
+			for (i = (int)job->high; i > (int)job->low; i--) {
 				item = &table->odt_items[i];
 				if (!F_ISSET(item, VAN_ITEM_MERGED))
 					continue;
 				VAN_MUTEX_LOCK(item, mutex, ret);
-				item->trees[1] = NULL;
 				item->merged_indx = 0;
 				item->merged_ticks = 0;
-				if (i > job->low) {
-					VAN_ASSERT(item->trees[0] != NULL);
-					item->trees[0] = NULL;
-					F_CLR(item, VAN_ITEM_INUSE);
-					F_SET(item, VAN_ITEM_UNUSED);
-				} else {
-					F_CLR(item, VAN_ITEM_UNUSED);
-					F_SET(item, VAN_ITEM_INUSE);
-				}
+				VAN_ASSERT(item->trees[1] == NULL);
+				VAN_ASSERT(item->trees[0] != NULL);
+				item->trees[0] = NULL;
+				F_CLR(item, VAN_ITEM_INUSE);
+				F_SET(item, VAN_ITEM_UNUSED);
 				F_CLR(item, VAN_ITEM_MERGED);
 				VAN_MUTEX_UNLOCK(item, mutex, ret);
 				/* We put off the closing later. */

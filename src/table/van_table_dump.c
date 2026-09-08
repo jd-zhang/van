@@ -97,7 +97,7 @@ void *_van_table_frozen_dump_thread(void *arg) {
 	table = dumpjob->table;
 	frozen = table->frozen;
 
-	ret = _van_table_new_dumpfile(table, &item, &odtree);
+	ret = _van_table_new_dumpfile(table, &odtree);
 	CHK_ERR(ret);
 	ret = _van_ondisktree_store_inmem(odtree, frozen);
 	CHK_ERR(ret);
@@ -107,11 +107,34 @@ void *_van_table_frozen_dump_thread(void *arg) {
 	CHK_ERR(ret);
 
 	/*
-	 * Fully initialize the item under item->mutex (the same lock
-	 * readers use) and only then publish it by bumping odt_top, so
-	 * a concurrent get can never see trees[0] == NULL.
+	 * Allocate the next free slot and fully initialize the item,
+	 * then publish it with odt_top++, all inside one odt_mtx
+	 * critical section.
+	 *
+	 * The slot is taken from the *current* odt_top at dump
+	 * completion (not from the value that was current when the dump
+	 * file was created), so a concurrent compaction that shrinks
+	 * odt_top while the dump is running can no longer leave the
+	 * finished item stranded in a slot above the readers' scan
+	 * range.
+	 *
+	 * Readers also scan the slot at odt_top (they start at
+	 * cur_indx == odt_top and skip items flagged VAN_ITEM_UNUSED),
+	 * so item->mutex - the same lock the readers take - is held
+	 * while the item is initialized, and a concurrent get can never
+	 * see trees[0] == NULL.
 	 */
+	VAN_MUTEX_LOCK(table, odt_mtx, ret);
+	if (ret != 0)
+		goto err;
+	VAN_ASSERT(table->odt_top < table->odtpath_capacity);
+	item = &table->odt_items[table->odt_top];
 	VAN_MUTEX_LOCK(item, mutex, ret);
+	if (ret != 0) {
+		VAN_MUTEX_UNLOCK(table, odt_mtx, ret);
+		goto err;
+	}
+	(void)_van_table_clear_odtitem(table, item);
 	item->trees[0] = odtree;
 	/*
 	 * Use the ticks recorded when the tree was frozen, not the dump
@@ -124,13 +147,11 @@ void *_van_table_frozen_dump_thread(void *arg) {
 	F_CLR(item, VAN_ITEM_UNUSED);
 	F_SET(item, VAN_ITEM_INUSE);
 	F_CLR(item, VAN_ITEM_DUMPING);
-	VAN_MUTEX_UNLOCK(item, mutex, ret);
-
-	VAN_MUTEX_LOCK(table, odt_mtx, ret);
 	table->odt_top++;
+	table->frozen = NULL;
+	VAN_MUTEX_UNLOCK(item, mutex, ret);
 	VAN_MUTEX_UNLOCK(table, odt_mtx, ret);
 
-	table->frozen = NULL;
  	F_SET(frozen, INMEM_TREE_DUMPED);
  	ret = _van_table_curticks(table, &frozen->dumped_ticks);
 	/*

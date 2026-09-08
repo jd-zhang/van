@@ -627,9 +627,20 @@ err:
 	return (ret);
 }
 
+/*
+ * Generate a unique on-disk file name for the table.
+ *
+ * The suffix is derived from the current time plus a per-second counter.
+ * Dump threads and merge jobs (several of them) may run concurrently, so the
+ * static naming state must be protected by a mutex; otherwise two callers in
+ * the same second can observe the same counter value and open the same path
+ * with O_TRUNC, corrupting each other's on-disk trees.
+ */
+static pthread_mutex_t odfilename_mtx = PTHREAD_MUTEX_INITIALIZER;
+static time_t pretime = 0;
+static int preind = 0;
+
 int _van_table_new_odfilename(VAN_TABLE *table, char *buf, size_t buflen) {
-	static time_t pretime = 0;
-	static int preind = 0;
 	time_t curtime;
 	int ret, ind, num;
 
@@ -637,6 +648,7 @@ int _van_table_new_odfilename(VAN_TABLE *table, char *buf, size_t buflen) {
 	curtime = time(NULL);
 	ind = 0;
 
+	VAN_ASSERT(pthread_mutex_lock(&odfilename_mtx) == 0);
 	if (curtime == pretime) {
 		preind++;
 		ind = preind;
@@ -644,6 +656,7 @@ int _van_table_new_odfilename(VAN_TABLE *table, char *buf, size_t buflen) {
 		preind = 0;
 		pretime = curtime;
 	}
+	VAN_ASSERT(pthread_mutex_unlock(&odfilename_mtx) == 0);
 
 	num = snprintf(buf, buflen, "%s.ondisk.%lu.%d", table->table_name,
 	   (unsigned long)curtime, ind);
@@ -888,60 +901,54 @@ err:
 	return (ret);
 }
 
-int _van_table_new_dumpfile(VAN_TABLE *table,
-    VAN_TABLE_ODT_ITEM **itemp, ONDISK_TREE **odtreep) {
-	int ret, ret1;
-	size_t indx;
-	VAN_TABLE_ODT_ITEM *item;
+int _van_table_new_dumpfile(VAN_TABLE *table, ONDISK_TREE **odtreep) {
+	int ret;
 	char filepath[VAN_MAXPATHLEN];
 	ONDISK_TREE *odtree;
 	flags_t oflags;
 
-	/* TODO: Mutex handling carefully. */
-	/* TODO: Release the locker earlier */
+	odtree = NULL;
+	memset(filepath, 0, sizeof(filepath));
+	oflags = VAN_OPEN_CREAT | VAN_OPEN_TRUNC;
+	ret = 0;
 
+	/*
+	 * Make sure there is room for one more on-disk tree before we
+	 * create the dump file.  The item slot is not reserved here: it
+	 * is allocated and published by the caller once the dump
+	 * completes, inside a single odt_mtx critical section that takes
+	 * the slot from the *current* odt_top (see the publish logic in
+	 * _van_table_dump_frozen / _van_table_frozen_dump_thread).
+	 * Only one dump can be in flight at a time and merge/compaction
+	 * only shrink odt_top, so this check still guarantees that there
+	 * is room at publish time.
+	 */
 	VAN_MUTEX_LOCK(table, odt_mtx, ret);
 	if (table->odt_top == table->odtpath_capacity) {
 		VAN_MUTEX_UNLOCK(table, odt_mtx, ret);
 		return (VAN_OVERFLOW);
 	}
+	VAN_MUTEX_UNLOCK(table, odt_mtx, ret);
 
-	indx = table->odt_top;
-	item = &table->odt_items[indx];
-	(void)_van_table_clear_odtitem(table, item);
-	/*
-	 * Keep the item VAN_ITEM_UNUSED here.  The caller must fully
-	 * initialize the item (under item->mutex) and only then publish
-	 * it by bumping table->odt_top (under odt_mtx), so that readers
-	 * can never see a half-initialized item with trees[0] == NULL.
-	 */
-
-	odtree = NULL;
-	memset(filepath, 0, sizeof(filepath));
-	oflags = VAN_OPEN_CREAT | VAN_OPEN_TRUNC;
 	ret = _van_table_new_odfilename(table, filepath, VAN_MAXPATHLEN);
 	CHK_ERR(ret);
 	ret = _van_ondisktree_create(table, &odtree);
 	CHK_ERR(ret);
 	ret = _van_ondisktree_open(odtree, filepath, oflags);
 	CHK_ERR(ret);
-	*itemp = item;
 	*odtreep = odtree;
+	return (ret);
 
-	if (0) {
 err:
-		if (odtree != NULL)
-			ret1 = _van_ondisktree_close(odtree, VAN_CLOSE_REMOVE);
-	}
-	VAN_MUTEX_UNLOCK(table, odt_mtx, ret);
-ret:
-	return ret;
+	if (odtree != NULL)
+		(void)_van_ondisktree_close(odtree, VAN_CLOSE_REMOVE);
+	return (ret);
 }
 
 int _van_table_dump_frozen(VAN_TABLE *table, ONDISK_TREE **odtreep) {
 	VAN_TABLE_ODT_ITEM *item;
 	ONDISK_TREE *odtree;
-	int ret, ret1;
+	int ret;
 
 	/* TODO: Mutex handling carefully. */
 
@@ -951,36 +958,58 @@ int _van_table_dump_frozen(VAN_TABLE *table, ONDISK_TREE **odtreep) {
 	if (table->frozen == NULL)
 		return 0;
 
-	ret = _van_table_new_dumpfile(table, &item, &odtree);
+	ret = _van_table_new_dumpfile(table, &odtree);
 	CHK_ERR(ret);
-	VAN_MUTEX_LOCK(item, mutex, ret);
 	ret = _van_ondisktree_store_inmem(odtree, table->frozen);
+	CHK_ERR(ret);
+	/*
+	 * Allocate the next free slot and fully initialize the item,
+	 * then publish it with odt_top++, all inside one odt_mtx
+	 * critical section.
+	 *
+	 * The slot is taken from the *current* odt_top at dump
+	 * completion (not from the value that was current when the dump
+	 * file was created), so a concurrent compaction that shrinks
+	 * odt_top while the dump is running can no longer leave the
+	 * finished item stranded in a slot above the readers' scan
+	 * range.
+	 *
+	 * Readers also scan the slot at odt_top (they start at
+	 * cur_indx == odt_top and skip items flagged VAN_ITEM_UNUSED),
+	 * so item->mutex - the same lock the readers take - is held
+	 * while the item is initialized, ensuring a concurrent get can
+	 * never observe trees[0] == NULL.
+	 */
+	VAN_MUTEX_LOCK(table, odt_mtx, ret);
+	if (ret != 0)
+		goto err;
+	VAN_ASSERT(table->odt_top < table->odtpath_capacity);
+	item = &table->odt_items[table->odt_top];
+	VAN_MUTEX_LOCK(item, mutex, ret);
 	if (ret != 0) {
-		VAN_MUTEX_UNLOCK(item, mutex, ret1);
+		VAN_MUTEX_UNLOCK(table, odt_mtx, ret);
 		goto err;
 	}
+	(void)_van_table_clear_odtitem(table, item);
 	item->trees[0] = odtree;
+	/*
+	 * Use the ticks recorded when the tree was frozen, not the dump
+	 * completion ticks, so that operations created between the
+	 * freeze and the publication of this item can still see its
+	 * records.
+	 */
+	item->ticks = table->frozen->frozen_ticks;
 	F_CLR(item, VAN_ITEM_UNUSED);
 	F_CLR(item, VAN_ITEM_DUMPING);
 	F_SET(item, VAN_ITEM_INUSE);
-	/*
-	 * Use the ticks recorded when the tree was frozen, not the dump
-	 * completion ticks, so that operations created between the freeze
-	 * and the publication of this item can still see its records.
-	 */
-	item->ticks = table->frozen->frozen_ticks;
-	*odtreep = odtree;
-	VAN_MUTEX_UNLOCK(item, mutex, ret);
-	/*
-	 * Publish the item only after it is fully initialized, so a
-	 * concurrent reader can never see trees[0] == NULL.
-	 */
-	VAN_MUTEX_LOCK(table, odt_mtx, ret);
 	table->odt_top++;
+	*odtreep = odtree;
+	F_SET(table->frozen, INMEM_TREE_DUMPED);
+	table->frozen = NULL;
+	VAN_MUTEX_UNLOCK(item, mutex, ret);
 	VAN_MUTEX_UNLOCK(table, odt_mtx, ret);
 err:
 	return (ret);
-
 }
 
 /* For testing use currently */
@@ -1005,20 +1034,16 @@ int _van_table_dump_inmem(VAN_TABLE *table) {
 	F_SET(table->active, INMEM_TREE_FROZEN);
 	frozen = table->active;
 	table->frozen = frozen;
-
 	ret = _van_inmemtree_create(table, &active);
 	CHK_ERR(ret);
 	active->threshold = table->inmem_threshold;
 	table->active = active;
-
 	ret = _van_table_dump_frozen(table, &odtree);
+	CHK_ERR(ret);
+	ret = _van_inmemtree_destory(frozen);
 	CHK_ERR(ret);
 	ret = _van_table_add_odtpath(table, odtree);
 	CHK_ERR(ret);
-	F_SET(frozen, INMEM_TREE_DUMPED);
-	table->frozen = NULL;
-	ret = _van_inmemtree_destory(frozen);
-
 err:
 	return (ret);
 }
@@ -1202,8 +1227,6 @@ int _van_table_test_get(VAN_TABLE *table, VAN_DATUM *key, VAN_DATUM *data,
 		wherebuf[0] = '\0';
 
 	active = table->active;
-	frozen = table->frozen;
-
 	/* 1. Search the active in-memory tree. */
 	if (active != NULL) {
 		ret = active->getraw(active, key, data, flags);
@@ -1215,6 +1238,7 @@ int _van_table_test_get(VAN_TABLE *table, VAN_DATUM *key, VAN_DATUM *data,
 		}
 	}
 
+	frozen = table->frozen;
 	/* 2. Search the frozen in-memory tree. */
 	if (frozen != NULL) {
 		ret = frozen->getraw(frozen, key, data, flags);

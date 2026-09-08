@@ -48,8 +48,7 @@ extern int _van_table_copy_odtitem(VAN_TABLE *table, VAN_TABLE_ODT_ITEM *src,
 extern int _van_table_move_odtitem(VAN_TABLE *table, VAN_TABLE_ODT_ITEM *src,
     VAN_TABLE_ODT_ITEM *dst);
 extern int _van_table_compact_odtiems(VAN_TABLE *table);
-extern int _van_table_new_dumpfile(VAN_TABLE *table,
-    VAN_TABLE_ODT_ITEM **itemp, ONDISK_TREE **odtreep);
+extern int _van_table_new_dumpfile(VAN_TABLE *table, ONDISK_TREE **odtreep);
 
 extern int _van_table_dump_frozen(VAN_TABLE *table, ONDISK_TREE **odtreep);
 extern int _van_table_dump_inmem(VAN_TABLE *table);
