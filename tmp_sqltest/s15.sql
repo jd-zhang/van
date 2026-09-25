@@ -1,0 +1,7 @@
+SELECT * FROM t;
+SELECT id, s, n FROM t WHERE s = 'two';
+INSERT INTO t VALUES (3, 'three', 300, 3.5, '2024-03-03', '2024-03-03 11:00:00', X'0304');
+SELECT * FROM t ORDER BY id DESC;
+UPDATE t SET n = n + 1 WHERE id = 3;
+DELETE FROM t WHERE id = 2;
+SELECT * FROM t ORDER BY id;

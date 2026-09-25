@@ -18,6 +18,10 @@ CXXLIBS=	-lpthread -L/usr/local/lib
 all: libvan.a
 test: all
 	cp -f libvan.a test && cd test && make
+
+# The SQL layer comes with its own command line shell.
+sqlcli: libvan.a
+	cd cli && $(MAKE)
 # Libraries.
 VAN_OBJS=\
 	 van_alloc.o van_alloc_debug.o van_fid.o van_hash.o \
@@ -38,13 +42,19 @@ VAN_OBJS=\
 	 ondisktree_search.o ondisktree_verify.o \
 	 van_store.o van_store_id.o van_store_path.o \
 	 van_table.o van_table_dump.o van_table_merge.o van_table_op.o \
-	 van_table_path.o txn.o
+	 van_table_path.o txn.o \
+	 sql_ast.o sql_catalog.o sql_exec.o sql_lex.o sql_parse.o \
+	 sql_row.o sql_session.o sql_type.o sql_value.o
+
+SQL_OBJS=	sql_ast.o sql_catalog.o sql_exec.o sql_lex.o sql_parse.o \
+	sql_row.o sql_session.o sql_type.o sql_value.o
 
 libvan.a: $(VAN_OBJS) 
 	$(CC) -shared -o $@ $(VAN_OBJS)  $(CLIBS)
 
 clean:
 	cd test && make clean && rm -f libvan.a
+	cd cli && make clean
 	rm -fr *.o
 	rm -fr *.a
 
@@ -168,4 +178,24 @@ van_table_path.o: src/table/van_table_path.c
 
 # src/txn
 txn.o: src/txn/txn.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $?
+
+# src/sql
+sql_ast.o: src/sql/sql_ast.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $?
+sql_catalog.o: src/sql/sql_catalog.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $?
+sql_exec.o: src/sql/sql_exec.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $?
+sql_lex.o: src/sql/sql_lex.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $?
+sql_parse.o: src/sql/sql_parse.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $?
+sql_row.o: src/sql/sql_row.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $?
+sql_session.o: src/sql/sql_session.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $?
+sql_type.o: src/sql/sql_type.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $?
+sql_value.o: src/sql/sql_value.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $?
