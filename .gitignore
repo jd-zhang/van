@@ -191,3 +191,7 @@ gradle-app.setting
 /show_all.sh
 /syncto*.sh
 /test/*.ondisk.*
+vanlog.000*
+err.txt
+out.txt
+*.odlist
