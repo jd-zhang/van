@@ -30,8 +30,26 @@ int _van_ondisktree_create(VAN_TABLE *table, ONDISK_TREE **treep) {
 		return (ret);
 	tree->table = table;
 	ret = _van_ondisktree_init(tree);
-	if (ret == 0)
+	if (ret == 0) {
+		/*
+		 * A newly created tree uses the block size configured on
+		 * the store instead of the compiled in default.
+		 *
+		 * This has to happen before _van_ondisktree_open():
+		 * for a new file that call runs _van_ondisktree_initmeta(),
+		 * which copies tree->blksize into the persistent meta
+		 * data.  Once written, the block size belongs to the file.
+		 *
+		 * Trees that are opened later are unaffected: their open
+		 * path calls _van_ondisktree_initwithmeta(), which sets
+		 * tree->blksize from the meta data and overwrites
+		 * whatever we put here.
+		 */
+		if (table != NULL && table->store != NULL &&
+		    table->store->ondisk_blksize != 0)
+			tree->blksize = table->store->ondisk_blksize;
 		*treep = tree;
+	}
 
 	return (ret);
 }
@@ -76,14 +94,15 @@ int _van_ondisktree_init(ONDISK_TREE *tree) {
 }
 
 int _van_ondisktree_init_cache(ONDISK_TREE *tree) {
-	ONDISK_META *meta;
 	int ret;
-	size_t nblks;
 
-	/* No real work here. */
+	/*
+	 * No real work here: the block cache is owned by the store and
+	 * shared by every tree of that store, so there is nothing to set
+	 * up per tree.  The cache size comes from store->cache_size.
+	 */
 	ret = 0;
-	meta = tree->meta;
-	nblks = meta->root_blkid + 1;
+	(void)tree;
 
 	return (ret);
 }
@@ -183,7 +202,6 @@ err:
 int _van_ondisktree_close(ONDISK_TREE *tree, flags_t flags) {
 	int ret, ret1;
 	ONDISK_CACHE_BLOCK *block;
-	size_t indx;
 	VAN_STORE *store;
 
 	ret = 0;
@@ -200,18 +218,17 @@ int _van_ondisktree_close(ONDISK_TREE *tree, flags_t flags) {
 	 */
 	while (atomic_load(&tree->refcount) > 0)
 		_van_sleep(1, 0);
-	/* Put the cache */
+	/*
+	 * Put the cache.
+	 *
+	 * _van_ondisk_cache_discard() removes the block from its hash
+	 * bucket and from the LRU lists, so both are left consistent.
+	 * The tree lock is the outermost in the lock order
+	 * (tree -> LRU -> bucket) and is held across the loop.
+	 */
 	while ((block = TAILQ_FIRST(&tree->odfile.head)) != NULL) {
 		TAILQ_REMOVE(&tree->odfile.head, block, tree_links);
-		indx = block->hash_indx;
-		VAN_MUTEX_LOCK(&store->cache_header[indx], mtx_hash, ret);
-		/* panic handing */
-		VAN_ASSERT(ret == 0);
-		TAILQ_REMOVE(&store->cache_header[indx].head, block, links);
-		VAN_MUTEX_UNLOCK(&store->cache_header[indx], mtx_hash, ret);
-		/* panic handing */
-		VAN_ASSERT(ret == 0);
-		ret = _van_ondisk_cache_block_destory(block);
+		ret = _van_ondisk_cache_discard(store, block);
 		/* panic handing */
 		VAN_ASSERT(ret == 0);
 	}
@@ -351,7 +368,6 @@ int _van_ondisktree_initmeta(ONDISK_TREE *tree) {
 		sprintf(meta->bloom_path, "%s", tree->bloom_path);
 	/* TODO: meta->fileid */
 
-err:
-	return ret;
+	return (ret);
 }
 

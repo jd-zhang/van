@@ -66,6 +66,7 @@ typedef struct _van_cond_stat		VAN_COND_STAT;
 /* From van_ondisk_cache.h */
 typedef struct _ondisk_cache_block	ONDISK_CACHE_BLOCK;
 typedef struct _ondisk_cache_header	ONDISK_CACHE_HEADER;
+typedef struct _ondisk_cache_lru	ONDISK_CACHE_LRU;
 
 /* From van_ondisk_tree.h */
 typedef struct _ondisk_buildinfo	ONDISK_BUILDINFO;

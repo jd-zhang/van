@@ -47,6 +47,8 @@ struct _van_store {
 
 	size_t		cache_header_size;
 	ONDISK_CACHE_HEADER	*cache_header;
+	/* Global replacement state, see van_ondisk_cache.h. */
+	ONDISK_CACHE_LRU	cache_lru;
 	size_t		cache_size;
 	size_t		ondisk_blksize;
 

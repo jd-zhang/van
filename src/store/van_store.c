@@ -98,10 +98,13 @@ int _van_store_open(VAN_STORE *store, const char *st_dir, flags_t openflags) {
 		store->cache_header_size = DEF_CACHE_HEADER_SIZE;
 	if (store->ondisk_blksize == 0)
 		store->ondisk_blksize = OD_DEF_BLKSIZE;
-	/* This data should be used later */
+	/*
+	 * Total bytes the block cache may hold.  It used to be derived
+	 * from the hash size times the block size, which happened to
+	 * land on 64MB but said nothing about the intent.
+	 */
 	if (store->cache_size == 0)
-		store->cache_size = (store->cache_header_size *
-		    store->ondisk_blksize);
+		store->cache_size = OD_DEF_CACHESIZE;
 
 	ret = _van_ondisk_cache_init(store);
 	CHK_ERR(ret);
