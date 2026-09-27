@@ -36,6 +36,8 @@ extern int _van_table_get_record(VAN_TABLE *table, VAN_DATUM *key,
     VAN_DATUM *data, flags_t flags);
 extern int _van_table_del_record(VAN_TABLE *table, VAN_DATUM *key,
     flags_t flags);
+extern int _van_table_traverse(VAN_TABLE *table, flags_t flags,
+    VAN_TRAVERSE_FUNC func, void *arg);
 extern int _van_table_new_odfilename(VAN_TABLE *table,
     char *buf, size_t buflen);
 extern int _van_table_add_odtpath(VAN_TABLE *table, ONDISK_TREE *odtree);

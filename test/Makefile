@@ -33,7 +33,7 @@ misc_tmain_objs=  misc_t1.o misc_tmain.o
 
 odt_tmain_objs=  odt_t1.o odt_tmain.o
 
-table_tmain_objs=  table_t1.o table_tmain.o
+table_tmain_objs=  table_t1.o table_t2.o table_tmain.o
 
 
 imtree1_objs= imtree1.o
@@ -101,6 +101,9 @@ table_t1.o: ./table/table_t1.c
 	$(CC) -c -o $@ $(CPPFLAGS) $(CFLAGS) $?
 
 table_tmain.o: ./table/table_tmain.c
+	$(CC) -c -o $@ $(CPPFLAGS) $(CFLAGS) $?
+
+table_t2.o: ./table/table_t2.c
 	$(CC) -c -o $@ $(CPPFLAGS) $(CFLAGS) $?
 
 

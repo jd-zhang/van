@@ -148,6 +148,7 @@ static void _van_table_set_functions(VAN_TABLE *table) {
 	table->put = _van_table_put_record;
 	table->get = _van_table_get_record;
 	table->del = _van_table_del_record;
+	table->traverse = _van_table_traverse;
 	table->open = _van_table_open;
 	table->close = _van_table_close;
 	table->start_threads = _van_table_start_threads;

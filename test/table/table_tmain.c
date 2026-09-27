@@ -22,6 +22,12 @@ extern int table_t1_1d();
 extern int table_t1_2();
 extern int table_t1_3();
 extern int table_t1_4();
+extern int table_t2_1();
+extern int table_t2_2();
+extern int table_t2_3();
+extern int table_t2_4();
+extern int table_t2_5();
+extern int table_t2_6();
 int main(int argc, char *argv[]) {
 	int ret;
 	ret = 0;
@@ -55,6 +61,30 @@ int main(int argc, char *argv[]) {
 	} else if (strcmp(argv[1], "table_t1_4") == 0) {
 		fprintf(stderr, "============ table_t1_4() ===========\n");
 		ret = table_t1_4();
+		fprintf(stderr, "\n");
+	} else if (strcmp(argv[1], "table_t2_1") == 0) {
+		fprintf(stderr, "============ table_t2_1() ===========\n");
+		ret = table_t2_1();
+		fprintf(stderr, "\n");
+	} else if (strcmp(argv[1], "table_t2_2") == 0) {
+		fprintf(stderr, "============ table_t2_2() ===========\n");
+		ret = table_t2_2();
+		fprintf(stderr, "\n");
+	} else if (strcmp(argv[1], "table_t2_3") == 0) {
+		fprintf(stderr, "============ table_t2_3() ===========\n");
+		ret = table_t2_3();
+		fprintf(stderr, "\n");
+	} else if (strcmp(argv[1], "table_t2_4") == 0) {
+		fprintf(stderr, "============ table_t2_4() ===========\n");
+		ret = table_t2_4();
+		fprintf(stderr, "\n");
+	} else if (strcmp(argv[1], "table_t2_5") == 0) {
+		fprintf(stderr, "============ table_t2_5() ===========\n");
+		ret = table_t2_5();
+		fprintf(stderr, "\n");
+	} else if (strcmp(argv[1], "table_t2_6") == 0) {
+		fprintf(stderr, "============ table_t2_6() ===========\n");
+		ret = table_t2_6();
 		fprintf(stderr, "\n");
 	} else {
 		fprintf(stderr, "Unknown test case: %s\n", argv[1]);

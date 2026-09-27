@@ -42,7 +42,7 @@ VAN_OBJS=\
 	 ondisktree_search.o ondisktree_verify.o \
 	 van_store.o van_store_id.o van_store_path.o \
 	 van_table.o van_table_dump.o van_table_merge.o van_table_op.o \
-	 van_table_path.o txn.o \
+	 van_table_path.o van_table_traverse.o txn.o \
 	 sql_ast.o sql_catalog.o sql_exec.o sql_lex.o sql_parse.o \
 	 sql_row.o sql_session.o sql_type.o sql_value.o
 
@@ -174,6 +174,8 @@ van_table_merge.o: src/table/van_table_merge.c
 van_table_op.o: src/table/van_table_op.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $?
 van_table_path.o: src/table/van_table_path.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $?
+van_table_traverse.o: src/table/van_table_traverse.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $?
 
 # src/txn

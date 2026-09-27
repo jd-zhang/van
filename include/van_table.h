@@ -22,6 +22,28 @@ extern "C" {
 
 #define MAX_ONDISK_CNT	1000
 
+/*
+ * Table level full scan.
+ *
+ * The traversal is done inside the engine: no cursor object is handed
+ * out, so the caller cannot hold on to any traversal state and the
+ * lifetime of everything involved stays under our control.
+ */
+#define VAN_TRAVERSE_FORWARD	1
+#define VAN_TRAVERSE_BACKWARD	2
+
+/*
+ * Called once per key that survives the merge.
+ *
+ * Returning 0 continues the traversal.  Returning non zero stops it
+ * immediately and that value is handed back to the caller of
+ * table->traverse() unchanged, so the caller can tell "ran to the end"
+ * (0) apart from "stopped early" (the value it returned).
+ *
+ * Sleeping inside the callback is the caller's responsibility.
+ */
+typedef int (*VAN_TRAVERSE_FUNC)(void *arg,
+    const VAN_DATUM *key, const VAN_DATUM *value);
 
 #define VAN_TABLE_MERGE_MIN 4
 #define VAN_TABLE_MERGE_MAX 10
@@ -118,6 +140,7 @@ struct _van_table {
 	int (*get)(VAN_TABLE *, VAN_DATUM *, VAN_DATUM *, flags_t);
 	int (*put)(VAN_TABLE *, VAN_DATUM *, VAN_DATUM *, flags_t);
 	int (*del)(VAN_TABLE *, VAN_DATUM *, flags_t);
+	int (*traverse)(VAN_TABLE *, flags_t, VAN_TRAVERSE_FUNC, void *);
 	int (*start_threads)(VAN_TABLE *);
 	int (*set_flags)(VAN_TABLE *, flags_t);
 	int (*get_flags)(VAN_TABLE *, flags_t *);
