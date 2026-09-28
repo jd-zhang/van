@@ -16,6 +16,9 @@
 #include "van_int.h"
 #include "van.h"
 
+#include <limits.h>
+#include <stdlib.h>
+
 #include "van_inmem_tree.h"
 
 int _van_store_init(VAN_STORE *store);
@@ -90,9 +93,26 @@ int _van_store_open(VAN_STORE *store, const char *st_dir, flags_t openflags) {
 
 	orig_oflags = openflags;
 
-	/* No other actions then just set the dir currently */
-	ret = _van_strdup(NULL, st_dir, &store->store_dir);
-	CHK_ERR(ret);
+	/*
+	 * Resolve the store directory to an absolute path and verify it
+	 * exists.  This makes every on-disk artifact (WAL, odlist and the
+	 * ondisk dumps, whose path now derives from store_dir) deterministic
+	 * with respect to the process working directory, so a store opened
+	 * from any cwd and reopened from a different one still finds its
+	 * files.  The directory itself is created by the caller
+	 * (e.g. sql_session_open / vansql), never here, so a missing
+	 * directory is a hard error.
+	 */
+	{
+		char abspath[PATH_MAX];
+
+		if (realpath(st_dir, abspath) == NULL) {
+			ret = _van_getsys_error();
+			goto err;
+		}
+		ret = _van_strdup(NULL, abspath, &store->store_dir);
+		CHK_ERR(ret);
+	}
 
 	if (store->cache_header_size == 0)
 		store->cache_header_size = DEF_CACHE_HEADER_SIZE;

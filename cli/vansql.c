@@ -16,6 +16,8 @@
 #include "sql_internal.h"
 #include "sql_ext.h"
 #include "van_sql.h"
+#include <unistd.h>
+#include "linenoise.h"
 
 /*
  * vansql -- a tiny front end for the VanDB SQL layer.
@@ -58,6 +60,18 @@ static int starts_with(const char *str, const char *word) {
 static int is_select(const char *stmt) {
 
 	return (starts_with(stmt, "select"));
+}
+
+/*
+ * True for the DML statements that report an affected-row count.  This is a
+ * cheap CLI-level prefix test (case insensitive); the engine keeps the real
+ * count in sess->rows_affected regardless of how the statement arrived.
+ */
+static int is_dml(const char *stmt) {
+
+	return (starts_with(stmt, "insert") ||
+	    starts_with(stmt, "update") ||
+	    starts_with(stmt, "delete"));
 }
 
 static void print_list(SQL_RESULTSET *rs, FILE *out) {
@@ -131,10 +145,20 @@ static int run_sql(SQL_SESSION *sess, const char *sql) {
 		if (ret == SQL_OK && nstmt > 1 && show_stats)
 			(void)fprintf(stdout, "%zu statements executed.\n",
 			    nstmt);
+		if (ret == SQL_OK && is_dml(sql)) {
+			(void)fprintf(stdout, "Query OK, %zu %s affected\n",
+			    sess->rows_affected,
+			    sess->rows_affected == 1 ? "row" : "rows");
+		}
 	}
 
 	if (ret != SQL_OK) {
-		(void)fprintf(stderr, "Error: %s\n", sql_errstr(ret));
+		const char *msg = sql_session_errmsg(sess);
+
+		if (msg != NULL && *msg != '\0')
+			(void)fprintf(stderr, "%s\n", msg);
+		else
+			(void)fprintf(stderr, "Error: %s\n", sql_errstr(ret));
 		return (ret);
 	}
 	if (show_stats && nrows > 0)
@@ -147,90 +171,118 @@ static int run_sql(SQL_SESSION *sess, const char *sql) {
  * Dot commands
  ********************************************************************/
 static int dot_tables(SQL_SESSION *sess) {
-	size_t i;
+	char **names;
+	size_t n, i;
+	int ret;
 
-	if (sess->ntables == 0) {
-		(void)printf("(no tables)\n");
+	ret = sql_catalog_list(sess, &names, &n);
+	if (ret != SQL_OK) {
+		(void)fprintf(stderr, "Error: cannot read catalog: %s\n",
+		    sql_errstr(ret));
 		return (SQL_OK);
 	}
-	for (i = 0; i < sess->ntables; i++)
-		(void)printf("%s\n", sess->tables[i]->name);
+	if (n == 0)
+		(void)printf("(no tables)\n");
+	for (i = 0; i < n; i++)
+		(void)printf("%s\n", names[i]);
+	sql_catalog_list_free(names, n);
 
 	return (SQL_OK);
 }
 
-static int dot_schema(SQL_SESSION *sess, const char *arg) {
-	size_t i;
-	int found;
+static void print_create_table(SQL_SCHEMA *schema) {
+	size_t c;
 
-	found = 0;
-	for (i = 0; i < sess->ntables; i++) {
-		SQL_TABLE *tb;
-		SQL_SCHEMA *schema;
-		size_t c;
+	(void)printf("CREATE TABLE %s (\n", schema->name);
+	for (c = 0; c < schema->ncols; c++) {
+		SQL_COLUMN *col;
+		char *def;
 
-		tb = sess->tables[i];
-		if (arg != NULL && strcasecmp(tb->name, arg) != 0)
-			continue;
-		found = 1;
-		schema = tb->schema;
-		(void)printf("CREATE TABLE %s (\n", schema->name);
-		for (c = 0; c < schema->ncols; c++) {
-			SQL_COLUMN *col;
-			char *def;
-
-			col = &schema->cols[c];
-			def = NULL;
-			if (col->has_default)
-				(void)sql_value_tostring(&col->defval, &def);
-			(void)printf("    %s %s", col->name,
-			    sql_type_name(col->type));
-			if (col->length != 0)
-				(void)printf("(%zu)", col->length);
-			if (col->not_null)
-				(void)printf(" NOT NULL");
-			if (col->primary_key)
-				(void)printf(" PRIMARY KEY");
-			if (col->has_default) {
-				(void)printf(" DEFAULT ");
-				if (def != NULL) {
-					if (SQL_TYPE_IS_STRING(col->type) ||
-					    SQL_TYPE_IS_BINARY(col->type) ||
-					    SQL_TYPE_IS_TEMPORAL(col->type))
-						(void)fprintf(stdout, "'%s'",
-						    def);
-					else
-						(void)fprintf(stdout, "%s",
-						    def);
-				}
+		col = &schema->cols[c];
+		def = NULL;
+		if (col->has_default)
+			(void)sql_value_tostring(&col->defval, &def);
+		(void)printf("    %s %s", col->name, sql_type_name(col->type));
+		if (col->length != 0)
+			(void)printf("(%zu)", col->length);
+		if (col->not_null)
+			(void)printf(" NOT NULL");
+		if (col->primary_key)
+			(void)printf(" PRIMARY KEY");
+		if (col->has_default) {
+			(void)printf(" DEFAULT ");
+			if (def != NULL) {
+				if (SQL_TYPE_IS_STRING(col->type) ||
+				    SQL_TYPE_IS_BINARY(col->type) ||
+				    SQL_TYPE_IS_TEMPORAL(col->type))
+					(void)fprintf(stdout, "'%s'", def);
+				else
+					(void)fprintf(stdout, "%s", def);
 			}
-			(void)printf("%s\n", (c + 1 < schema->ncols ?
-			    "," : ""));
-			sql_free(def);
 		}
-		(void)printf(");\n");
+		(void)printf("%s\n", (c + 1 < schema->ncols ? "," : ""));
+		sql_free(def);
 	}
+	(void)printf(");\n");
+}
+
+static int dot_schema(SQL_SESSION *sess, const char *arg) {
+	char **names;
+	size_t n, i;
+	int found;
+	int ret;
+
+	ret = sql_catalog_list(sess, &names, &n);
+	if (ret != SQL_OK) {
+		(void)fprintf(stderr, "Error: cannot read catalog: %s\n",
+		    sql_errstr(ret));
+		return (SQL_OK);
+	}
+	found = 0;
+	for (i = 0; i < n; i++) {
+		SQL_SCHEMA *schema = NULL;
+
+		if (arg != NULL && strcasecmp(names[i], arg) != 0)
+			continue;
+		if (sql_catalog_get_schema(sess, names[i],
+		    &schema) != SQL_OK || schema == NULL)
+			continue;
+		print_create_table(schema);
+		sql_schema_free(schema);
+		found = 1;
+	}
+	sql_catalog_list_free(names, n);
 	if (!found && arg != NULL)
 		(void)printf("no such table: %s\n", arg);
 
 	return (SQL_OK);
 }
 
-static int dot_command(SQL_SESSION *sess, const char *line) {
+static int dot_command(SQL_SESSION *sess, char *line) {
 
 	if (strcmp(line, ".quit") == 0 || strcmp(line, ".exit") == 0 ||
 	    strcmp(line, ".q") == 0)
 		return (1);
 	if (strncmp(line, ".tables", 7) == 0) {
+		char *arg = line + 7;
+
+		while (*arg == ' ')
+			arg++;
+		if (*arg == ';')		/* tolerate a trailing ';' */
+			*arg = '\0';
 		(void)dot_tables(sess);
 		return (0);
 	}
 	if (strncmp(line, ".schema", 7) == 0) {
-		const char *arg;
+		char *arg = line + 7;
 
-		arg = line + 7;
 		while (*arg == ' ')
 			arg++;
+		if (*arg != '\0') {
+			size_t al = strlen(arg);
+			if (arg[al - 1] == ';')
+				arg[al - 1] = '\0';
+		}
 		(void)dot_schema(sess, (*arg == '\0' ? NULL : arg));
 		return (0);
 	}
@@ -318,17 +370,54 @@ static void trim_ws(char *str) {
 		str[--len] = '\0';
 }
 
+/*
+ * Read one line of input.  On a tty we use linenoise so the user gets line
+ * editing and command history; otherwise we fall back to the plain reader so
+ * that piped input, -c and -f keep their existing behaviour unchanged.
+ * Returns NULL on EOF; *eof is set to 1 in that case.
+ */
+static char *read_input(int tty, const char *prompt, int *eof) {
+	char *s;
+
+	if (tty) {
+		s = linenoise(prompt);
+		if (s == NULL)
+			*eof = 1;
+		return (s);
+	}
+	(void)printf("%s", prompt);
+	(void)fflush(stdout);
+	return (read_line(stdin, eof));
+}
+
+/* Build the per-user history file path into 'buf'; returns 0 on success. */
+static int history_path(char *buf, size_t bufsz) {
+	const char *home;
+
+	home = getenv("HOME");
+	if (home == NULL || *home == '\0')
+		return (-1);
+	if ((size_t)snprintf(buf, bufsz, "%s/.vansql_history", home) >= bufsz)
+		return (-1);
+	return (0);
+}
+
 static int interactive(SQL_SESSION *sess) {
 	int eof, quit;
+	int tty;
+	char hpath[1024];
 
+	tty = isatty(fileno(stdin));
+	hpath[0] = '\0';
+	if (tty && history_path(hpath, sizeof(hpath)) == 0) {
+		(void)linenoiseHistoryLoad(hpath);
+		(void)linenoiseHistorySetMaxLen(1000);
+	}
 	quit = 0;
 	while (!quit) {
 		char *line, *stmt;
 
-		(void)printf("vansql> ");
-		(void)fflush(stdout);
-		eof = 0;
-		line = read_line(stdin, &eof);
+		line = read_input(tty, "vansql> ", &eof);
 		if (line == NULL) {
 			if (eof)
 				break;
@@ -350,9 +439,7 @@ static int interactive(SQL_SESSION *sess) {
 			char *more, *joined;
 			size_t l1, l2;
 
-			(void)printf("   ...> ");
-			(void)fflush(stdout);
-			more = read_line(stdin, &eof);
+			more = read_input(tty, "   ...> ", &eof);
 			if (more == NULL)
 				break;
 			l1 = strlen(stmt);
@@ -371,14 +458,19 @@ static int interactive(SQL_SESSION *sess) {
 			stmt = joined;
 		}
 		trim_ws(stmt);
-		if (*stmt != '\0')
+		if (*stmt != '\0') {
 			(void)run_sql(sess, stmt);
+			if (tty)
+				(void)linenoiseHistoryAdd(stmt);
+		}
 		if (stmt != line)
 			free(stmt);
 		free(line);
 	}
 
 	(void)printf("\n");
+	if (tty && hpath[0] != '\0')
+		(void)linenoiseHistorySave(hpath);
 	return (SQL_OK);
 }
 

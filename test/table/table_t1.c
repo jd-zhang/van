@@ -120,7 +120,7 @@ int table_t1_1() {
 
 	system("rm -fr test1*");
 	system("rm -fr vanlog.*");
-	ret = van_store_create(&store);
+	ret = van_test_store_create(&store);
 	CHK_RET(ret, "van_store_create");
 	ret = store->open(store, ".", 0);
 	CHK_RET(ret, "store->open");
@@ -166,7 +166,7 @@ int table_t1_1() {
 	ret = store->close(store);
 	CHK_RET(ret, "store->close");
 
-	ret = van_store_create(&store);
+	ret = van_test_store_create(&store);
 	CHK_RET(ret, "van_store_create");
 	ret = store->open(store, ".", 0);
 	CHK_RET(ret, "store->open");
@@ -192,7 +192,7 @@ int table_t1_1b() {
 
 	system("rm -fr test1*");
 	system("rm -fr vanlog.*");
-	ret = van_store_create(&store);
+	ret = van_test_store_create(&store);
 	CHK_RET(ret, "van_store_create");
 	ret = store->open(store, ".", 0);
 	CHK_RET(ret, "store->open");
@@ -244,7 +244,7 @@ int table_t1_1c() {
 
 	system("rm -fr test1*");
 	system("rm -fr vanlog.*");
-	ret = van_store_create(&store);
+	ret = van_test_store_create(&store);
 	CHK_RET(ret, "van_store_create");
 	ret = store->open(store, ".", 0);
 	CHK_RET(ret, "store->open");
@@ -327,7 +327,7 @@ int table_t1_1d() {
 
 	system("rm -fr test1*");
 	system("rm -fr vanlog.*");
-	ret = van_store_create(&store);
+	ret = van_test_store_create(&store);
 	CHK_RET(ret, "van_store_create");
 	ret = store->open(store, ".", 0);
 	CHK_RET(ret, "store->open");
@@ -420,7 +420,7 @@ int table_t1_2() {
 
 	system("rm -fr test1*");
 	system("rm -fr vanlog.*");
-	ret = van_store_create(&store);
+	ret = van_test_store_create(&store);
 	CHK_RET(ret, "van_store_create");
 	ret = store->open(store, ".", 0);
 	CHK_RET(ret, "store->open");
@@ -477,7 +477,7 @@ int table_t1_2() {
 	store = NULL;
 
 	fprintf(stderr, "============ 5 reopen table from ondisk =========\n");
-	ret = van_store_create(&store);
+	ret = van_test_store_create(&store);
 	CHK_RET(ret, "van_store_create");
 	ret = store->open(store, ".", 0);
 	CHK_RET(ret, "store->open");
@@ -543,7 +543,7 @@ int table_t1_3() {
 	failcnt = 0;
 	system("rm -fr test1*");
 	system("rm -fr vanlog.*");
-	ret = van_store_create(&store);
+	ret = van_test_store_create(&store);
 	CHK_RET(ret, "van_store_create");
 	ret = store->open(store, ".", 0);
 	CHK_RET(ret, "store->open");
@@ -695,7 +695,7 @@ int table_t1_4() {
 	failcnt = 0;
 	system("rm -fr test1*");
 	system("rm -fr vanlog.*");
-	ret = van_store_create(&store);
+	ret = van_test_store_create(&store);
 	CHK_RET(ret, "van_store_create");
 	ret = store->open(store, ".", 0);
 	CHK_RET(ret, "store->open");

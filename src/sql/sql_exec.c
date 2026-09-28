@@ -44,6 +44,14 @@ int sql_schema_findcol(SQL_SCHEMA *schema, const char *lname,
 	return (SQL_ERR_NO_COLUMN);
 }
 
+static int
+sql_seterr_notable(SQL_SESSION *sess, const char *lname) {
+
+	(void)snprintf(sess->errmsg, sizeof(sess->errmsg),
+	    "Error: no such table '%s'", lname);
+	return (SQL_ERR_NO_TABLE);
+}
+
 static int result_bool(SQL_VALUE *res, int val) {
 	int ret;
 
@@ -860,7 +868,7 @@ static int exec_drop_table(SQL_SESSION *sess, SQL_STMT *stmt, FILE *out) {
 	if (tb == NULL) {
 		if (stmt->if_exists)
 			return (SQL_OK);
-		return (SQL_ERR_NO_TABLE);
+		return (sql_seterr_notable(sess, stmt->ltablename));
 	}
 
 	/*
@@ -915,18 +923,29 @@ static int insert_one_row(SQL_SESSION *sess, SQL_STMT *stmt, SQL_TABLE *tb,
 
 	ncols = schema->ncols;
 	buf = NULL;
+	const char *vs = (row->nitems == 1) ? "value" : "values";
 	targets = NULL;
 	blen = 0;
 	dirty = 0;
 	rowid = 0;
 
-	if (stmt->ninscols != 0 && stmt->ninscols != row->nitems) {
-		/* Arity is checked against the schema further down. */
-		if (row->nitems != stmt->ninscols)
-			return (SQL_ERR_ARG);
+	if (stmt->ninscols != 0) {
+		if (row->nitems != stmt->ninscols) {
+			(void)snprintf(sess->errmsg, sizeof(sess->errmsg),
+			    "Error: column count mismatch, table '%s' lists "
+			    "%zu columns but %zu %s provided",
+			    stmt->ltablename,
+			    stmt->ninscols, row->nitems, vs);
+			return (SQL_ERR_COLUMN_COUNT);
+		}
+	} else if (row->nitems != ncols) {
+		(void)snprintf(sess->errmsg, sizeof(sess->errmsg),
+		    "Error: column count mismatch, table '%s' has %zu "
+		    "columns, but %zu %s provided",
+		    stmt->ltablename,
+		    ncols, row->nitems, vs);
+		return (SQL_ERR_COLUMN_COUNT);
 	}
-	if (row->nitems > ncols)
-		return (SQL_ERR_ARG);
 
 	targets = (size_t *)sql_calloc(ncols, sizeof(size_t));
 	vals = row_values_alloc(ncols);
@@ -1165,7 +1184,7 @@ static int exec_select(SQL_SESSION *sess, SQL_STMT *stmt, FILE *out,
 
 	tb = sql_session_find(sess, stmt->ltablename);
 	if (tb == NULL)
-		return (SQL_ERR_NO_TABLE);
+		return (sql_seterr_notable(sess, stmt->ltablename));
 	ret = sql_table_ensure_open(sess, tb);
 	if (ret != SQL_OK)
 		return (ret);
@@ -1200,6 +1219,28 @@ static int exec_select(SQL_SESSION *sess, SQL_STMT *stmt, FILE *out,
 			if (names[i] == NULL) {
 				ret = SQL_ERR_NOMEM;
 				goto err;
+			}
+		}
+	}
+
+	/* Validate that every projected column actually exists. */
+	if (!stmt->select_star) {
+		for (i = 0; i < nproj; i++) {
+			SQL_EXPR *e = stmt->select_items[i].expr;
+
+			if (e != NULL && e->xtype == EX_COLUMN) {
+				size_t cindx;
+
+				if (sql_schema_findcol(schema, e->lname,
+				    &cindx) != SQL_OK) {
+					(void)snprintf(sess->errmsg,
+					    sizeof(sess->errmsg),
+					    "Error: no such column '%s' in "
+					    "table '%s'",
+					    e->lname, stmt->ltablename);
+					ret = SQL_ERR_NO_COLUMN;
+					goto err;
+				}
 			}
 		}
 	}
@@ -1440,7 +1481,7 @@ static int exec_insert(SQL_SESSION *sess, SQL_STMT *stmt, FILE *out,
 	(void)out;
 	tb = sql_session_find(sess, stmt->ltablename);
 	if (tb == NULL)
-		return (SQL_ERR_NO_TABLE);
+		return (sql_seterr_notable(sess, stmt->ltablename));
 	ret = sql_table_ensure_open(sess, tb);
 	if (ret != SQL_OK)
 		return (ret);
@@ -1486,7 +1527,7 @@ static int exec_update(SQL_SESSION *sess, SQL_STMT *stmt, FILE *out,
 	(void)out;
 	tb = sql_session_find(sess, stmt->ltablename);
 	if (tb == NULL)
-		return (SQL_ERR_NO_TABLE);
+		return (sql_seterr_notable(sess, stmt->ltablename));
 	ret = sql_table_ensure_open(sess, tb);
 	if (ret != SQL_OK)
 		return (ret);
@@ -1630,7 +1671,7 @@ static int exec_delete(SQL_SESSION *sess, SQL_STMT *stmt, FILE *out,
 	(void)out;
 	tb = sql_session_find(sess, stmt->ltablename);
 	if (tb == NULL)
-		return (SQL_ERR_NO_TABLE);
+		return (sql_seterr_notable(sess, stmt->ltablename));
 	ret = sql_table_ensure_open(sess, tb);
 	if (ret != SQL_OK)
 		return (ret);

@@ -835,3 +835,113 @@ int sql_catalog_drop(SQL_SESSION *sess, const char *lname) {
 
 	return (save_tablelist(sess));
 }
+
+/*
+ * Enumerate the table names recorded in the catalog.  This reads the
+ * authoritative table-list key directly from the catalog table, so the
+ * caller sees every table that exists in the store rather than only the
+ * ones open in the current session.  The returned array and each string
+ * are allocated and released with sql_catalog_list_free().
+ */
+int sql_catalog_list(SQL_SESSION *sess, char ***namesp, size_t *np) {
+	char *list, *p, *next;
+	char **names = NULL;
+	size_t n = 0, cap = 0;
+	int ret;
+
+	if (sess == NULL || namesp == NULL || np == NULL)
+		return (SQL_ERR_ARG);
+	*namesp = NULL;
+	*np = 0;
+
+	ret = cat_get(sess, SQL_TABLELIST_KEY, &list);
+	if (ret != SQL_OK)
+		return (ret);
+	if (list == NULL)
+		return (SQL_OK);
+
+	p = list;
+	while (p != NULL && *p != '\0') {
+		next = strchr(p, '\n');
+		if (next != NULL) {
+			*next = '\0';
+			next++;
+		}
+		if (*p != '\0') {
+			if (n == cap) {
+				char **newv;
+				size_t newcap;
+
+				newcap = (cap == 0 ? 8 : cap * 2);
+				newv = realloc(names, newcap * sizeof(char *));
+				if (newv == NULL) {
+					ret = SQL_ERR_NOMEM;
+					goto err;
+				}
+				names = newv;
+				cap = newcap;
+			}
+			names[n] = sql_strdup(p);
+			if (names[n] == NULL) {
+				ret = SQL_ERR_NOMEM;
+				goto err;
+			}
+			n++;
+		}
+		p = next;
+	}
+
+	sql_free(list);
+	*namesp = names;
+	*np = n;
+	return (SQL_OK);
+
+err:
+	sql_free(list);
+	while (n > 0)
+		sql_free(names[--n]);
+	sql_free(names);
+	return (ret);
+}
+
+void sql_catalog_list_free(char **names, size_t n) {
+	size_t i;
+
+	if (names == NULL)
+		return;
+	for (i = 0; i < n; i++)
+		sql_free(names[i]);
+	sql_free(names);
+}
+
+/*
+ * Fetch and deserialize the schema for 'name' straight from the catalog.
+ * The caller owns the returned SQL_SCHEMA and must release it with
+ * sql_schema_free().  Returns SQL_ERR_NO_TABLE when the name is unknown.
+ */
+int sql_catalog_get_schema(SQL_SESSION *sess, const char *name,
+    SQL_SCHEMA **schemap) {
+	char *lname, *text;
+	SQL_SCHEMA *schema;
+	int ret;
+
+	if (sess == NULL || name == NULL || schemap == NULL)
+		return (SQL_ERR_ARG);
+	*schemap = NULL;
+
+	lname = sql_strlower(name, strlen(name));
+	if (lname == NULL)
+		return (SQL_ERR_NOMEM);
+	ret = cat_get(sess, lname, &text);
+	sql_free(lname);
+	if (ret != SQL_OK)
+		return (ret);
+	if (text == NULL)
+		return (SQL_ERR_NO_TABLE);
+	ret = sql_schema_deserialize(text, &schema);
+	sql_free(text);
+	if (ret != SQL_OK)
+		return (ret);
+	*schemap = schema;
+	return (SQL_OK);
+}

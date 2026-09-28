@@ -17,7 +17,7 @@ clib=""
 inc="-I$loc -I$loc/include -I$loc/include_auto"
 clib="$loc/libvan.a"
 
-ADD_LIBS="-lpthread"
+ADD_LIBS="-lpthread -lm"
 
 if test "`uname -s`" = "SunOS"; then
 	ADD_LIBS="$ADD_LIBS -lsocket -lrt -lnsl"

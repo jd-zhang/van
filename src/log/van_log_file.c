@@ -31,7 +31,7 @@ static int lognames_cmp(const void *d1, const void *d2) {
 
 int _van_log_listfiles(VAN_LOG *logp, int *cntp) {
 	VAN_STORE *store;
-	int ret, ret1, cnt;
+	int ret = 0, ret1, cnt;
 	const char *ldir;
 	DIR *dirobj;
 	struct dirent *dent;

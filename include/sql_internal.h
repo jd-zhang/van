@@ -116,6 +116,8 @@ typedef struct _sql_token {
 	const char	*text;		/* Points into the lexer input	*/
 	size_t		len;
 	size_t		off;		/* Byte offset into the input	*/
+	size_t		line;		/* 1-based line number		*/
+	size_t		col;		/* 1-based column number	*/
 	int64		ival;		/* TK_INTEGER			*/
 	double		fval;		/* TK_FLOAT			*/
 	unsigned char	*sval;		/* Unescaped string/blob	*/
@@ -263,6 +265,19 @@ typedef struct _sql_row {
 	size_t		ncols;
 	SQL_VALUE	*vals;
 } SQL_ROW;
+
+/********************************************************************
+ * Catalog enumeration
+ *
+ * These read the authoritative table list straight out of the catalog
+ * table so that callers (such as the CLI dot commands) can list every
+ * table that exists in the store, independent of which tables happen to
+ * be open in the current session.
+ ********************************************************************/
+int sql_catalog_list(SQL_SESSION *sess, char ***namesp, size_t *np);
+void sql_catalog_list_free(char **names, size_t n);
+int sql_catalog_get_schema(SQL_SESSION *sess, const char *name,
+    SQL_SCHEMA **schemap);
 
 #if defined(__cplusplus)
 }

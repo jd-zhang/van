@@ -2181,10 +2181,22 @@ git status --short
 #define	SQL_ERR_CONVERT		(-15)	/* 值转换失败		*/
 #define	SQL_ERR_LIMIT		(-16)	/* 超出内部限制		*/
 #define	SQL_ERR_READONLY	(-17)	/* 会话只读		*/
+#define	SQL_ERR_COLUMN_COUNT	(-18)	/* 列数/值数不匹配	*/
 #define	SQL_ERR_UNKNOWN		(-99)	/* 其他		*/
 ```
 
 `SQL_ERR_AMBIGUOUS` 目前**预留但未使用**（单表查询不可能有歧义），JOIN 引入后会用到。
+
+`SQL_ERR_COLUMN_COUNT` 在 INSERT 的值列表与表列数（或显式列清单）不匹配时返回。
+
+语义错误（表不存在、列数不匹配、列不存在）除返回错误码外，还会在
+`SQL_SESSION.errmsg` 中写入人读详情，由 `sql_session_errmsg()` 取回并打印；
+无详情时回退到 `sql_errstr()` 的静态串。这与 4.1 的词法/语法错误共用同一条
+`errmsg` 通道。例如：
+
+* `select * from t2;` → `Error: no such table 't2'`
+* `insert into t1 values(1,'a','b');` → `Error: column count mismatch, table 't1' has 2 columns, but 3 values provided`
+* `select xyz from t1;` → `Error: no such column 'xyz' in table 't1'`
 
 ## 附录 B：目录持久化格式
 

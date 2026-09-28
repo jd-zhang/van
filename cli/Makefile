@@ -10,14 +10,17 @@ CLIBS=	-lpthread -lm
 
 all: vansql
 
-vansql: vansql.o $(VAN_OBJS)
-	$(CC) -o $@ $(LDFLAGS) vansql.o $(VAN_OBJS) $(CLIBS)
+vansql: vansql.o linenoise.o $(VAN_OBJS)
+	$(CC) -o $@ $(LDFLAGS) vansql.o linenoise.o $(VAN_OBJS) $(CLIBS)
 
 vansql.o: vansql.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ vansql.c
+
+linenoise.o: linenoise.c linenoise.h
+	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ linenoise.c
 
 ../libvan.a:
 	cd .. && $(MAKE) libvan.a
 
 clean:
-	rm -f vansql.o vansql.exe vansql
+	rm -f vansql.o vansql.exe vansql linenoise.o

@@ -644,6 +644,7 @@ static int preind = 0;
 int _van_table_new_odfilename(VAN_TABLE *table, char *buf, size_t buflen) {
 	time_t curtime;
 	int ret, ind, num;
+	char base[VAN_MAXPATHLEN];
 
 	ret = 0;
 	curtime = time(NULL);
@@ -659,13 +660,23 @@ int _van_table_new_odfilename(VAN_TABLE *table, char *buf, size_t buflen) {
 	}
 	VAN_ASSERT(pthread_mutex_unlock(&odfilename_mtx) == 0);
 
-	num = snprintf(buf, buflen, "%s.ondisk.%lu.%d", table->table_name,
+	/*
+	 * Build the bare file name first, then anchor it inside the store
+	 * directory through the same path logic used for the WAL/odlist.
+	 * Previously this returned only the basename, so the ondisk dump
+	 * was created relative to the process cwd (outside the store) and
+	 * could not be found when the store was reopened from a different
+	 * working directory.
+	 */
+	num = snprintf(base, sizeof(base), "%s.ondisk.%lu.%d", table->table_name,
 	   (unsigned long)curtime, ind);
 	if (num < 0) {
 		ret = _van_getsys_error();
+		return (ret);
 	}
 
-	return ret;
+	ret = _van_table_path_noalloc(table, buf, buflen, base);
+	return (ret);
 }
 
 int _van_table_add_odtpath(VAN_TABLE *table, ONDISK_TREE *odtree) {

@@ -62,7 +62,7 @@ static int tb2_setup(VAN_STORE **storep, VAN_TABLE **tablep,
 
 	system("rm -fr test1*");
 	system("rm -fr vanlog.*");
-	ret = van_store_create(&store);
+	ret = van_test_store_create(&store);
 	CHK_RET(ret, "van_store_create");
 	ret = store->open(store, ".", 0);
 	CHK_RET(ret, "store->open");

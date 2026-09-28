@@ -11,3 +11,4 @@
 vanlog.0*
 test/*.odlist*
 test/*.ondisk.*
+*.ondisk.1*

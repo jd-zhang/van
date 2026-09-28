@@ -15,6 +15,8 @@
  */
 #include "sql_internal.h"
 #include "sql_ext.h"
+#include "van_sql.h"
+#include <ctype.h>
 
 /*
  * Recursive descent parser for the supported subset of SQL:
@@ -1152,9 +1154,132 @@ static int parse_delete(SQL_TOKENSTREAM *ts, SQL_STMT *stmt) {
 }
 
 /*
- * Parse exactly one statement, consuming its terminating semicolon.
+ * Levenshtein edit distance for two short, NUL terminated strings.  Used
+ * to suggest the closest known statement keyword when the first token is a
+ * typo'd identifier.  On allocation failure it returns a distance that is
+ * guaranteed not to look "close", disabling the suggestion.
  */
-int sql_parse(SQL_TOKENSTREAM *ts, SQL_STMT **stmtp) {
+static int parse_edit_distance(const char *a, const char *b) {
+	size_t la, lb, i;
+	int *prev, *cur;
+	int result;
+
+	la = strlen(a);
+	lb = strlen(b);
+	if (la == 0)
+		return ((int)lb);
+	if (lb == 0)
+		return ((int)la);
+
+	prev = sql_calloc(lb + 1, sizeof(int));
+	cur = sql_calloc(lb + 1, sizeof(int));
+	if (prev == NULL || cur == NULL) {
+		sql_free(prev);
+		sql_free(cur);
+		return (99);
+	}
+	for (i = 0; i <= lb; i++)
+		prev[i] = (int)i;
+	for (i = 1; i <= la; i++) {
+		size_t j;
+
+		cur[0] = (int)i;
+		for (j = 1; j <= lb; j++) {
+			int cost = (a[i - 1] == b[j - 1] ? 0 : 1);
+			int v = prev[j] + 1;
+			if (cur[j - 1] + 1 < v)
+				v = cur[j - 1] + 1;
+			if (prev[j - 1] + cost < v)
+				v = prev[j - 1] + cost;
+			cur[j] = v;
+		}
+		{ int *tmp = prev; prev = cur; cur = tmp; }
+	}
+	result = prev[lb];
+	sql_free(prev);
+	sql_free(cur);
+
+	return (result);
+}
+
+static const char *parse_stmt_keywords[] = {
+	"create", "drop", "insert", "select", "update", "delete", NULL
+};
+
+/*
+ * If 'tk' looks like a misspelling of a known statement keyword, return
+ * that keyword (the canonical lower case spelling); otherwise NULL.
+ */
+static const char *parse_suggest_keyword(SQL_TOKEN *tk) {
+	size_t i, tl;
+	char buf[64];
+	int bestd;
+	size_t besti;
+
+	if (tk == NULL || tk->type != TK_IDENT)
+		return (NULL);
+	tl = tk->len < (sizeof(buf) - 1) ? tk->len : (sizeof(buf) - 1);
+	for (i = 0; i < tl; i++)
+		buf[i] = (char)tolower((unsigned char)tk->text[i]);
+	buf[tl] = '\0';
+
+	bestd = 99;
+	besti = 0;
+	for (i = 0; parse_stmt_keywords[i] != NULL; i++) {
+		int d = parse_edit_distance(buf, parse_stmt_keywords[i]);
+		if (d < bestd) {
+			bestd = d;
+			besti = i;
+		}
+	}
+	if (bestd > 2)
+		return (NULL);
+
+	return (parse_stmt_keywords[besti]);
+}
+
+/*
+ * Build a friendly syntax-error message into sess->errmsg describing the
+ * token at the current parser position, optionally naming the keyword the
+ * parser expected (an edit-distance suggestion for a typo'd first token).
+ */
+static void parse_set_syntax_err(SQL_TOKENSTREAM *ts, SQL_SESSION *sess,
+    const char *expected) {
+	SQL_TOKEN *tk;
+	char tbuf[64];
+	const char *ttext;
+	size_t tl;
+
+	if (sess == NULL)
+		return;
+	tk = peek(ts, 0);
+	if (tk == NULL || tk->type == TK_EOF) {
+		ttext = "<EOF>";
+	} else {
+		tl = tk->len < (sizeof(tbuf) - 1) ? tk->len : (sizeof(tbuf) - 1);
+		(void)memcpy(tbuf, tk->text, tl);
+		tbuf[tl] = '\0';
+		ttext = tbuf;
+	}
+	if (expected != NULL) {
+		(void)snprintf(sess->errmsg, sizeof(sess->errmsg),
+		    "Error at line %zu, column %zu: syntax error near '%s', "
+		    "expected '%s'", tk->line, tk->col, ttext, expected);
+	} else {
+		(void)snprintf(sess->errmsg, sizeof(sess->errmsg),
+		    "Error at line %zu, column %zu: syntax error near '%s'",
+		    tk->line, tk->col, ttext);
+	}
+}
+
+/*
+ * Parse exactly one statement, consuming its terminating semicolon.
+ *
+ * sess may be NULL (defensive), but when supplied a syntax error records a
+ * detailed, human readable message in sess->errmsg so the caller can show
+ * the token position and, for a typo'd first keyword, a suggestion.
+ */
+int sql_parse(SQL_TOKENSTREAM *ts, SQL_SESSION *sess, SQL_STMT **stmtp) {
 	SQL_TOKEN *tk;
 	SQL_STMT *stmt;
 	sql_stmt_type type;
@@ -1164,9 +1289,14 @@ int sql_parse(SQL_TOKENSTREAM *ts, SQL_STMT **stmtp) {
 		return (SQL_ERR_ARG);
 	*stmtp = NULL;
 
+	if (sess != NULL)
+		sess->errmsg[0] = '\0';
+
 	tk = peek(ts, 0);
-	if (tok_is_eof(tk))
+	if (tok_is_eof(tk)) {
+		parse_set_syntax_err(ts, sess, NULL);
 		return (SQL_ERR_PARSE);
+	}
 
 	switch (tk->kw) {
 		case KW_CREATE:
@@ -1188,8 +1318,15 @@ int sql_parse(SQL_TOKENSTREAM *ts, SQL_STMT **stmtp) {
 			type = STMT_DELETE;
 			break;
 		default:
-			return (tk->type == TK_IDENT ?
-			    SQL_ERR_FEATURE : SQL_ERR_PARSE);
+			if (tk->type == TK_IDENT) {
+				const char *exp;
+
+				exp = parse_suggest_keyword(tk);
+				parse_set_syntax_err(ts, sess, exp);
+				return (SQL_ERR_PARSE);
+			}
+			parse_set_syntax_err(ts, sess, NULL);
+			return (SQL_ERR_PARSE);
 	}
 
 	ret = sql_stmt_alloc(type, &stmt);
@@ -1220,6 +1357,11 @@ int sql_parse(SQL_TOKENSTREAM *ts, SQL_STMT **stmtp) {
 			break;
 	}
 
+	if (ret == SQL_ERR_PARSE) {
+		parse_set_syntax_err(ts, sess, NULL);
+		sql_stmt_free(stmt);
+		return (ret);
+	}
 	if (ret != SQL_OK) {
 		sql_stmt_free(stmt);
 		return (ret);

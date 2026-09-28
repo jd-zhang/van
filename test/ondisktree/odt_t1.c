@@ -29,7 +29,7 @@ int odt_t1_1() {
 	odtpath = "test1.ondisk.odt_t1";
 	system("rm -rf test1.ondisk.odt_t1*");
 	system("rm -fr vanlog.*");
-	ret = van_store_create(&store);
+	ret = van_test_store_create(&store);
 	CHK_RET(ret, "van_store_create");
 	ret = store->open(store, ".", 0);
 	CHK_RET(ret, "store->open");
@@ -183,7 +183,7 @@ int odt_t1_2() {
 	system("rm -f od_table.ondisk*");
 	system("rm -f od_table.odlist*");
 	system("rm -fr vanlog.*");
-	ret = van_store_create(&store);
+	ret = van_test_store_create(&store);
 	CHK_RET(ret, "van_store_create");
 	ret = store->open(store, ".", 0);
 	CHK_RET(ret, "store->open");
@@ -306,7 +306,7 @@ int odt_t1_3() {
 	system("rm -f od_table.ondisk*");
 	system("rm -f od_table.odlist*");
 	system("rm -fr vanlog.*");
-	ret = van_store_create(&store);
+	ret = van_test_store_create(&store);
 	CHK_RET(ret, "van_store_create");
 	ret = store->open(store, ".", 0);
 	CHK_RET(ret, "store->open");

@@ -56,7 +56,7 @@ extern void sql_ts_consume(SQL_TOKENSTREAM *ts);
 extern int sql_kw_lookup(const char *text, size_t len);
 
 /* src/sql/sql_parse.c */
-extern int sql_parse(SQL_TOKENSTREAM *ts, SQL_STMT **stmtp);
+extern int sql_parse(SQL_TOKENSTREAM *ts, SQL_SESSION *sess, SQL_STMT **stmtp);
 
 /* src/sql/sql_type.c */
 extern int sql_type_parse(sql_kw kw, int has_arg, size_t arg,

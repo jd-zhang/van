@@ -425,6 +425,20 @@ int sql_lex(const char *sql, size_t len, SQL_TOKENSTREAM **tsp) {
 
 		memset(&tk, 0, sizeof(tk));
 		tk.off = i;
+		{
+			size_t k, ln, ls;
+
+			ln = 1;
+			ls = 0;
+			for (k = 0; k < i; k++) {
+				if (p[k] == '\n') {
+					ln++;
+					ls = k + 1;
+				}
+			}
+			tk.line = ln;
+			tk.col = i - ls + 1;
+		}
 
 		/* Quoted identifiers */
 		if (p[i] == '"' || p[i] == '`') {

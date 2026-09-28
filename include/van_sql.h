@@ -51,6 +51,7 @@ struct _van_table;
 #define	SQL_ERR_CONVERT		(-15)	/* Value conversion failure	*/
 #define	SQL_ERR_LIMIT		(-16)	/* Internal limit reached	*/
 #define	SQL_ERR_READONLY	(-17)	/* Session opened read only	*/
+#define	SQL_ERR_COLUMN_COUNT	(-18)	/* Column/value count mismatch	*/
 #define	SQL_ERR_UNKNOWN		(-99)	/* Anything else		*/
 
 /* Safety limits of the minimal layer. */
@@ -175,6 +176,7 @@ typedef struct _sql_resultset {
 /*
  * A session owns the underlying store and the opened tables.
  */
+#define	SQL_ERRMSG_LEN	512	/* Size of the per-session errmsg buffer */
 typedef struct _sql_session {
 	struct _van_store *store;
 	char		*dir;
@@ -193,6 +195,12 @@ typedef struct _sql_session {
 	/* Change statistics of the last statement. */
 	size_t		rows_affected;
 	size_t		last_rowid;
+	/*
+	 * Detailed, human readable error text for the last failed
+	 * operation, modelled after sqlite3_errmsg().  Empty until an
+	 * error writes to it.
+	 */
+	char		errmsg[SQL_ERRMSG_LEN];
 } SQL_SESSION;
 
 /* Open/close flags for sql_session_open(). */
@@ -210,6 +218,7 @@ extern int sql_session_query(SQL_SESSION *sess, const char *sql,
 
 /* Errors & diagnostics. */
 extern const char *sql_errstr(int err);
+extern const char *sql_session_errmsg(SQL_SESSION *sess);
 
 /* Types. */
 extern const char *sql_type_name(sql_type_t type);

@@ -117,6 +117,13 @@ int sql_session_close(SQL_SESSION *sess) {
 	return (ret);
 }
 
+const char *sql_session_errmsg(SQL_SESSION *sess) {
+
+	if (sess == NULL || sess->errmsg[0] == '\0')
+		return ("");
+	return (sess->errmsg);
+}
+
 /*
  * Shared implementation for sql_session_exec() and the script runner.
  *
@@ -134,6 +141,9 @@ static int session_run(SQL_SESSION *sess, const char *sql, FILE *out,
 	if (!sess->opened)
 		return (SQL_ERR_STORE);
 
+	if (sess->errmsg != NULL)
+		sess->errmsg[0] = '\0';
+
 	ts = NULL;
 	stmt = NULL;
 	n = 0;
@@ -146,7 +156,7 @@ static int session_run(SQL_SESSION *sess, const char *sql, FILE *out,
 	for (;;) {
 		if (sql_ts_peek(ts, 0)->type == TK_EOF)
 			break;
-		ret = sql_parse(ts, &stmt);
+		ret = sql_parse(ts, sess, &stmt);
 		if (ret != SQL_OK)
 			goto err;
 		if (strict_one && sql_ts_peek(ts, 0)->type != TK_EOF) {

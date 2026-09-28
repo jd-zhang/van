@@ -19,6 +19,23 @@
 /* Internal headers */
 #include "van_int.h"
 
+/*
+ * Create a store with an enlarged on-disk cache (1G instead of the
+ * default 64MB).  The table/ondisktree tests push a lot of data past the
+ * in-memory threshold and the small default cache makes them thrash / fail,
+ * so we bump it here.  Only used by the table and ondisktree test suites.
+ */
+static inline int
+van_test_store_create(VAN_STORE **storep)
+{
+	int ret;
+
+	ret = van_store_create(storep);
+	if (ret == 0 && storep != NULL && *storep != NULL)
+		(*storep)->set_cachesize(*storep, GIGABYTE);
+	return (ret);
+}
+
 #define DEF_DIRMODE (S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH)
 #define DEF_FILEMODE (S_IRWXU|S_IRGRP|S_IROTH)
 #define CMD_BUF_LEN 500

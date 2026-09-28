@@ -95,6 +95,8 @@ const char *sql_errstr(int err) {
 			return ("internal limit exceeded");
 		case SQL_ERR_READONLY:
 			return ("session is read only");
+		case SQL_ERR_COLUMN_COUNT:
+			return ("column count mismatch");
 		default:
 			break;
 	}
