@@ -36,6 +36,11 @@
  * No cursor object is handed out: the state below lives entirely inside
  * this file and is torn down before traverse returns.
  *
+ * Ranges are optional, see VAN_TRAVERSE_OPT.  When one is given every
+ * source seeks instead of starting at its end, and the merge stops as soon
+ * as the leading key leaves the range.  A range that cannot match anything
+ * returns 0 without calling the callback -- "no rows" is not an error.
+ *
  * Isolation is a hybrid, see the design notes:
  *   - everything that existed when the scan started is reported;
  *   - writes that land in the active tree while the scan runs are not
@@ -92,6 +97,20 @@ struct _van_traverse {
 	void			*arg;
 	VAN_DATUM_CMPFUNC	 cmp;
 	int			 backward;
+
+	/*
+	 * Optional range, see VAN_TRAVERSE_OPT.
+	 *
+	 * The caller always hands over logical boundaries: start is where
+	 * the traversal begins, end is where it stops.  Backward therefore
+	 * receives them the other way round (start is the highest key),
+	 * and every use below mirrors on tv->backward.  Both NULL means a
+	 * plain full scan, exactly as before ranges existed.
+	 */
+	const VAN_DATUM		*start;		/* NULL = unbounded below */
+	const VAN_DATUM		*end;		/* NULL = unbounded above */
+	int			 start_inc;
+	int			 end_inc;
 
 	struct _van_traverse_src	*srcs;
 	size_t			 nsrcs;
@@ -242,6 +261,118 @@ static void trav_heap_build(struct _van_traverse *tv) {
 }
 
 /*
+ * Does this key still fall inside the requested range?
+ *
+ * Both bounds are checked in every call, which keeps the two directions
+ * symmetrical: whichever way the traversal walks, a key has to stay on the
+ * far side of start (the bound it began at) and on the near side of end
+ * (the bound it stops at).  Backward simply swaps which comparison means
+ * "beyond".
+ *
+ * Called from trav_seek() when a source has just been positioned, and once
+ * per key in the merge loop.
+ */
+static int trav_inrange(struct _van_traverse *tv, const VAN_DATUM *key) {
+	int c;
+
+	if (tv->start != NULL) {
+		c = tv->cmp(key, tv->start);
+		if (tv->backward) {
+			/* start is the high end: nothing may sit above it. */
+			if (tv->start_inc ? (c > 0) : (c >= 0))
+				return (0);
+		} else {
+			if (tv->start_inc ? (c < 0) : (c <= 0))
+				return (0);
+		}
+	}
+	if (tv->end != NULL) {
+		c = tv->cmp(key, tv->end);
+		if (tv->backward) {
+			/* end is the low end: nothing may fall below it. */
+			if (tv->end_inc ? (c < 0) : (c <= 0))
+				return (0);
+		} else {
+			if (tv->end_inc ? (c > 0) : (c >= 0))
+				return (0);
+		}
+	}
+
+	return (1);
+}
+
+/*
+ * Position a source for the first time.
+ *
+ * Without a range this is the old VAN_FIRST / VAN_LAST pair.
+ *
+ * With a range the search always goes through VAN_SET_RANGE, and both
+ * trees implement that flag as a lower bound: it lands on the first key
+ * that is >= the search key, whatever direction the cursor is walked in
+ * afterwards.  Forward that is exactly what a start bound needs.  Backward
+ * it is not, because there we want the last key that is still inside the
+ * start bound, so the landing point is corrected below.
+ */
+static int trav_seek(struct _van_traverse *tv, size_t i) {
+	struct _van_traverse_src *src;
+	int ret, c;
+
+	src = &tv->srcs[i];
+
+	if (tv->start == NULL)
+		return (trav_fetch(tv, i, tv->backward ? VAN_LAST : VAN_FIRST));
+
+	/*
+	 * Every tree's getraw takes the search key in through the very same
+	 * datum it later fills with the key it landed on, so prime our own
+	 * key buffer with a copy of the start key and read the landing
+	 * point back out of it.  src->key uses VAN_REALLOC, which is what
+	 * lets _van_datum_copy() grow it in place.
+	 */
+	ret = _van_datum_copy(tv->start, &src->key);
+	if (ret != 0)
+		return (ret);
+
+	ret = trav_fetch(tv, i, VAN_SET_RANGE);
+	if (ret != 0)
+		return (ret);
+
+	if (!tv->backward) {
+		if (!src->valid)
+			return (0);
+		/*
+		 * The lower bound is what forward wants.  The only fixup is
+		 * an exclusive start that landed exactly on the boundary
+		 * key, which has to be stepped over.
+		 */
+		if (!tv->start_inc && tv->cmp(&src->key, tv->start) == 0)
+			return (trav_fetch(tv, i, VAN_NEXT));
+		return (0);
+	}
+
+	/*
+	 * Backward, three cases after the lower bound search:
+	 *
+	 *   nothing is >= start -> every key of this source already lies
+	 *                          below start, so begin at its last key;
+	 *   it landed above start -> step back onto the largest key that is
+	 *                          still within the bound.  Every key below
+	 *                          a lower bound is below start, so one
+	 *                          step is enough;
+	 *   it landed on start  -> keep it when start is inclusive,
+	 *                          otherwise step back as above.
+	 */
+	if (!src->valid)
+		return (trav_fetch(tv, i, VAN_LAST));
+
+	c = tv->cmp(&src->key, tv->start);
+	if (c == 0 && tv->start_inc)
+		return (0);
+
+	return (trav_fetch(tv, i, VAN_PREV));
+}
+
+/*
  * Release everything a traversal holds.
  *
  * Two references were taken per tree and both have to go: the manual one
@@ -303,7 +434,7 @@ static int trav_add_inmem(struct _van_traverse *tv, INMEM_TREE *tree) {
 }
 
 int _van_table_traverse(VAN_TABLE *table, flags_t flags,
-    VAN_TRAVERSE_FUNC func, void *arg) {
+    const VAN_TRAVERSE_OPT *opt, VAN_TRAVERSE_FUNC func, void *arg) {
 	struct _van_traverse tv;
 	struct _van_traverse_src *src;
 	size_t *heap;
@@ -311,7 +442,8 @@ int _van_table_traverse(VAN_TABLE *table, flags_t flags,
 	INMEM_TREE *active, *frozen;
 	ONDISK_TREE *odtree;
 	VAN_TABLE_ODT_ITEM *item;
-	flags_t firstflag, nextflag;
+	flags_t nextflag;
+	int empty, cmp;
 	int ret, ret1;
 
 	if (table == NULL || func == NULL)
@@ -320,11 +452,49 @@ int _van_table_traverse(VAN_TABLE *table, flags_t flags,
 		return (VAN_INVALID);
 
 	memset(&tv, 0, sizeof(tv));
+	/*
+	 * Must precede any goto done: the empty range check below can reach
+	 * the cleanup before heap has been allocated, and the cleanup frees
+	 * it unconditionally.
+	 */
+	heap = NULL;
 	tv.table = table;
 	tv.func = func;
 	tv.arg = arg;
 	tv.cmp = table->cmp_func;
 	tv.backward = LF_ISSET(VAN_TRAVERSE_BACKWARD) ? 1 : 0;
+
+	/*
+	 * opt == NULL leaves every field below zeroed, which is the plain
+	 * full scan this function has always done.
+	 */
+	if (opt != NULL) {
+		tv.start = opt->start_key;
+		tv.end = opt->end_key;
+		tv.start_inc = opt->start_inclusive ? 1 : 0;
+		tv.end_inc = opt->end_inclusive ? 1 : 0;
+	}
+
+	/*
+	 * A range that cannot match anything selects no rows, and that is
+	 * not an error: report nothing, leave the callback untouched and
+	 * return 0.
+	 *
+	 * start beyond end is empty whichever way we walk -- the boundaries
+	 * are logical ones, so it reads "start > end" forward and
+	 * "start < end" backward.  Touching end points need both extremes
+	 * to be inclusive to yield anything at all.
+	 */
+	if (tv.start != NULL && tv.end != NULL) {
+		cmp = tv.cmp(tv.start, tv.end);
+		empty = tv.backward ? (cmp < 0) : (cmp > 0);
+		if (!empty && cmp == 0 && !(tv.start_inc && tv.end_inc))
+			empty = 1;
+		if (empty) {
+			ret = 0;
+			goto done;
+		}
+	}
 
 	/*
 	 * Snapshot the ondisk tree count.  Anything dumped from here on
@@ -401,11 +571,15 @@ int _van_table_traverse(VAN_TABLE *table, flags_t flags,
 		CHK_ERR(ret);
 	}
 
-	/* Prime every source, then build the heap. */
-	firstflag = tv.backward ? VAN_LAST : VAN_FIRST;
+	/*
+	 * Prime every source, then build the heap.
+	 *
+	 * trav_seek() collapses to VAN_FIRST / VAN_LAST when no start key
+	 * was given, so the full scan path keeps doing what it always did.
+	 */
 	nextflag = tv.backward ? VAN_PREV : VAN_NEXT;
 	for (i = 0; i < tv.nsrcs; i++) {
-		ret = trav_fetch(&tv, i, firstflag);
+		ret = trav_seek(&tv, i);
 		CHK_ERR(ret);
 	}
 	trav_heap_build(&tv);
@@ -415,6 +589,24 @@ int _van_table_traverse(VAN_TABLE *table, flags_t flags,
 		size_t top;
 
 		top = tv.heap[0];
+
+		/*
+		 * Range scan: once the leading key has walked past the far
+		 * end of the range nothing can be reported any more.  The
+		 * heap always hands out the next key in traversal order, so
+		 * every other source is past it too and stopping here loses
+		 * nothing.
+		 *
+		 * A key outside the range is never handed to the callback,
+		 * but it still takes part in the merge below so a tombstone
+		 * keeps suppressing older versions of its key.
+		 */
+		if (tv.start != NULL || tv.end != NULL) {
+			if (!trav_inrange(&tv, &tv.srcs[top].key)) {
+				ret = 0;
+				goto done;
+			}
+		}
 
 		if (!tv.srcs[top].deleted) {
 			ret = tv.func(tv.arg, &tv.srcs[top].key,

@@ -184,6 +184,12 @@ have_page:
 				ret = VAN_NOTFOUND;
 			else
 				ret = 0;
+			/*
+			 * Without this break the case falls through into
+			 * default and every range search on an ondisk tree
+			 * reports VAN_INVALID, which made the flag unusable.
+			 */
+			break;
 		default:
 			ret = VAN_INVALID;
 	}

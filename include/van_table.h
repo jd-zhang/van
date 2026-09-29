@@ -45,6 +45,30 @@ extern "C" {
 typedef int (*VAN_TRAVERSE_FUNC)(void *arg,
     const VAN_DATUM *key, const VAN_DATUM *value);
 
+/*
+ * An optional key range for table->traverse().
+ *
+ * The boundaries are always "logical": start_key is where the traversal
+ * begins and end_key is where it stops, whatever the direction.  For
+ * VAN_TRAVERSE_BACKWARD that means start_key is the *highest* key visited
+ * and end_key the *lowest* one -- the SQL range "(200, 100]" read backwards
+ * is expressed as start_key == 200, end_key == 100, start_inclusive == 0,
+ * end_inclusive == 1.  The traversal mirrors them internally.
+ *
+ * A NULL pointer for either key means "unbounded on that side", and
+ * opt == NULL is a plain full scan.
+ *
+ * A range that cannot match anything -- start beyond end, or both ends on
+ * the same key while either side is exclusive -- selects no rows: that is
+ * not an error, traverse() returns 0 and never calls the callback.
+ */
+typedef struct {
+	const VAN_DATUM *start_key;	/* NULL = from the beginning */
+	const VAN_DATUM *end_key;	/* NULL = until the end */
+	int start_inclusive;		/* start itself is part of the range */
+	int end_inclusive;		/* end itself is part of the range */
+} VAN_TRAVERSE_OPT;
+
 #define VAN_TABLE_MERGE_MIN 4
 #define VAN_TABLE_MERGE_MAX 10
 struct _van_table_merge_config {
@@ -140,7 +164,8 @@ struct _van_table {
 	int (*get)(VAN_TABLE *, VAN_DATUM *, VAN_DATUM *, flags_t);
 	int (*put)(VAN_TABLE *, VAN_DATUM *, VAN_DATUM *, flags_t);
 	int (*del)(VAN_TABLE *, VAN_DATUM *, flags_t);
-	int (*traverse)(VAN_TABLE *, flags_t, VAN_TRAVERSE_FUNC, void *);
+	int (*traverse)(VAN_TABLE *, flags_t, const VAN_TRAVERSE_OPT *,
+	    VAN_TRAVERSE_FUNC, void *);
 	int (*start_threads)(VAN_TABLE *);
 	int (*set_flags)(VAN_TABLE *, flags_t);
 	int (*get_flags)(VAN_TABLE *, flags_t *);
