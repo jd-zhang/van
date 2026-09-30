@@ -16,6 +16,8 @@
 #include "test_common.h"
 
 extern int odt_t1_1();
+extern int odt_t1_1b();
+extern int odt_t1_1c();
 extern int odt_t1_2();
 extern int odt_t1_3();
 
@@ -29,6 +31,18 @@ int main(int argc, char *argv[]) {
 		fprintf(stderr, "\n");
 	}
 
+
+	if (strcmp(argv[1], "odt_t1_1b") == 0) {
+		fprintf(stderr, "============ odt_t1_1b() ===========\n");
+		ret = odt_t1_1b();
+		fprintf(stderr, "\n");
+	}
+
+	if (strcmp(argv[1], "odt_t1_1c") == 0) {
+		fprintf(stderr, "============ odt_t1_1c() ===========\n");
+		ret = odt_t1_1c();
+		fprintf(stderr, "\n");
+	}
 
 	if (strcmp(argv[1], "odt_t1_2") == 0) {
 		fprintf(stderr, "============ odt_t1_2() ===========\n");

@@ -695,6 +695,361 @@ int verify_table_data_withcursor(VAN_TABLE *table, char **keys,
 }
 
 /*
+ * Helpers shared by the cursor verification functions below.
+ *
+ * A table does not hand out a cursor, so every walk of a table goes through
+ * table->traverse() instead.  The cursor direction flags map onto the
+ * traversal like this:
+ *
+ *	VAN_NEXT, VAN_FIRST -> VAN_TRAVERSE_FORWARD
+ *	VAN_PREV, VAN_LAST  -> VAN_TRAVERSE_BACKWARD
+ */
+static int traverse_backward(flags_t direction) {
+	switch (direction & VAN_MASKMODE) {
+		case VAN_PREV:
+		case VAN_LAST:
+			return (1);
+		default:
+			return (0);
+	}
+}
+
+typedef struct {
+	size_t    rcnt;
+	int       backward;
+	int       haspre;
+	char      prebuf[MAX_BUF_LEN];
+	VAN_DATUM prekey;
+} dir_ctx_t;
+
+/*
+ * Count the records of a traversal and check that they keep arriving in
+ * order.  Used as the table->traverse() callback.
+ */
+static int dir_cb(void *arg, const VAN_DATUM *key, const VAN_DATUM *value) {
+	dir_ctx_t *c;
+	int cmp;
+
+	c = (dir_ctx_t *)arg;
+	c->rcnt++;
+	if (c->haspre) {
+		cmp = van_datum_defcmp(key, &c->prekey);
+		TEST_ASSERT2(c->backward ? (cmp < 0) : (cmp > 0),
+		    "direction broken at record %lu",
+		    (unsigned long)c->rcnt);
+	}
+	TEST_ASSERT(key->size <= sizeof(c->prebuf));
+	memcpy(c->prebuf, key->data, key->size);
+	c->prekey.data = c->prebuf;
+	c->prekey.size = key->size;
+	c->haspre = 1;
+
+	return (0);
+}
+
+typedef struct {
+	size_t   rcnt;
+	int      backward;
+	size_t   cnt;
+	char   **keys;
+	size_t  *ksizes;
+	char   **values;
+	size_t  *vsizes;
+} dirfull_ctx_t;
+
+/*
+ * Same, but every record is compared with the expected one as well.
+ *
+ * The arrays are sorted ascending by key, so walking forward starts at
+ * keys[0] and walking backward starts at keys[cnt - 1].
+ */
+static int dirfull_cb(void *arg, const VAN_DATUM *key,
+    const VAN_DATUM *value) {
+	dirfull_ctx_t *c;
+	size_t idx;
+
+	c = (dirfull_ctx_t *)arg;
+	TEST_ASSERT2(c->rcnt < c->cnt,
+	    "more records than expected (%lu)", (unsigned long)c->cnt);
+	idx = c->backward ? (c->cnt - 1 - c->rcnt) : c->rcnt;
+
+	TEST_ASSERT2(key->size == c->ksizes[idx],
+	    "record %lu: key size %lu, expected %lu", (unsigned long)idx,
+	    (unsigned long)key->size, (unsigned long)c->ksizes[idx]);
+	TEST_ASSERT2(memcmp(key->data, c->keys[idx], key->size) == 0,
+	    "record %lu: key does not match", (unsigned long)idx);
+
+	if (value != NULL && value->data != NULL) {
+		TEST_ASSERT2(value->size == c->vsizes[idx],
+		    "record %lu: value size %lu, expected %lu",
+		    (unsigned long)idx, (unsigned long)value->size,
+		    (unsigned long)c->vsizes[idx]);
+		TEST_ASSERT2(memcmp(value->data, c->values[idx],
+		    value->size) == 0,
+		    "record %lu: value does not match", (unsigned long)idx);
+	}
+
+	c->rcnt++;
+
+	return (0);
+}
+
+typedef struct {
+	int      got;
+	char     kbuf[MAX_BUF_LEN];
+	size_t   ksize;
+	char     vbuf[MAX_BUF_LEN];
+	size_t   vsize;
+} first_ctx_t;
+
+/*
+ * Keep the first record of a traversal, then stop it.
+ */
+static int first_cb(void *arg, const VAN_DATUM *key,
+    const VAN_DATUM *value) {
+	first_ctx_t *c;
+
+	c = (first_ctx_t *)arg;
+	if (c->got)
+		return (1);
+	c->got = 1;
+
+	TEST_ASSERT(key->size <= sizeof(c->kbuf));
+	memcpy(c->kbuf, key->data, key->size);
+	c->ksize = key->size;
+	if (value != NULL && value->data != NULL) {
+		TEST_ASSERT(value->size <= sizeof(c->vbuf));
+		memcpy(c->vbuf, value->data, value->size);
+		c->vsize = value->size;
+	} else
+		c->vsize = 0;
+
+	/*
+	 * A non zero return stops the traversal and is handed back to the
+	 * caller of table->traverse(), see table_first_record().
+	 */
+	return (1);
+}
+
+static int table_first_record(VAN_TABLE *table, flags_t direction,
+    first_ctx_t *ctx) {
+	int ret;
+
+	memset(ctx, 0, sizeof(*ctx));
+	ret = table->traverse(table, traverse_backward(direction) ?
+	    VAN_TRAVERSE_BACKWARD : VAN_TRAVERSE_FORWARD,
+	    NULL, first_cb, ctx);
+	/* first_cb stops the traversal with 1, that is not an error. */
+	if (ret == 1)
+		ret = 0;
+
+	return (ret);
+}
+
+/*
+ * Get the single record a direction yields on a fresh cursor, whatever the
+ * object is: the first record walking forward for VAN_FIRST / VAN_NEXT, the
+ * first record walking backward for VAN_LAST / VAN_PREV.
+ *
+ * The record is copied out, because the datum a cursor returns aliases its
+ * own buffer and is gone once the cursor is cleaned up.
+ */
+static int border_record(void *obj, flags_t direction, flags_t cflags,
+    int otype, char *kbuf, size_t *ksizep, char *vbuf, size_t *vsizep) {
+	INMEM_TREE *imtree;
+	INMEM_TREECURSOR *imcursor;
+	ONDISK_TREE *odtree;
+	ONDISK_TREECURSOR *odcursor;
+	VAN_TABLE *table;
+	VAN_DATUM key, value;
+	first_ctx_t fctx;
+	int ret, ret1;
+
+	imtree = (INMEM_TREE *)obj;
+	odtree = (ONDISK_TREE *)obj;
+	table = (VAN_TABLE *)obj;
+	imcursor = NULL;
+	odcursor = NULL;
+	memset(&key, 0, sizeof(key));
+	memset(&value, 0, sizeof(value));
+	*ksizep = 0;
+	*vsizep = 0;
+
+	if (otype == OP_TABLE) {
+		ret = table_first_record(table, direction, &fctx);
+		if (ret != 0)
+			return (ret);
+		memcpy(kbuf, fctx.kbuf, fctx.ksize);
+		*ksizep = fctx.ksize;
+		memcpy(vbuf, fctx.vbuf, fctx.vsize);
+		*vsizep = fctx.vsize;
+
+		return (0);
+	}
+
+	switch (otype) {
+		case OP_INMEMTREE:
+			ret = imtree->cursor(imtree, &imcursor, cflags);
+			break;
+		case OP_ONDISKTREE:
+			ret = odtree->cursor(odtree, &odcursor, cflags);
+			break;
+		default:
+			return (van_error_print("BAD OP_TYPE"));
+	}
+	if (ret != 0)
+		return (ret);
+
+	switch (otype) {
+		case OP_INMEMTREE:
+			ret = imcursor->get(imcursor, &key, &value, direction);
+			break;
+		case OP_ONDISKTREE:
+			ret = odcursor->get(odcursor, &key, &value, direction);
+			break;
+	}
+	if (ret == 0) {
+		TEST_ASSERT(key.size <= MAX_BUF_LEN);
+		memcpy(kbuf, key.data, key.size);
+		*ksizep = key.size;
+		if (value.data != NULL) {
+			TEST_ASSERT(value.size <= MAX_BUF_LEN);
+			memcpy(vbuf, value.data, value.size);
+			*vsizep = value.size;
+		} else
+			*vsizep = 0;
+	}
+
+	switch (otype) {
+		case OP_INMEMTREE:
+			ret1 = imcursor->cleanup(imcursor);
+			break;
+		case OP_ONDISKTREE:
+			ret1 = odcursor->cleanup(odcursor);
+			break;
+		default:
+			ret1 = 0;
+			break;
+	}
+	SET_RET(ret1, ret);
+
+	return (ret);
+}
+
+/*
+ * qsort() can reorder only one array, so the permutation is built on an
+ * index array and then applied to all four parallel arrays.  The context has
+ * to live in file scope: qsort_r() is not portable across the platforms we
+ * build on, and these helpers are never called concurrently.
+ */
+static char **sort_keys;
+static size_t *sort_ksizes;
+static VAN_DATUM_CMPFUNC sort_cmp;
+
+static int sort_idx_cmp(const void *a, const void *b) {
+	VAN_DATUM d1, d2;
+	size_t ia, ib;
+
+	ia = *(const size_t *)a;
+	ib = *(const size_t *)b;
+	memset(&d1, 0, sizeof(d1));
+	memset(&d2, 0, sizeof(d2));
+	d1.data = sort_keys[ia];
+	d1.size = sort_ksizes[ia];
+	d2.data = sort_keys[ib];
+	d2.size = sort_ksizes[ib];
+
+	return (sort_cmp(&d1, &d2));
+}
+
+int sort_testdata(char **keys, size_t *ksizes, char **values, size_t *vsizes,
+    size_t cnt, VAN_DATUM_CMPFUNC cmp) {
+	char **nkeys, **nvalues;
+	size_t *nksizes, *nvsizes, *idx;
+	size_t i, j;
+
+	if (cnt == 0)
+		return (0);
+	if (cmp == NULL)
+		cmp = van_datum_defcmp;
+
+	idx = (size_t *)malloc(cnt * sizeof(size_t));
+	nkeys = (char **)malloc(cnt * sizeof(char *));
+	nvalues = (char **)malloc(cnt * sizeof(char *));
+	nksizes = (size_t *)malloc(cnt * sizeof(size_t));
+	nvsizes = (size_t *)malloc(cnt * sizeof(size_t));
+	TEST_ASSERT(idx != NULL && nkeys != NULL && nvalues != NULL &&
+	    nksizes != NULL && nvsizes != NULL);
+
+	for (i = 0; i < cnt; i++)
+		idx[i] = i;
+
+	sort_keys = keys;
+	sort_ksizes = ksizes;
+	sort_cmp = cmp;
+	qsort(idx, cnt, sizeof(size_t), sort_idx_cmp);
+
+	for (i = 0; i < cnt; i++) {
+		j = idx[i];
+		nkeys[i] = keys[j];
+		nksizes[i] = ksizes[j];
+		nvalues[i] = values[j];
+		nvsizes[i] = vsizes[j];
+	}
+	for (i = 0; i < cnt; i++) {
+		keys[i] = nkeys[i];
+		ksizes[i] = nksizes[i];
+		values[i] = nvalues[i];
+		vsizes[i] = nvsizes[i];
+	}
+
+	free(idx);
+	free(nkeys);
+	free(nvalues);
+	free(nksizes);
+	free(nvsizes);
+
+	return (0);
+}
+
+int verify_child_fails(int (*check)(void *), void *arg) {
+	pid_t pid;
+	int status, fd;
+
+	/*
+	 * Flush first: the child inherits the buffered output of the test
+	 * and would write it a second time when it exits.
+	 */
+	fflush(NULL);
+	pid = fork();
+	TEST_ASSERT(pid >= 0);
+
+	if (pid == 0) {
+		/*
+		 * Child.  The check is supposed to fail, and the failure is
+		 * printed with TEST_ASSERT2(), so send its output to
+		 * /dev/null instead of into the log of a passing test.
+		 */
+		fd = open("/dev/null", O_WRONLY);
+		if (fd >= 0) {
+			(void)dup2(fd, STDOUT_FILENO);
+			(void)dup2(fd, STDERR_FILENO);
+			if (fd > STDERR_FILENO)
+				(void)close(fd);
+		}
+		(void)check(arg);
+		/* No mismatch was reported: that is the bug we look for. */
+		_exit(0);
+	}
+
+	TEST_ASSERT(waitpid(pid, &status, 0) == pid);
+	if (WIFEXITED(status))
+		return (WEXITSTATUS(status) != 0);
+	/* Dying on a signal counts as "did not pass" too. */
+	return (1);
+}
+
+/*
 verify the records in the in-memory tree and on-disk tree are the same,
 and the order is the same, and the number of records is the same.
 
@@ -817,6 +1172,34 @@ static int verify_cursor_direction(void *obj, flags_t direction,
 		goto err;
 
 	time(&t1);
+
+	/*
+	 * A table has no cursor to walk, so it is traversed instead:
+	 * VAN_NEXT / VAN_FIRST read it forward, VAN_PREV / VAN_LAST read it
+	 * backward.  dir_cb() counts the records and checks their order,
+	 * which is exactly what the cursor loop below does for a tree.
+	 */
+	if (otype == OP_TABLE) {
+		dir_ctx_t dctx;
+
+		memset(&dctx, 0, sizeof(dctx));
+		dctx.prekey.data = dctx.prebuf;
+		dctx.backward = traverse_backward(direction);
+		ret = table->traverse(table, dctx.backward ?
+		    VAN_TRAVERSE_BACKWARD : VAN_TRAVERSE_FORWARD,
+		    NULL, dir_cb, &dctx);
+		if (ret != 0)
+			goto err;
+		rcnt = dctx.rcnt;
+
+		time(&t2);
+		fprintf(stderr, "time consuming: %g seconds\n", difftime(t2, t1));
+		if (rcntp != NULL)
+			*rcntp = rcnt;
+
+		return (0);
+	}
+
 	haspre = 0;
 	memset(&prekey, 0, sizeof(prekey));
 	prekey.data = prebuf;
@@ -916,6 +1299,7 @@ static int verify_cursor_border(void *obj, flags_t direction,
 	VAN_DATUM key1, value1, key2, value2;
 	char kbuf1[MAX_BUF_LEN], vbuf1[MAX_BUF_LEN];
 	char kbuf2[MAX_BUF_LEN], vbuf2[MAX_BUF_LEN];
+	size_t klen1, vlen1, klen2, vlen2;
 	flags_t direction2;
 
 	imtree = (INMEM_TREE *)obj;
@@ -1006,8 +1390,36 @@ static int verify_cursor_border(void *obj, flags_t direction,
 			SET_RET(ret1, ret);
 			break;
 		case OP_TABLE:
-			ret = 0; /* TODO: Add table cursor test here */
-			table = table;
+			/*
+			 * No cursor for a table either: both gets become a
+			 * traversal, forward for VAN_FIRST / VAN_NEXT and
+			 * backward for VAN_LAST / VAN_PREV, and only the
+			 * first record of each is compared.  border_record()
+			 * copies the record out, so it stays valid after the
+			 * traversal is gone.
+			 */
+			ret1 = border_record(table, direction, cflags, otype,
+			    kbuf1, &klen1, vbuf1, &vlen1);
+			ret2 = border_record(table, direction2, cflags, otype,
+			    kbuf2, &klen2, vbuf2, &vlen2);
+
+			memset(&key1, 0, sizeof(key1));
+			key1.data = kbuf1;
+			key1.size = klen1;
+			memset(&value1, 0, sizeof(value1));
+			value1.data = vbuf1;
+			value1.size = vlen1;
+			memset(&key2, 0, sizeof(key2));
+			key2.data = kbuf2;
+			key2.size = klen2;
+			memset(&value2, 0, sizeof(value2));
+			value2.data = vbuf2;
+			value2.size = vlen2;
+
+			TEST_ASSERT(ret1 == ret2);
+			if (ret1 == VAN_NOTFOUND)
+				ret1 = 0;
+			SET_RET(ret1, ret);
 			break;
 		default:
 			ret = van_error_print("BAD OP_TYPE");
@@ -1038,6 +1450,234 @@ int verify_ondisktree_cursor_border(ONDISK_TREE *tree,
 int verify_table_cursor_border(VAN_TABLE *table,
     flags_t direction, flags_t cflags) {
 	return verify_cursor_border(table, direction, cflags, OP_TABLE);
+}
+
+/*
+ * Walk the object in the given direction and check both the number of
+ * records and every single record against the expected ones.
+ *
+ * keys / ksizes / values / vsizes must be sorted ascending by key with the
+ * compare function of the object under test, see sort_testdata().
+ *
+ * For a table the walk is table->traverse(): VAN_NEXT reads it forward,
+ * VAN_PREV backward.
+ */
+static int verify_cursor_direction_full(void *obj, flags_t direction,
+    flags_t cflags, size_t *rcntp,
+    char **keys, size_t *ksizes, char **values, size_t *vsizes, size_t cnt,
+    int otype) {
+	INMEM_TREE *imtree;
+	INMEM_TREECURSOR *imcursor;
+	ONDISK_TREE *odtree;
+	ONDISK_TREECURSOR *odcursor;
+	VAN_TABLE *table;
+	VAN_DATUM key, value;
+	const char *info;
+	int ret, ret1, backward;
+	size_t rcnt, idx;
+	time_t t1, t2;
+
+	imtree = (INMEM_TREE *)obj;
+	odtree = (ONDISK_TREE *)obj;
+	table = (VAN_TABLE *)obj;
+	imcursor = NULL;
+	odcursor = NULL;
+	info = "cursor->get";
+	rcnt = 0;
+	backward = traverse_backward(direction);
+
+	time(&t1);
+
+	if (otype == OP_TABLE) {
+		dirfull_ctx_t dctx;
+
+		memset(&dctx, 0, sizeof(dctx));
+		dctx.backward = backward;
+		dctx.cnt = cnt;
+		dctx.keys = keys;
+		dctx.ksizes = ksizes;
+		dctx.values = values;
+		dctx.vsizes = vsizes;
+		ret = table->traverse(table, backward ?
+		    VAN_TRAVERSE_BACKWARD : VAN_TRAVERSE_FORWARD,
+		    NULL, dirfull_cb, &dctx);
+		if (ret != 0)
+			goto err;
+		rcnt = dctx.rcnt;
+		TEST_ASSERT2(rcnt == cnt,
+		    "expected %lu records, walked %lu",
+		    (unsigned long)cnt, (unsigned long)rcnt);
+
+		time(&t2);
+		fprintf(stderr, "time consuming: %g seconds\n",
+		    difftime(t2, t1));
+		if (rcntp != NULL)
+			*rcntp = rcnt;
+
+		return (0);
+	}
+
+	switch (otype) {
+		case OP_INMEMTREE:
+			ret = imtree->cursor(imtree, &imcursor, cflags);
+			info = "imcursor->get";
+			break;
+		case OP_ONDISKTREE:
+			ret = odtree->cursor(odtree, &odcursor, cflags);
+			info = "odcursor->get";
+			break;
+		default:
+			ret = van_error_print("BAD OP_TYPE");
+			break;
+	}
+	if (ret != 0)
+		goto err;
+
+	for (ret = 0; ret == 0;) {
+		memset(&key, 0, sizeof(key));
+		memset(&value, 0, sizeof(value));
+		switch (otype) {
+			case OP_INMEMTREE:
+				ret = imcursor->get(imcursor, &key, &value,
+				    direction);
+				break;
+			case OP_ONDISKTREE:
+				ret = odcursor->get(odcursor, &key, &value,
+				    direction);
+				break;
+		}
+
+		if (ret == 0) {
+			TEST_ASSERT2(rcnt < cnt,
+			    "more records than expected (%lu)",
+			    (unsigned long)cnt);
+			idx = backward ? (cnt - 1 - rcnt) : rcnt;
+
+			TEST_ASSERT2(key.size == ksizes[idx],
+			    "record %lu: key size %lu, expected %lu",
+			    (unsigned long)idx, (unsigned long)key.size,
+			    (unsigned long)ksizes[idx]);
+			TEST_ASSERT2(memcmp(key.data, keys[idx],
+			    key.size) == 0,
+			    "record %lu: key does not match",
+			    (unsigned long)idx);
+			if (value.data != NULL) {
+				TEST_ASSERT2(value.size == vsizes[idx],
+				    "record %lu: value size %lu, "
+				    "expected %lu", (unsigned long)idx,
+				    (unsigned long)value.size,
+				    (unsigned long)vsizes[idx]);
+				TEST_ASSERT2(memcmp(value.data, values[idx],
+				    value.size) == 0,
+				    "record %lu: value does not match",
+				    (unsigned long)idx);
+			}
+			rcnt++;
+		} else if (ret != VAN_NOTFOUND)
+			CHK_RET(ret, info);
+	}
+
+	if (ret == VAN_NOTFOUND)
+		ret = 0;
+	TEST_ASSERT2(rcnt == cnt, "expected %lu records, walked %lu",
+	    (unsigned long)cnt, (unsigned long)rcnt);
+
+	time(&t2);
+	fprintf(stderr, "time consuming: %g seconds\n", difftime(t2, t1));
+err:
+	if (imcursor != NULL) {
+		ret1 = imcursor->cleanup(imcursor);
+		SET_RET(ret1, ret);
+	}
+	if (odcursor != NULL) {
+		ret1 = odcursor->cleanup(odcursor);
+		SET_RET(ret1, ret);
+	}
+	if (rcntp != NULL)
+		*rcntp = rcnt;
+
+	return (ret);
+}
+
+int verify_inmemtree_cursor_direction_full(INMEM_TREE *tree,
+    flags_t direction, flags_t cflags, size_t *rcntp,
+    char **keys, size_t *ksizes, char **values, size_t *vsizes, size_t cnt) {
+	return verify_cursor_direction_full(tree, direction, cflags, rcntp,
+	    keys, ksizes, values, vsizes, cnt, OP_INMEMTREE);
+}
+
+int verify_ondisktree_cursor_direction_full(ONDISK_TREE *tree,
+    flags_t direction, flags_t cflags, size_t *rcntp,
+    char **keys, size_t *ksizes, char **values, size_t *vsizes, size_t cnt) {
+	return verify_cursor_direction_full(tree, direction, cflags, rcntp,
+	    keys, ksizes, values, vsizes, cnt, OP_ONDISKTREE);
+}
+
+int verify_table_cursor_direction_full(VAN_TABLE *table,
+    flags_t direction, flags_t cflags, size_t *rcntp,
+    char **keys, size_t *ksizes, char **values, size_t *vsizes, size_t cnt) {
+	return verify_cursor_direction_full(table, direction, cflags, rcntp,
+	    keys, ksizes, values, vsizes, cnt, OP_TABLE);
+}
+
+/*
+ * Like verify_xxx_cursor_border(), but the record VAN_FIRST / VAN_LAST
+ * returns is also compared with the expected first / last record.
+ */
+static int verify_cursor_border_full(void *obj, flags_t direction,
+    flags_t cflags, char *key, size_t ksize, char *value, size_t vsize,
+    int otype) {
+	char kbuf[MAX_BUF_LEN], vbuf[MAX_BUF_LEN];
+	size_t klen, vlen;
+	int ret;
+
+	/*
+	 * First the plain border check: on a fresh cursor the first
+	 * VAN_NEXT is VAN_FIRST, and the first VAN_PREV is VAN_LAST.
+	 */
+	ret = verify_cursor_border(obj, direction, cflags, otype);
+	if (ret != 0)
+		return (ret);
+
+	/* Then check it really is the record the caller expects. */
+	ret = border_record(obj, direction, cflags, otype,
+	    kbuf, &klen, vbuf, &vlen);
+	if (ret == VAN_NOTFOUND)
+		ret = 0;
+	if (ret != 0)
+		return (ret);
+
+	TEST_ASSERT2(klen == ksize && memcmp(kbuf, key, ksize) == 0,
+	    "border record: key does not match the expected one "
+	    "(got %lu bytes, expected %lu)", (unsigned long)klen,
+	    (unsigned long)ksize);
+	TEST_ASSERT2(vlen == vsize && memcmp(vbuf, value, vsize) == 0,
+	    "border record: value does not match the expected one "
+	    "(got %lu bytes, expected %lu)", (unsigned long)vlen,
+	    (unsigned long)vsize);
+
+	return (0);
+}
+
+int verify_inmemtree_cursor_border_full(INMEM_TREE *tree,
+    flags_t direction, flags_t cflags,
+    char *key, size_t ksize, char *value, size_t vsize) {
+	return verify_cursor_border_full(tree, direction, cflags,
+	    key, ksize, value, vsize, OP_INMEMTREE);
+}
+
+int verify_ondisktree_cursor_border_full(ONDISK_TREE *tree,
+    flags_t direction, flags_t cflags,
+    char *key, size_t ksize, char *value, size_t vsize) {
+	return verify_cursor_border_full(tree, direction, cflags,
+	    key, ksize, value, vsize, OP_ONDISKTREE);
+}
+
+int verify_table_cursor_border_full(VAN_TABLE *table,
+    flags_t direction, flags_t cflags,
+    char *key, size_t ksize, char *value, size_t vsize) {
+	return verify_cursor_border_full(table, direction, cflags,
+	    key, ksize, value, vsize, OP_TABLE);
 }
 
 int generate_string_testdata(char **keys, size_t *ksizes, int kmin, int kmax,

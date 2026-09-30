@@ -160,6 +160,289 @@ int odt_t1_1() {
 }
 
 
+/*
+ * Like odt_t1_1, but the walks are checked against the expected records
+ * instead of only counting them.
+ *
+ * The records go into an in-memory tree first and are then stored into the
+ * on-disk tree, exactly as odt_t1_1() does.  The expected records are
+ * sorted with the compare function the on-disk tree compares keys with, so
+ * that walking it has to hand back keys[0] .. keys[cnt - 1] forward and the
+ * reverse order backward.
+ */
+int odt_t1_1b() {
+	VAN_TABLE *table;
+	VAN_STORE *store;
+	INMEM_TREE *tree;
+	ONDISK_TREE *odtree;
+	int ret, cnt;
+	size_t rcnt;
+	STRING_TESTDATA_DEFINE;
+	const char *odtpath;
+
+	odtpath = "test1.ondisk.odt_t1b";
+	system("rm -rf test1.ondisk.odt_t1b*");
+	system("rm -fr vanlog.*");
+	ret = van_test_store_create(&store);
+	CHK_RET(ret, "van_store_create");
+	ret = store->open(store, ".", 0);
+	CHK_RET(ret, "store->open");
+	ret = van_table_create(store, &table);
+	CHK_RET(ret, "van_table_create");
+	ret = table->open(table, "test1", VAN_TABLE_SKIP_THREAD_START);
+	CHK_RET(ret, "table->open");
+
+	ret = van_inmemtree_create(table, &tree);
+	CHK_RET(ret, "van_inmemtree_create");
+
+	cnt = 100000;
+	STRING_TESTDATA_INIT;
+	(void)generate_string_testdata(keys, ksizes, 20, 30, values, vsizes,
+	    50, 120, cnt);
+
+	fprintf(stderr, "============ 1 Try to put %lu records =========\n",
+	    (unsigned long)cnt);
+	ret = populate_inmemtree(tree, keys, ksizes, values, vsizes, cnt);
+	CHK_RET(ret, "populate_inmemtree");
+
+	fprintf(stderr, "========== 2 Build the ondisk tree ============\n");
+	ret = van_ondisktree_create(table, &odtree);
+	CHK_RET(ret, "van_ondisktree_create");
+	ret = odtree->open(odtree, odtpath,
+	    VAN_OPEN_CREAT | VAN_OPEN_TRUNC);
+	CHK_RET(ret, "odtree->open(VAN_OPEN_CREAT | VAN_OPEN_TRUNC)");
+	ret = odtree->store_inmem(odtree, tree);
+	CHK_RET(ret, "odtree->store_inmem");
+
+	fprintf(stderr, "========== 3 Sort the expected records ==========\n");
+	ret = sort_testdata(keys, ksizes, values, vsizes, (size_t)cnt,
+	    odtree->table->cmp_func);
+	CHK_RET(ret, "sort_testdata");
+
+	fprintf(stderr, "======== 4 Walk forward using VAN_NEXT ========\n");
+	rcnt = 0;
+	ret = verify_ondisktree_cursor_direction_full(odtree, VAN_NEXT, 0,
+	    &rcnt, keys, ksizes, values, vsizes, (size_t)cnt);
+	CHK_RET(ret, "verify_ondisktree_cursor_direction_full(VAN_NEXT)");
+	TEST_ASSERT2(rcnt == (size_t)cnt, "expected %d records, walked %lu",
+	    cnt, (unsigned long)rcnt);
+
+	fprintf(stderr, "======== 5 Walk backward using VAN_PREV ========\n");
+	rcnt = 0;
+	ret = verify_ondisktree_cursor_direction_full(odtree, VAN_PREV, 0,
+	    &rcnt, keys, ksizes, values, vsizes, (size_t)cnt);
+	CHK_RET(ret, "verify_ondisktree_cursor_direction_full(VAN_PREV)");
+	TEST_ASSERT2(rcnt == (size_t)cnt, "expected %d records, walked %lu",
+	    cnt, (unsigned long)rcnt);
+
+	fprintf(stderr, "======== 6 VAN_FIRST is the first record ========\n");
+	ret = verify_ondisktree_cursor_border_full(odtree, VAN_FIRST, 0,
+	    keys[0], ksizes[0], values[0], vsizes[0]);
+	CHK_RET(ret, "verify_ondisktree_cursor_border_full(VAN_FIRST)");
+
+	fprintf(stderr, "======== 7 VAN_LAST is the last record ========\n");
+	ret = verify_ondisktree_cursor_border_full(odtree, VAN_LAST, 0,
+	    keys[cnt - 1], ksizes[cnt - 1],
+	    values[cnt - 1], vsizes[cnt - 1]);
+	CHK_RET(ret, "verify_ondisktree_cursor_border_full(VAN_LAST)");
+
+	fprintf(stderr, "====== 8 Destroy the tree(ondisk and inmemory) =====\n");
+	ret = odtree->close(odtree, 0);
+	CHK_RET(ret, "odtree->close");
+	ret = tree->destroy(tree);
+	CHK_RET(ret, "tree->destroy");
+
+	(void)free_string_testdata(keys, ksizes, values, vsizes, cnt);
+
+	ret = table->close(table, 0);
+	CHK_RET(ret, "table->close");
+	ret = store->close(store);
+	CHK_RET(ret, "store->close");
+
+	return (ret);
+}
+
+/*
+ * What a wrong expectation looks like.  odt_t1_1c() feeds these to the
+ * checks and expects every one of them to be caught.
+ *
+ * There is no write cursor for an ondisk tree, so the directions are the
+ * only thing that varies here.
+ */
+#define ODT_NEG_KEY     1
+#define ODT_NEG_VALUE   2
+#define ODT_NEG_COUNT   3
+#define ODT_NEG_BORDERK 4
+#define ODT_NEG_BORDERV 5
+
+static char odt_neg_key[] = "zzzz-bogus-key-that-is-not-in-the-tree";
+static char odt_neg_val[] = "zzzz-bogus-value-that-is-not-in-the-tree";
+
+typedef struct {
+	ONDISK_TREE *tree;
+	flags_t      direction;
+	char       **keys, **values;
+	size_t      *ksizes, *vsizes;
+	size_t       cnt;
+	int          mode;
+} odt_neg_t;
+
+static int odt_neg_check(void *arg) {
+	odt_neg_t *c;
+	size_t rcnt, idx;
+	int backward;
+
+	c = (odt_neg_t *)arg;
+	rcnt = 0;
+	backward = (c->direction == VAN_PREV || c->direction == VAN_LAST);
+	/* Corrupt the record the walk reads first. */
+	idx = backward ? c->cnt - 1 : 0;
+
+	switch (c->mode) {
+	case ODT_NEG_KEY:
+		c->keys[idx] = odt_neg_key;
+		c->ksizes[idx] = strlen(odt_neg_key);
+		break;
+	case ODT_NEG_VALUE:
+		c->values[idx] = odt_neg_val;
+		c->vsizes[idx] = strlen(odt_neg_val);
+		break;
+	case ODT_NEG_COUNT:
+		return verify_ondisktree_cursor_direction_full(c->tree,
+		    c->direction, 0, &rcnt, c->keys, c->ksizes,
+		    c->values, c->vsizes, c->cnt - 1);
+	case ODT_NEG_BORDERK:
+		return verify_ondisktree_cursor_border_full(c->tree,
+		    c->direction, 0, odt_neg_key, strlen(odt_neg_key),
+		    c->values[idx], c->vsizes[idx]);
+	case ODT_NEG_BORDERV:
+		return verify_ondisktree_cursor_border_full(c->tree,
+		    c->direction, 0, c->keys[idx], c->ksizes[idx],
+		    odt_neg_val, strlen(odt_neg_val));
+	default:
+		return (0);
+	}
+
+	return verify_ondisktree_cursor_direction_full(c->tree, c->direction,
+	    0, &rcnt, c->keys, c->ksizes, c->values, c->vsizes, c->cnt);
+}
+
+static int odt_neg_one(ONDISK_TREE *tree, char **keys, size_t *ksizes,
+    char **values, size_t *vsizes, size_t cnt, flags_t direction, int mode,
+    const char *what) {
+	odt_neg_t ctx;
+
+	memset(&ctx, 0, sizeof(ctx));
+	ctx.tree = tree;
+	ctx.direction = direction;
+	ctx.keys = keys;
+	ctx.ksizes = ksizes;
+	ctx.values = values;
+	ctx.vsizes = vsizes;
+	ctx.cnt = cnt;
+	ctx.mode = mode;
+
+	TEST_ASSERT2(verify_child_fails(odt_neg_check, &ctx),
+	    "%s: the check passed, it must catch this", what);
+	fprintf(stderr, "   caught: %s\n", what);
+
+	return (0);
+}
+
+/*
+ * Negative test for the checks odt_t1_1b() uses: every wrong expectation
+ * below has to be caught, see imt_t1_3c() for why they run in a child.
+ */
+int odt_t1_1c() {
+	VAN_TABLE *table;
+	VAN_STORE *store;
+	INMEM_TREE *tree;
+	ONDISK_TREE *odtree;
+	int ret, cnt;
+	STRING_TESTDATA_DEFINE;
+	const char *odtpath;
+
+	odtpath = "test1.ondisk.odt_t1c";
+	system("rm -rf test1.ondisk.odt_t1c*");
+	system("rm -fr vanlog.*");
+	ret = van_test_store_create(&store);
+	CHK_RET(ret, "van_store_create");
+	ret = store->open(store, ".", 0);
+	CHK_RET(ret, "store->open");
+	ret = van_table_create(store, &table);
+	CHK_RET(ret, "van_table_create");
+	ret = table->open(table, "test1", VAN_TABLE_SKIP_THREAD_START);
+	CHK_RET(ret, "table->open");
+
+	ret = van_inmemtree_create(table, &tree);
+	CHK_RET(ret, "van_inmemtree_create");
+
+	cnt = 10000;
+	STRING_TESTDATA_INIT;
+	(void)generate_string_testdata(keys, ksizes, 20, 30, values, vsizes,
+	    50, 120, cnt);
+
+	fprintf(stderr, "============ 1 Try to put %lu records =========\n",
+	    (unsigned long)cnt);
+	ret = populate_inmemtree(tree, keys, ksizes, values, vsizes, cnt);
+	CHK_RET(ret, "populate_inmemtree");
+
+	fprintf(stderr, "========== 2 Build the ondisk tree ============\n");
+	ret = van_ondisktree_create(table, &odtree);
+	CHK_RET(ret, "van_ondisktree_create");
+	ret = odtree->open(odtree, odtpath,
+	    VAN_OPEN_CREAT | VAN_OPEN_TRUNC);
+	CHK_RET(ret, "odtree->open(VAN_OPEN_CREAT | VAN_OPEN_TRUNC)");
+	ret = odtree->store_inmem(odtree, tree);
+	CHK_RET(ret, "odtree->store_inmem");
+
+	fprintf(stderr, "========== 3 Sort the expected records ==========\n");
+	ret = sort_testdata(keys, ksizes, values, vsizes, (size_t)cnt,
+	    odtree->table->cmp_func);
+	CHK_RET(ret, "sort_testdata");
+
+	fprintf(stderr, "======== 4 A wrong record must be caught ========\n");
+	ret = odt_neg_one(odtree, keys, ksizes, values, vsizes, (size_t)cnt,
+	    VAN_NEXT, ODT_NEG_KEY, "VAN_NEXT, wrong key");
+	ret = odt_neg_one(odtree, keys, ksizes, values, vsizes, (size_t)cnt,
+	    VAN_PREV, ODT_NEG_KEY, "VAN_PREV, wrong key");
+	ret = odt_neg_one(odtree, keys, ksizes, values, vsizes, (size_t)cnt,
+	    VAN_NEXT, ODT_NEG_VALUE, "VAN_NEXT, wrong value");
+	ret = odt_neg_one(odtree, keys, ksizes, values, vsizes, (size_t)cnt,
+	    VAN_PREV, ODT_NEG_VALUE, "VAN_PREV, wrong value");
+
+	fprintf(stderr, "======== 5 A wrong count must be caught =========\n");
+	ret = odt_neg_one(odtree, keys, ksizes, values, vsizes, (size_t)cnt,
+	    VAN_NEXT, ODT_NEG_COUNT, "VAN_NEXT, one record too few");
+	ret = odt_neg_one(odtree, keys, ksizes, values, vsizes, (size_t)cnt,
+	    VAN_PREV, ODT_NEG_COUNT, "VAN_PREV, one record too few");
+
+	fprintf(stderr, "======== 6 A wrong border must be caught ========\n");
+	ret = odt_neg_one(odtree, keys, ksizes, values, vsizes, (size_t)cnt,
+	    VAN_FIRST, ODT_NEG_BORDERK, "VAN_FIRST, wrong key");
+	ret = odt_neg_one(odtree, keys, ksizes, values, vsizes, (size_t)cnt,
+	    VAN_LAST, ODT_NEG_BORDERK, "VAN_LAST, wrong key");
+	ret = odt_neg_one(odtree, keys, ksizes, values, vsizes, (size_t)cnt,
+	    VAN_FIRST, ODT_NEG_BORDERV, "VAN_FIRST, wrong value");
+	ret = odt_neg_one(odtree, keys, ksizes, values, vsizes, (size_t)cnt,
+	    VAN_LAST, ODT_NEG_BORDERV, "VAN_LAST, wrong value");
+
+	fprintf(stderr, "====== 7 Destroy the tree(ondisk and inmemory) ===\n");
+	ret = odtree->close(odtree, 0);
+	CHK_RET(ret, "odtree->close");
+	ret = tree->destroy(tree);
+	CHK_RET(ret, "tree->destroy");
+
+	(void)free_string_testdata(keys, ksizes, values, vsizes, cnt);
+
+	ret = table->close(table, 0);
+	CHK_RET(ret, "table->close");
+	ret = store->close(store);
+	CHK_RET(ret, "store->close");
+
+	return (ret);
+}
+
 int odt_t1_2() {
 #define TNUM_ODT_T1_2 5
 	VAN_STORE *store;

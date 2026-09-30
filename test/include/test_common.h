@@ -194,6 +194,71 @@ extern int verify_ondisktree_cursor_border(ONDISK_TREE *tree,
 extern int verify_table_cursor_border(VAN_TABLE *table,
     flags_t direction, flags_t cflags);
 
+/*
+ * Same as verify_xxx_cursor_direction(), but every record is also compared
+ * against the expected one.
+ *
+ * keys / ksizes / values / vsizes describe the expected records and must be
+ * sorted ascending by key, using the compare function the tree or table was
+ * built with (see sort_testdata()).  cnt is the number of expected records.
+ *
+ * Walking with VAN_NEXT starts at keys[0] and ends at keys[cnt - 1], walking
+ * with VAN_PREV starts at keys[cnt - 1] and ends at keys[0].  A single
+ * mismatch aborts the test.
+ */
+extern int verify_inmemtree_cursor_direction_full(INMEM_TREE *tree,
+    flags_t direction, flags_t cflags, size_t *rcntp,
+    char **keys, size_t *ksizes, char **values, size_t *vsizes, size_t cnt);
+extern int verify_ondisktree_cursor_direction_full(ONDISK_TREE *tree,
+    flags_t direction, flags_t cflags, size_t *rcntp,
+    char **keys, size_t *ksizes, char **values, size_t *vsizes, size_t cnt);
+extern int verify_table_cursor_direction_full(VAN_TABLE *table,
+    flags_t direction, flags_t cflags, size_t *rcntp,
+    char **keys, size_t *ksizes, char **values, size_t *vsizes, size_t cnt);
+
+/*
+ * Same as verify_xxx_cursor_border(), but the record that VAN_FIRST /
+ * VAN_LAST returns is also compared against the expected first / last
+ * record, passed in as key / ksize / value / vsize.
+ */
+extern int verify_inmemtree_cursor_border_full(INMEM_TREE *tree,
+    flags_t direction, flags_t cflags,
+    char *key, size_t ksize, char *value, size_t vsize);
+extern int verify_ondisktree_cursor_border_full(ONDISK_TREE *tree,
+    flags_t direction, flags_t cflags,
+    char *key, size_t ksize, char *value, size_t vsize);
+extern int verify_table_cursor_border_full(VAN_TABLE *table,
+    flags_t direction, flags_t cflags,
+    char *key, size_t ksize, char *value, size_t vsize);
+
+/*
+ * Sort four parallel test data arrays ascending by key, using cmp -- the
+ * compare function of the tree or table under test, so that the resulting
+ * order is exactly the one a forward walk of that object produces.
+ *
+ * qsort() can only reorder one array, so the permutation is built on an
+ * index array and then applied to all four.
+ */
+extern int sort_testdata(char **keys, size_t *ksizes,
+    char **values, size_t *vsizes, size_t cnt, VAN_DATUM_CMPFUNC cmp);
+
+/*
+ * Run check in a child process and tell whether it failed.
+ *
+ * The verify_xxx_*_full() helpers report a mismatch with TEST_ASSERT2(),
+ * which exits the process, so a negative test cannot call one directly and
+ * still go on.  Running it in a child keeps the test alive:
+ *
+ *	1 = the child did not come back with 0, which is what a negative
+ *	    test wants to see;
+ *	0 = the check passed, so a wrong record went undetected.
+ *
+ * The child gets its own copy of the test data (fork is copy on write), so
+ * it may corrupt the expected records without touching the parent's.  Its
+ * output is thrown away, the failure it reports is the whole point.
+ */
+extern int verify_child_fails(int (*check)(void *), void *arg);
+
 #define STRING_TESTDATA_DEFINE \
 	char **keys, **values; \
 	size_t *ksizes, *vsizes

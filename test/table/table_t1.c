@@ -401,6 +401,255 @@ int table_t1_1d() {
 }
 
 /*
+ * Verify both directions of table->traverse() against the expected records.
+ *
+ * The records are put through table->put(), then the expected arrays are
+ * sorted with the compare function of the table, so that a forward
+ * traversal has to hand back keys[0] .. keys[cnt - 1] and a backward one
+ * the same records in reverse.
+ *
+ * A table has no cursor, so verify_table_cursor_direction_full() and
+ * verify_table_cursor_border_full() walk it with table->traverse():
+ * VAN_NEXT / VAN_FIRST forward, VAN_PREV / VAN_LAST backward.
+ */
+int table_t1_1e() {
+	VAN_TABLE *table;
+	VAN_STORE *store;
+	int ret, cnt;
+	size_t rcnt;
+	STRING_TESTDATA_DEFINE;
+
+	system("rm -fr test1*");
+	system("rm -fr vanlog.*");
+	ret = van_test_store_create(&store);
+	CHK_RET(ret, "van_store_create");
+	ret = store->open(store, ".", 0);
+	CHK_RET(ret, "store->open");
+	ret = van_table_create(store, &table);
+	CHK_RET(ret, "van_table_create");
+	/*
+	 * A huge threshold and no background threads: everything stays in
+	 * the active in-memory tree, so the traversal is deterministic.
+	 */
+	table->set_inmem_threshold(table, GIGABYTE);
+	ret = table->open(table, "test1", VAN_TABLE_SKIP_THREAD_START);
+	CHK_RET(ret, "table->open");
+
+	cnt = 100000;
+	STRING_TESTDATA_INIT;
+	(void)generate_string_testdata(keys, ksizes, 20, 30, values, vsizes,
+	    50, 120, cnt);
+
+	fprintf(stderr, "============ 1 put %lu records =========\n",
+	    (unsigned long)cnt);
+	ret = populate_table(table, keys, ksizes, values, vsizes, cnt);
+	CHK_RET(ret, "populate_table");
+
+	fprintf(stderr, "============ 2 Sort the expected records =========\n");
+	ret = sort_testdata(keys, ksizes, values, vsizes, (size_t)cnt,
+	    table->cmp_func);
+	CHK_RET(ret, "sort_testdata");
+
+	fprintf(stderr,
+	    "============ 3 traverse forward (VAN_NEXT) =========\n");
+	rcnt = 0;
+	ret = verify_table_cursor_direction_full(table, VAN_NEXT, 0, &rcnt,
+	    keys, ksizes, values, vsizes, (size_t)cnt);
+	CHK_RET(ret, "verify_table_cursor_direction_full(VAN_NEXT)");
+	TEST_ASSERT2(rcnt == (size_t)cnt, "expected %d records, walked %lu",
+	    cnt, (unsigned long)rcnt);
+
+	fprintf(stderr,
+	    "============ 4 traverse backward (VAN_PREV) =========\n");
+	rcnt = 0;
+	ret = verify_table_cursor_direction_full(table, VAN_PREV, 0, &rcnt,
+	    keys, ksizes, values, vsizes, (size_t)cnt);
+	CHK_RET(ret, "verify_table_cursor_direction_full(VAN_PREV)");
+	TEST_ASSERT2(rcnt == (size_t)cnt, "expected %d records, walked %lu",
+	    cnt, (unsigned long)rcnt);
+
+	fprintf(stderr, "============ 5 VAN_FIRST is the first record =====\n");
+	ret = verify_table_cursor_border_full(table, VAN_FIRST, 0,
+	    keys[0], ksizes[0], values[0], vsizes[0]);
+	CHK_RET(ret, "verify_table_cursor_border_full(VAN_FIRST)");
+
+	fprintf(stderr, "============ 6 VAN_LAST is the last record ======\n");
+	ret = verify_table_cursor_border_full(table, VAN_LAST, 0,
+	    keys[cnt - 1], ksizes[cnt - 1],
+	    values[cnt - 1], vsizes[cnt - 1]);
+	CHK_RET(ret, "verify_table_cursor_border_full(VAN_LAST)");
+
+	(void)free_string_testdata(keys, ksizes, values, vsizes, cnt);
+
+	ret = table->close(table, 0);
+	CHK_RET(ret, "table->close");
+	ret = store->close(store);
+	CHK_RET(ret, "store->close");
+
+	return (ret);
+}
+
+/*
+ * What a wrong expectation looks like.  table_t1_1f() feeds these to the
+ * checks and expects every one of them to be caught.
+ *
+ * A table has no cursor and no cursor flags, so the traversal direction is
+ * the only thing that varies.
+ */
+#define TBL_NEG_KEY     1
+#define TBL_NEG_VALUE   2
+#define TBL_NEG_COUNT   3
+#define TBL_NEG_BORDERK 4
+#define TBL_NEG_BORDERV 5
+
+static char tbl_neg_key[] = "zzzz-bogus-key-that-is-not-in-the-table";
+static char tbl_neg_val[] = "zzzz-bogus-value-that-is-not-in-the-table";
+
+typedef struct {
+	VAN_TABLE *table;
+	flags_t    direction;
+	char     **keys, **values;
+	size_t    *ksizes, *vsizes;
+	size_t     cnt;
+	int        mode;
+} tbl_neg_t;
+
+static int tbl_neg_check(void *arg) {
+	tbl_neg_t *c;
+	size_t rcnt, idx;
+	int backward;
+
+	c = (tbl_neg_t *)arg;
+	rcnt = 0;
+	backward = (c->direction == VAN_PREV || c->direction == VAN_LAST);
+	/* Corrupt the record the traversal reads first. */
+	idx = backward ? c->cnt - 1 : 0;
+
+	switch (c->mode) {
+	case TBL_NEG_KEY:
+		c->keys[idx] = tbl_neg_key;
+		c->ksizes[idx] = strlen(tbl_neg_key);
+		break;
+	case TBL_NEG_VALUE:
+		c->values[idx] = tbl_neg_val;
+		c->vsizes[idx] = strlen(tbl_neg_val);
+		break;
+	case TBL_NEG_COUNT:
+		return verify_table_cursor_direction_full(c->table,
+		    c->direction, 0, &rcnt, c->keys, c->ksizes,
+		    c->values, c->vsizes, c->cnt - 1);
+	case TBL_NEG_BORDERK:
+		return verify_table_cursor_border_full(c->table,
+		    c->direction, 0, tbl_neg_key, strlen(tbl_neg_key),
+		    c->values[idx], c->vsizes[idx]);
+	case TBL_NEG_BORDERV:
+		return verify_table_cursor_border_full(c->table,
+		    c->direction, 0, c->keys[idx], c->ksizes[idx],
+		    tbl_neg_val, strlen(tbl_neg_val));
+	default:
+		return (0);
+	}
+
+	return verify_table_cursor_direction_full(c->table, c->direction,
+	    0, &rcnt, c->keys, c->ksizes, c->values, c->vsizes, c->cnt);
+}
+
+static int tbl_neg_one(VAN_TABLE *table, char **keys, size_t *ksizes,
+    char **values, size_t *vsizes, size_t cnt, flags_t direction, int mode,
+    const char *what) {
+	tbl_neg_t ctx;
+
+	memset(&ctx, 0, sizeof(ctx));
+	ctx.table = table;
+	ctx.direction = direction;
+	ctx.keys = keys;
+	ctx.ksizes = ksizes;
+	ctx.values = values;
+	ctx.vsizes = vsizes;
+	ctx.cnt = cnt;
+	ctx.mode = mode;
+
+	TEST_ASSERT2(verify_child_fails(tbl_neg_check, &ctx),
+	    "%s: the check passed, it must catch this", what);
+	fprintf(stderr, "   caught: %s\n", what);
+
+	return (0);
+}
+
+/*
+ * Negative test for the checks table_t1_1e() uses: every wrong expectation
+ * below has to be caught, see imt_t1_3c() for why they run in a child.
+ */
+int table_t1_1f() {
+	VAN_TABLE *table;
+	VAN_STORE *store;
+	int ret, cnt;
+	STRING_TESTDATA_DEFINE;
+
+	system("rm -fr test1*");
+	system("rm -fr vanlog.*");
+	ret = van_test_store_create(&store);
+	CHK_RET(ret, "van_store_create");
+	ret = store->open(store, ".", 0);
+	CHK_RET(ret, "store->open");
+	ret = van_table_create(store, &table);
+	CHK_RET(ret, "van_table_create");
+	table->set_inmem_threshold(table, GIGABYTE);
+	ret = table->open(table, "test1", VAN_TABLE_SKIP_THREAD_START);
+	CHK_RET(ret, "table->open");
+
+	cnt = 10000;
+	STRING_TESTDATA_INIT;
+	(void)generate_string_testdata(keys, ksizes, 20, 30, values, vsizes,
+	    50, 120, cnt);
+
+	fprintf(stderr, "============ 1 put %lu records =========\n",
+	    (unsigned long)cnt);
+	ret = populate_table(table, keys, ksizes, values, vsizes, cnt);
+	CHK_RET(ret, "populate_table");
+
+	fprintf(stderr, "============ 2 Sort the expected records =========\n");
+	ret = sort_testdata(keys, ksizes, values, vsizes, (size_t)cnt,
+	    table->cmp_func);
+	CHK_RET(ret, "sort_testdata");
+
+	fprintf(stderr, "============ 3 A wrong record must be caught =====\n");
+	ret = tbl_neg_one(table, keys, ksizes, values, vsizes, (size_t)cnt,
+	    VAN_NEXT, TBL_NEG_KEY, "VAN_NEXT, wrong key");
+	ret = tbl_neg_one(table, keys, ksizes, values, vsizes, (size_t)cnt,
+	    VAN_PREV, TBL_NEG_KEY, "VAN_PREV, wrong key");
+	ret = tbl_neg_one(table, keys, ksizes, values, vsizes, (size_t)cnt,
+	    VAN_NEXT, TBL_NEG_VALUE, "VAN_NEXT, wrong value");
+	ret = tbl_neg_one(table, keys, ksizes, values, vsizes, (size_t)cnt,
+	    VAN_PREV, TBL_NEG_VALUE, "VAN_PREV, wrong value");
+
+	fprintf(stderr, "============ 4 A wrong count must be caught ======\n");
+	ret = tbl_neg_one(table, keys, ksizes, values, vsizes, (size_t)cnt,
+	    VAN_NEXT, TBL_NEG_COUNT, "VAN_NEXT, one record too few");
+	ret = tbl_neg_one(table, keys, ksizes, values, vsizes, (size_t)cnt,
+	    VAN_PREV, TBL_NEG_COUNT, "VAN_PREV, one record too few");
+
+	fprintf(stderr, "============ 5 A wrong border must be caught =====\n");
+	ret = tbl_neg_one(table, keys, ksizes, values, vsizes, (size_t)cnt,
+	    VAN_FIRST, TBL_NEG_BORDERK, "VAN_FIRST, wrong key");
+	ret = tbl_neg_one(table, keys, ksizes, values, vsizes, (size_t)cnt,
+	    VAN_LAST, TBL_NEG_BORDERK, "VAN_LAST, wrong key");
+	ret = tbl_neg_one(table, keys, ksizes, values, vsizes, (size_t)cnt,
+	    VAN_FIRST, TBL_NEG_BORDERV, "VAN_FIRST, wrong value");
+	ret = tbl_neg_one(table, keys, ksizes, values, vsizes, (size_t)cnt,
+	    VAN_LAST, TBL_NEG_BORDERV, "VAN_LAST, wrong value");
+
+	(void)free_string_testdata(keys, ksizes, values, vsizes, cnt);
+
+	ret = table->close(table, 0);
+	CHK_RET(ret, "table->close");
+	ret = store->close(store);
+	CHK_RET(ret, "store->close");
+
+	return (ret);
+}
+
+/*
  Test populate_table using multiple threads with a small inmem_threshold
  (1MB), so that data is dumped to disk during populate.
 
