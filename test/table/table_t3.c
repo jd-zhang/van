@@ -36,7 +36,7 @@
  * in.  Every case is independently runnable via table_tmain <case>.
  */
 
-#define TB3_N 100000
+#define TB3_N 1000000
 
 /* ---------- setup / teardown (same pattern as table_t2.c) ---------- */
 
@@ -50,6 +50,7 @@ static int tb3_setup(VAN_STORE **storep, VAN_TABLE **tablep,
 	system("rm -fr vanlog.*");
 	ret = van_test_store_create(&store);
 	CHK_RET(ret, "van_store_create");
+	store->set_cachesize(store, 100*MEGABYTE);
 	ret = store->open(store, ".", 0);
 	CHK_RET(ret, "store->open");
 	ret = van_table_create(store, &table);
@@ -58,8 +59,8 @@ static int tb3_setup(VAN_STORE **storep, VAN_TABLE **tablep,
 	 * Keep the inmem threshold huge so the scan thread never dumps
 	 * on its own; the tests here want a single stable data source.
 	 */
-	table->set_inmem_threshold(table, GIGABYTE);
-	ret = table->open(table, name, VAN_TABLE_SKIP_THREAD_START);
+	table->set_inmem_threshold(table, 5*MEGABYTE);
+	ret = table->open(table, name, 0);
 	CHK_RET(ret, "table->open");
 	*storep = store;
 	*tablep = table;
@@ -534,7 +535,7 @@ static void assert_subset(TESTDATA *small, TESTDATA *big, const char *what,
 static int tb3_concurrent(int backward, int have_range, int lo_incl,
     int hi_incl, const char *what) {
 	VAN_STORE *store;
-	VAN_TABLE *table;
+	VAN_TABLE  *table;
 	TESTDATA td, r1, r2, r1c, allc, r1exp, allexp, gotv;
 	coll_t got;
 	VAN_DATUM lod, hid;

@@ -40,6 +40,7 @@ int odt_t1_1() {
 
 	ret = van_inmemtree_create(table, &tree);
 	CHK_RET(ret, "van_inmemtree_create");
+	tree->threshold = GIGABYTE;
 
 	cnt = 100000;
 	TESTDATA_INIT(&td, (size_t)cnt);
@@ -193,6 +194,7 @@ int odt_t1_1b() {
 
 	ret = van_inmemtree_create(table, &tree);
 	CHK_RET(ret, "van_inmemtree_create");
+	tree->threshold = GIGABYTE;
 
 	cnt = 100000;
 	TESTDATA_INIT(&td, (size_t)cnt);
@@ -371,6 +373,7 @@ int odt_t1_1c() {
 
 	ret = van_inmemtree_create(table, &tree);
 	CHK_RET(ret, "van_inmemtree_create");
+	tree->threshold = GIGABYTE;
 
 	cnt = 10000;
 	TESTDATA_INIT(&td, (size_t)cnt);

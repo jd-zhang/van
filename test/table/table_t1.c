@@ -130,11 +130,12 @@ int table_t1_1() {
 	system("rm -fr vanlog.*");
 	ret = van_test_store_create(&store);
 	CHK_RET(ret, "van_store_create");
+	store->set_cachesize(store, GIGABYTE);
 	ret = store->open(store, ".", 0);
 	CHK_RET(ret, "store->open");
 	ret = van_table_create(store, &table);
 	CHK_RET(ret, "van_table_create");
-	table->set_inmem_threshold(table, GIGABYTE);
+	table->set_inmem_threshold(table, 5*MEGABYTE);
 	ret = table->open(table, "test1", VAN_TABLE_SKIP_THREAD_START);
 	CHK_RET(ret, "table->open");
 	ret = table->start_threads(table);
@@ -198,6 +199,7 @@ int table_t1_1b() {
 	system("rm -fr vanlog.*");
 	ret = van_test_store_create(&store);
 	CHK_RET(ret, "van_store_create");
+	store->set_cachesize(store, 200*MEGABYTE);
 	ret = store->open(store, ".", 0);
 	CHK_RET(ret, "store->open");
 	ret = van_table_create(store, &table);
@@ -249,6 +251,7 @@ int table_t1_1c() {
 	system("rm -fr vanlog.*");
 	ret = van_test_store_create(&store);
 	CHK_RET(ret, "van_store_create");
+	store->set_cachesize(store, GIGABYTE);
 	ret = store->open(store, ".", 0);
 	CHK_RET(ret, "store->open");
 	ret = van_table_create(store, &table);
@@ -328,6 +331,7 @@ int table_t1_1d() {
 	system("rm -fr vanlog.*");
 	ret = van_test_store_create(&store);
 	CHK_RET(ret, "van_store_create");
+	store->set_cachesize(store, 200*MEGABYTE);
 	ret = store->open(store, ".", 0);
 	CHK_RET(ret, "store->open");
 	ret = van_table_create(store, &table);
@@ -423,12 +427,8 @@ int table_t1_1e() {
 	CHK_RET(ret, "store->open");
 	ret = van_table_create(store, &table);
 	CHK_RET(ret, "van_table_create");
-	/*
-	 * A huge threshold and no background threads: everything stays in
-	 * the active in-memory tree, so the traversal is deterministic.
-	 */
-	table->set_inmem_threshold(table, GIGABYTE);
-	ret = table->open(table, "test1", VAN_TABLE_SKIP_THREAD_START);
+	table->set_inmem_threshold(table, MEGABYTE);
+	ret = table->open(table, "test1", 0);
 	CHK_RET(ret, "table->open");
 
 	cnt = 100000;
@@ -586,11 +586,11 @@ int table_t1_1f() {
 	CHK_RET(ret, "store->open");
 	ret = van_table_create(store, &table);
 	CHK_RET(ret, "van_table_create");
-	table->set_inmem_threshold(table, GIGABYTE);
-	ret = table->open(table, "test1", VAN_TABLE_SKIP_THREAD_START);
+	table->set_inmem_threshold(table, MEGABYTE);
+	ret = table->open(table, "test1", 0);
 	CHK_RET(ret, "table->open");
 
-	cnt = 10000;
+	cnt = 100000;
 	TESTDATA_INIT(&td, (size_t)cnt);
 	(void)generate_string_testdata(&td, 20, 30, 50, 120);
 
@@ -661,6 +661,7 @@ int table_t1_2() {
 	system("rm -fr vanlog.*");
 	ret = van_test_store_create(&store);
 	CHK_RET(ret, "van_store_create");
+	store->set_cachesize(store, 200*MEGABYTE);
 	ret = store->open(store, ".", 0);
 	CHK_RET(ret, "store->open");
 	ret = van_table_create(store, &table);
@@ -762,7 +763,7 @@ int table_t1_2() {
  *    running TB_T1_3_VERIFY_TIMES rounds.
  * 4. close the table and the store.
  */
-#define TB_T1_3_NKEYS 10000
+#define TB_T1_3_NKEYS 100000
 #define TB_T1_3_NGROUPS 100
 #define TB_T1_3_VERIFY_TIMES 50  /* upper bound of the verify rounds */
 #define TB_T1_3_VERIFY_INTERVAL 10
@@ -909,7 +910,7 @@ int table_t1_3() {
  *    running TB_T1_4_VERIFY_TIMES rounds.
  * 4. close the table and the store.
  */
-#define TB_T1_4_NKEYS 10000
+#define TB_T1_4_NKEYS 100000
 #define TB_T1_4_NGROUPS 100
 #define TB_T1_4_KEY_MINLEN 8
 #define TB_T1_4_KEY_MAXLEN 20

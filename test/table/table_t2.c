@@ -35,7 +35,7 @@
  * Every case is independently runnable via table_tmain <case_name>.
  */
 
-#define TB2_N 1000
+#define TB2_N 100000
 
 /* ---------- small helpers ---------- */
 
@@ -68,7 +68,7 @@ static int tb2_setup(VAN_STORE **storep, VAN_TABLE **tablep,
 	system("rm -fr vanlog.*");
 	ret = van_test_store_create(&store);
 	CHK_RET(ret, "van_store_create");
-	ret = store->open(store, ".", 0);
+	ret = store->open(store, ".", VAN_TABLE_SKIP_THREAD_START);
 	CHK_RET(ret, "store->open");
 	ret = van_table_create(store, &table);
 	CHK_RET(ret, "van_table_create");
@@ -76,8 +76,8 @@ static int tb2_setup(VAN_STORE **storep, VAN_TABLE **tablep,
 	 * Keep the inmem threshold huge so the scan thread never dumps
 	 * on its own; dumps are done explicitly via table->dump_inmem.
 	 */
-	table->set_inmem_threshold(table, GIGABYTE);
-	ret = table->open(table, name, VAN_TABLE_SKIP_THREAD_START);
+	table->set_inmem_threshold(table, MEGABYTE);
+	ret = table->open(table, name, 0);
 	CHK_RET(ret, "table->open");
 	*storep = store;
 	*tablep = table;
