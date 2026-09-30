@@ -34,6 +34,26 @@ extern int table_t2_7();
 extern int table_t2_8();
 extern int table_t2_9();
 extern int table_t2_10();
+extern int table_t3_1a();
+extern int table_t3_1b();
+extern int table_t3_1c();
+extern int table_t3_1d();
+extern int table_t3_1e();
+extern int table_t3_1f();
+extern int table_t3_1g();
+extern int table_t3_1h();
+extern int table_t3_1i();
+extern int table_t3_1j();
+extern int table_t3_2a();
+extern int table_t3_2b();
+extern int table_t3_2c();
+extern int table_t3_2d();
+extern int table_t3_2e();
+extern int table_t3_2f();
+extern int table_t3_2g();
+extern int table_t3_2h();
+extern int table_t3_2i();
+extern int table_t3_2j();
 int main(int argc, char *argv[]) {
 	int ret;
 	ret = 0;
@@ -115,6 +135,86 @@ int main(int argc, char *argv[]) {
 	} else if (strcmp(argv[1], "table_t2_10") == 0) {
 		fprintf(stderr, "============ table_t2_10() ===========\n");
 		ret = table_t2_10();
+		fprintf(stderr, "\n");
+	} else if (strcmp(argv[1], "table_t3_1a") == 0) {
+		fprintf(stderr, "============ table_t3_1a() ===========\n");
+		ret = table_t3_1a();
+		fprintf(stderr, "\n");
+	} else if (strcmp(argv[1], "table_t3_1b") == 0) {
+		fprintf(stderr, "============ table_t3_1b() ===========\n");
+		ret = table_t3_1b();
+		fprintf(stderr, "\n");
+	} else if (strcmp(argv[1], "table_t3_1c") == 0) {
+		fprintf(stderr, "============ table_t3_1c() ===========\n");
+		ret = table_t3_1c();
+		fprintf(stderr, "\n");
+	} else if (strcmp(argv[1], "table_t3_1d") == 0) {
+		fprintf(stderr, "============ table_t3_1d() ===========\n");
+		ret = table_t3_1d();
+		fprintf(stderr, "\n");
+	} else if (strcmp(argv[1], "table_t3_1e") == 0) {
+		fprintf(stderr, "============ table_t3_1e() ===========\n");
+		ret = table_t3_1e();
+		fprintf(stderr, "\n");
+	} else if (strcmp(argv[1], "table_t3_1f") == 0) {
+		fprintf(stderr, "============ table_t3_1f() ===========\n");
+		ret = table_t3_1f();
+		fprintf(stderr, "\n");
+	} else if (strcmp(argv[1], "table_t3_1g") == 0) {
+		fprintf(stderr, "============ table_t3_1g() ===========\n");
+		ret = table_t3_1g();
+		fprintf(stderr, "\n");
+	} else if (strcmp(argv[1], "table_t3_1h") == 0) {
+		fprintf(stderr, "============ table_t3_1h() ===========\n");
+		ret = table_t3_1h();
+		fprintf(stderr, "\n");
+	} else if (strcmp(argv[1], "table_t3_1i") == 0) {
+		fprintf(stderr, "============ table_t3_1i() ===========\n");
+		ret = table_t3_1i();
+		fprintf(stderr, "\n");
+	} else if (strcmp(argv[1], "table_t3_1j") == 0) {
+		fprintf(stderr, "============ table_t3_1j() ===========\n");
+		ret = table_t3_1j();
+		fprintf(stderr, "\n");
+	} else if (strcmp(argv[1], "table_t3_2a") == 0) {
+		fprintf(stderr, "============ table_t3_2a() ===========\n");
+		ret = table_t3_2a();
+		fprintf(stderr, "\n");
+	} else if (strcmp(argv[1], "table_t3_2b") == 0) {
+		fprintf(stderr, "============ table_t3_2b() ===========\n");
+		ret = table_t3_2b();
+		fprintf(stderr, "\n");
+	} else if (strcmp(argv[1], "table_t3_2c") == 0) {
+		fprintf(stderr, "============ table_t3_2c() ===========\n");
+		ret = table_t3_2c();
+		fprintf(stderr, "\n");
+	} else if (strcmp(argv[1], "table_t3_2d") == 0) {
+		fprintf(stderr, "============ table_t3_2d() ===========\n");
+		ret = table_t3_2d();
+		fprintf(stderr, "\n");
+	} else if (strcmp(argv[1], "table_t3_2e") == 0) {
+		fprintf(stderr, "============ table_t3_2e() ===========\n");
+		ret = table_t3_2e();
+		fprintf(stderr, "\n");
+	} else if (strcmp(argv[1], "table_t3_2f") == 0) {
+		fprintf(stderr, "============ table_t3_2f() ===========\n");
+		ret = table_t3_2f();
+		fprintf(stderr, "\n");
+	} else if (strcmp(argv[1], "table_t3_2g") == 0) {
+		fprintf(stderr, "============ table_t3_2g() ===========\n");
+		ret = table_t3_2g();
+		fprintf(stderr, "\n");
+	} else if (strcmp(argv[1], "table_t3_2h") == 0) {
+		fprintf(stderr, "============ table_t3_2h() ===========\n");
+		ret = table_t3_2h();
+		fprintf(stderr, "\n");
+	} else if (strcmp(argv[1], "table_t3_2i") == 0) {
+		fprintf(stderr, "============ table_t3_2i() ===========\n");
+		ret = table_t3_2i();
+		fprintf(stderr, "\n");
+	} else if (strcmp(argv[1], "table_t3_2j") == 0) {
+		fprintf(stderr, "============ table_t3_2j() ===========\n");
+		ret = table_t3_2j();
 		fprintf(stderr, "\n");
 	} else {
 		fprintf(stderr, "Unknown test case: %s\n", argv[1]);
