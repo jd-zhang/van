@@ -30,12 +30,10 @@ static int LETTERS_SIZE = sizeof(LETTERS)/sizeof(LETTERS[0]);
 
 static int check_duplicate(void *obj, size_t maxksz, size_t *totalp,
     size_t *dupcountp, int otype);
-static int populate_data(void *obj, char **keys, size_t *ksizes,
-    char **values, size_t *vsizes, size_t cnt, int otype);
-static int delete_data_with_expected(void *obj, char **keys, size_t *ksizes,
-    size_t cnt, int otype, int start, int step, int expected) ;
-static int verify_data_withcursor(void *obj, char **keys, size_t *ksizes,
-    char **values, size_t *vsizes, size_t cnt, int otype);
+static int populate_data(void *obj, TESTDATA *td, int otype);
+static int delete_data_with_expected(void *obj, TESTDATA *td,
+    int otype, int start, int step, int expected) ;
+static int verify_data_withcursor(void *obj, TESTDATA *td, int otype);
 static int verify_cursor_direction(void *obj, flags_t direction,
     flags_t cflags, size_t *rcntp, int otype);
 static int verify_cursor_border(void *obj, flags_t direction,
@@ -230,8 +228,8 @@ int check_table_duplicate(VAN_TABLE *table,
 	    dupcountp, OP_TABLE);
 }
 
-static int populate_data_with_expected(void *obj, char **keys, size_t *ksizes,
-    char **values, size_t *vsizes, size_t cnt, int otype, int expected) {	
+static int populate_data_with_expected(void *obj, TESTDATA *td,
+    int otype, int expected) {	
 	size_t i;
 	int ret, rret;
 	VAN_DATUM key, value;
@@ -245,13 +243,13 @@ static int populate_data_with_expected(void *obj, char **keys, size_t *ksizes,
 	rret = 0;
 
 	time(&t1);
-	for (i = 0; i < cnt; i++) {
+	for (i = 0; i < td->count; i++) {
 		memset(&key, 0, sizeof(key));
 		memset(&value, 0, sizeof(value));
-		key.data = keys[i];
-		key.size = ksizes[i];
-		value.data = values[i];
-		value.size = vsizes[i];
+		key.data = td->records[i].key;
+		key.size = td->records[i].ksize;
+		value.data = td->records[i].value;
+		value.size = td->records[i].vsize;
 		switch (otype) {
 			case OP_TABLE:
 				info = "table->put";
@@ -282,38 +280,30 @@ static int populate_data_with_expected(void *obj, char **keys, size_t *ksizes,
 }
 
 
-static int populate_data(void *obj, char **keys, size_t *ksizes,
-    char **values, size_t *vsizes, size_t cnt, int otype){
-	return populate_data_with_expected(obj, keys, ksizes,
-	    values, vsizes, cnt, otype, 0);
+static int populate_data(void *obj, TESTDATA *td, int otype){
+	return populate_data_with_expected(obj, td, otype, 0);
 	}
 
-int populate_table(VAN_TABLE *table, char **keys, size_t *ksizes,
-    char **values, size_t *vsizes, size_t cnt) {
-	return populate_data(table,
-	    keys, ksizes, values, vsizes, cnt, OP_TABLE);
+int populate_table(VAN_TABLE *table, TESTDATA *td) {
+	return populate_data(table, td, OP_TABLE);
 }
 
-int populate_table_with_expected(VAN_TABLE *table, char **keys, size_t *ksizes,
-    char **values, size_t *vsizes, size_t cnt, int expected) {
-	return populate_data_with_expected(table,
-	    keys, ksizes, values, vsizes, cnt, OP_TABLE, expected);
+int populate_table_with_expected(VAN_TABLE *table, TESTDATA *td,
+    int expected) {
+	return populate_data_with_expected(table, td, OP_TABLE, expected);
 }
 
-int populate_inmemtree(INMEM_TREE *tree, char **keys, size_t *ksizes,
-    char **values, size_t *vsizes, size_t cnt) {
-	return populate_data(tree,
-	    keys, ksizes, values, vsizes, cnt, OP_INMEMTREE);
+int populate_inmemtree(INMEM_TREE *tree, TESTDATA *td) {
+	return populate_data(tree, td, OP_INMEMTREE);
 }
 
-int populate_inmemtree_with_expected(INMEM_TREE *tree, char **keys, size_t *ksizes,
-    char **values, size_t *vsizes, size_t cnt, int expected) {
-	return populate_data_with_expected(tree,
-	    keys, ksizes, values, vsizes, cnt, OP_INMEMTREE, expected);
+int populate_inmemtree_with_expected(INMEM_TREE *tree, TESTDATA *td,
+    int expected) {
+	return populate_data_with_expected(tree, td, OP_INMEMTREE, expected);
 }
 
-static int delete_data_with_expected(void *obj, char **keys, size_t *ksizes,
-    size_t cnt, int otype, int start, int step, int expected) {	
+static int delete_data_with_expected(void *obj, TESTDATA *td,
+    int otype, int start, int step, int expected) {	
 	size_t i;
 	int ret, rret;
 	VAN_DATUM key;
@@ -327,10 +317,10 @@ static int delete_data_with_expected(void *obj, char **keys, size_t *ksizes,
 	rret = 0;
 
 	time(&t1);
-	for (i = start; i < cnt; i+=step) {
+	for (i = (size_t)start; i < td->count; i+=(size_t)step) {
 		memset(&key, 0, sizeof(key));
-		key.data = keys[i];
-		key.size = ksizes[i];
+		key.data = td->records[i].key;
+		key.size = td->records[i].ksize;
 		switch (otype) {
 			case OP_TABLE:
 				info = "table->del";
@@ -359,28 +349,26 @@ static int delete_data_with_expected(void *obj, char **keys, size_t *ksizes,
 	return (rret);
 }
 
-int delete_inmemtree_with_expected(INMEM_TREE *tree, char **keys, size_t *ksizes,
-	size_t cnt, int start, int step, int expected) {
+int delete_inmemtree_with_expected(INMEM_TREE *tree, TESTDATA *td,
+	int start, int step, int expected) {
 	return delete_data_with_expected(tree,
-	    keys, ksizes, cnt, OP_INMEMTREE, start, step, expected);
+	    td, OP_INMEMTREE, start, step, expected);
 }
 
-int delete_inmemtree(INMEM_TREE *tree, char **keys, size_t *ksizes,
-	size_t cnt, int step) {
+int delete_inmemtree(INMEM_TREE *tree, TESTDATA *td, int step) {
 	return delete_data_with_expected(tree,
-	    keys, ksizes, cnt, OP_INMEMTREE, 0, step, 0);
+	    td, OP_INMEMTREE, 0, step, 0);
 }
 
-int delete_table_with_expected(VAN_TABLE *table, char **keys, size_t *ksizes,
-	size_t cnt, int start, int step, int expected) {
+int delete_table_with_expected(VAN_TABLE *table, TESTDATA *td,
+	int start, int step, int expected) {
 	return delete_data_with_expected(table,
-	    keys, ksizes, cnt, OP_TABLE, start, step, expected);
+	    td, OP_TABLE, start, step, expected);
 }
 
-int delete_table(VAN_TABLE *table, char **keys, size_t *ksizes,
-	size_t cnt, int step) {
+int delete_table(VAN_TABLE *table, TESTDATA *td, int step) {
 	return delete_data_with_expected(table,
-	    keys, ksizes, cnt, OP_TABLE, 0,step, 0);
+	    td, OP_TABLE, 0,step, 0);
 }
 
 /*
@@ -419,8 +407,8 @@ static void print_datum(FILE *f, const char *label, const VAN_DATUM *datum) {
 verify the records using the inmemtree/odisktree/table get function,
 and verify the records are the same as the input data.
 */
-static int verify_data_with_expected(void *obj, char **keys, size_t *ksizes,
-    char **values, size_t *vsizes, size_t cnt, int otype, int start, int step, int expected) {
+static int verify_data_with_expected(void *obj, TESTDATA *td, int otype,
+    int start, int step, int expected) {
 	INMEM_TREE *imtree;
 	ONDISK_TREE *odtree;
 	VAN_TABLE *table;
@@ -435,11 +423,11 @@ static int verify_data_with_expected(void *obj, char **keys, size_t *ksizes,
 	table = (VAN_TABLE *)obj;
 
 	time(&t1);
-	for (i = start; i < cnt; i+= step) {
+	for (i = (size_t)start; i < td->count; i+= (size_t)step) {
 		memset(&key, 0, sizeof(key));
 		memset(&value, 0, sizeof(value));
-		key.data = keys[i];
-		key.size = ksizes[i];
+		key.data = td->records[i].key;
+		key.size = td->records[i].ksize;
 
 		switch (otype) {
 			case OP_INMEMTREE:
@@ -460,8 +448,9 @@ static int verify_data_with_expected(void *obj, char **keys, size_t *ksizes,
 				ret = van_error_print("BAD OP_TYPE");
 		}
 		if (ret == 0) {
-			VAN_ASSERT(value.size == vsizes[i]);
-			VAN_ASSERT((memcmp(value.data, values[i], value.size) == 0));
+			VAN_ASSERT(value.size == td->records[i].vsize);
+			VAN_ASSERT((memcmp(value.data, td->records[i].value,
+			    value.size) == 0));
 		}
 		if (ret != expected) {
 			VAN_DATUM expval, retval;
@@ -475,8 +464,8 @@ static int verify_data_with_expected(void *obj, char **keys, size_t *ksizes,
 
 			memset(&expval, 0, sizeof(expval));
 			if (expected == 0) {
-				expval.data = values[i];
-				expval.size = vsizes[i];
+				expval.data = td->records[i].value;
+				expval.size = td->records[i].vsize;
 				print_datum(stderr, "key", &key);
 				print_datum(stderr, "expected value", &expval);
 			} else {
@@ -549,44 +538,37 @@ static int verify_data_with_expected(void *obj, char **keys, size_t *ksizes,
 	return (ret);
 }
 
-int verify_inmemtree_data(INMEM_TREE *tree, char **keys, size_t *ksizes,
-    char **values, size_t *vsizes, size_t cnt) {
-	return verify_data_with_expected(tree, keys, ksizes,
-	    values, vsizes, cnt, OP_INMEMTREE, 0, 1, 0);
+int verify_inmemtree_data(INMEM_TREE *tree, TESTDATA *td) {
+	return verify_data_with_expected(tree, td, OP_INMEMTREE, 0, 1, 0);
 }
 
-int verify_inmemtree_with_expected(INMEM_TREE *tree, char **keys, size_t *ksizes,
-    char **values, size_t *vsizes, size_t cnt, int start, int step, int expected) {
-	return verify_data_with_expected(tree, keys, ksizes,
-	    values, vsizes, cnt, OP_INMEMTREE, start, step, expected);
+int verify_inmemtree_with_expected(INMEM_TREE *tree, TESTDATA *td,
+    int start, int step, int expected) {
+	return verify_data_with_expected(tree, td,
+	    OP_INMEMTREE, start, step, expected);
 }
 
-int verify_ondisktree_data(ONDISK_TREE *tree, char **keys, size_t *ksizes,
-    char **values, size_t *vsizes, size_t cnt) {
-	return verify_data_with_expected(tree, keys, ksizes,
-	    values, vsizes, cnt, OP_ONDISKTREE, 0, 1, 0);
+int verify_ondisktree_data(ONDISK_TREE *tree, TESTDATA *td) {
+	return verify_data_with_expected(tree, td, OP_ONDISKTREE, 0, 1, 0);
 }
 
-int verify_ondisktree_with_expected(ONDISK_TREE *tree, char **keys, size_t *ksizes,
-    char **values, size_t *vsizes, size_t cnt, int start, int step, int expected) {
-	return verify_data_with_expected(tree, keys, ksizes,
-	    values, vsizes, cnt, OP_ONDISKTREE, start, step, expected);
+int verify_ondisktree_with_expected(ONDISK_TREE *tree, TESTDATA *td,
+    int start, int step, int expected) {
+	return verify_data_with_expected(tree, td,
+	    OP_ONDISKTREE, start, step, expected);
 }
 
-int verify_table_data(VAN_TABLE *table, char **keys, size_t *ksizes,
-    char **values, size_t *vsizes, size_t cnt) {
-	return verify_data_with_expected(table, keys, ksizes,
-	    values, vsizes, cnt, OP_TABLE, 0, 1, 0);
+int verify_table_data(VAN_TABLE *table, TESTDATA *td) {
+	return verify_data_with_expected(table, td, OP_TABLE, 0, 1, 0);
 }
 
-int verify_table_with_expected(VAN_TABLE *table, char **keys, size_t *ksizes,
-	char **values, size_t *vsizes, size_t cnt, int start, int step, int expected) {
-	return verify_data_with_expected(table, keys, ksizes,
-	    values, vsizes, cnt, OP_TABLE, start, step, expected);
+int verify_table_with_expected(VAN_TABLE *table, TESTDATA *td,
+	int start, int step, int expected) {
+	return verify_data_with_expected(table, td,
+	    OP_TABLE, start, step, expected);
 }
 
-static int verify_data_withcursor(void *obj, char **keys, size_t *ksizes,
-    char **values, size_t *vsizes, size_t cnt, int otype) {
+static int verify_data_withcursor(void *obj, TESTDATA *td, int otype) {
 	INMEM_TREE *imtree;
 	INMEM_TREECURSOR *imcursor;
 	ONDISK_TREE *odtree;
@@ -625,11 +607,11 @@ static int verify_data_withcursor(void *obj, char **keys, size_t *ksizes,
 		goto err;
 
 	time(&t1);
-	for (i = 0; i < cnt; i++) {
+	for (i = 0; i < td->count; i++) {
 		memset(&key, 0, sizeof(key));
 		memset(&value, 0, sizeof(value));
-		key.data = keys[i];
-		key.size = ksizes[i];
+		key.data = td->records[i].key;
+		key.size = td->records[i].ksize;
 
 		switch (otype) {
 			case OP_INMEMTREE:
@@ -651,8 +633,9 @@ static int verify_data_withcursor(void *obj, char **keys, size_t *ksizes,
 				ret = van_error_print("BAD OP_TYPE");
 		}
 		CHK_RET(ret, info);
-		VAN_ASSERT(value.size == vsizes[i]);
-		VAN_ASSERT((memcmp(value.data, values[i], value.size) == 0));
+		VAN_ASSERT(value.size == td->records[i].vsize);
+		VAN_ASSERT((memcmp(value.data, td->records[i].value,
+		    value.size) == 0));
 	}
 	time(&t2);
 	fprintf(stderr, "time consuming: %g seconds\n", difftime(t2, t1));
@@ -676,22 +659,16 @@ err:
 	return (ret);
 }
 
-int verify_inmemtree_data_withcursor(INMEM_TREE *tree, char **keys,
-    size_t *ksizes, char **values, size_t *vsizes, size_t cnt) {
-	return verify_data_withcursor(tree, keys, ksizes,
-	    values, vsizes, cnt, OP_INMEMTREE);
+int verify_inmemtree_data_withcursor(INMEM_TREE *tree, TESTDATA *td) {
+	return verify_data_withcursor(tree, td, OP_INMEMTREE);
 }
 
-int verify_ondisktree_data_withcursor(ONDISK_TREE *tree, char **keys,
-    size_t *ksizes, char **values, size_t *vsizes, size_t cnt) {
-	return verify_data_withcursor(tree, keys, ksizes,
-	    values, vsizes, cnt, OP_ONDISKTREE);
+int verify_ondisktree_data_withcursor(ONDISK_TREE *tree, TESTDATA *td) {
+	return verify_data_withcursor(tree, td, OP_ONDISKTREE);
 }
 
-int verify_table_data_withcursor(VAN_TABLE *table, char **keys,
-    size_t *ksizes, char **values, size_t *vsizes, size_t cnt) {
-	return verify_data_withcursor(table, keys, ksizes,
-	    values, vsizes, cnt, OP_TABLE);
+int verify_table_data_withcursor(VAN_TABLE *table, TESTDATA *td) {
+	return verify_data_withcursor(table, td, OP_TABLE);
 }
 
 /*
@@ -748,43 +725,42 @@ static int dir_cb(void *arg, const VAN_DATUM *key, const VAN_DATUM *value) {
 }
 
 typedef struct {
-	size_t   rcnt;
-	int      backward;
-	size_t   cnt;
-	char   **keys;
-	size_t  *ksizes;
-	char   **values;
-	size_t  *vsizes;
+	size_t    rcnt;
+	int       backward;
+	TESTDATA *td;
 } dirfull_ctx_t;
 
 /*
  * Same, but every record is compared with the expected one as well.
  *
- * The arrays are sorted ascending by key, so walking forward starts at
- * keys[0] and walking backward starts at keys[cnt - 1].
+ * The records are sorted ascending by key, so walking forward starts at
+ * records[0] and walking backward starts at records[count - 1].
  */
 static int dirfull_cb(void *arg, const VAN_DATUM *key,
     const VAN_DATUM *value) {
 	dirfull_ctx_t *c;
-	size_t idx;
+	RECORD *rec;
+	size_t idx, cnt;
 
 	c = (dirfull_ctx_t *)arg;
-	TEST_ASSERT2(c->rcnt < c->cnt,
-	    "more records than expected (%lu)", (unsigned long)c->cnt);
-	idx = c->backward ? (c->cnt - 1 - c->rcnt) : c->rcnt;
+	cnt = c->td->count;
+	TEST_ASSERT2(c->rcnt < cnt,
+	    "more records than expected (%lu)", (unsigned long)cnt);
+	idx = c->backward ? (cnt - 1 - c->rcnt) : c->rcnt;
+	rec = &c->td->records[idx];
 
-	TEST_ASSERT2(key->size == c->ksizes[idx],
+	TEST_ASSERT2(key->size == rec->ksize,
 	    "record %lu: key size %lu, expected %lu", (unsigned long)idx,
-	    (unsigned long)key->size, (unsigned long)c->ksizes[idx]);
-	TEST_ASSERT2(memcmp(key->data, c->keys[idx], key->size) == 0,
+	    (unsigned long)key->size, (unsigned long)rec->ksize);
+	TEST_ASSERT2(memcmp(key->data, rec->key, key->size) == 0,
 	    "record %lu: key does not match", (unsigned long)idx);
 
 	if (value != NULL && value->data != NULL) {
-		TEST_ASSERT2(value->size == c->vsizes[idx],
+		TEST_ASSERT2(value->size == rec->vsize,
 		    "record %lu: value size %lu, expected %lu",
 		    (unsigned long)idx, (unsigned long)value->size,
-		    (unsigned long)c->vsizes[idx]);
-		TEST_ASSERT2(memcmp(value->data, c->values[idx],
+		    (unsigned long)rec->vsize);
+		TEST_ASSERT2(memcmp(value->data, rec->value,
 		    value->size) == 0,
 		    "record %lu: value does not match", (unsigned long)idx);
 	}
@@ -937,77 +913,40 @@ static int border_record(void *obj, flags_t direction, flags_t cflags,
 }
 
 /*
- * qsort() can reorder only one array, so the permutation is built on an
- * index array and then applied to all four parallel arrays.  The context has
- * to live in file scope: qsort_r() is not portable across the platforms we
- * build on, and these helpers are never called concurrently.
+ * The compare function has to live in file scope: qsort_r() is not
+ * portable across the platforms we build on, and these helpers are never
+ * called concurrently.
  */
-static char **sort_keys;
-static size_t *sort_ksizes;
 static VAN_DATUM_CMPFUNC sort_cmp;
 
-static int sort_idx_cmp(const void *a, const void *b) {
+static int sort_rec_cmp(const void *a, const void *b) {
+	const RECORD *r1, *r2;
 	VAN_DATUM d1, d2;
-	size_t ia, ib;
 
-	ia = *(const size_t *)a;
-	ib = *(const size_t *)b;
+	r1 = (const RECORD *)a;
+	r2 = (const RECORD *)b;
 	memset(&d1, 0, sizeof(d1));
 	memset(&d2, 0, sizeof(d2));
-	d1.data = sort_keys[ia];
-	d1.size = sort_ksizes[ia];
-	d2.data = sort_keys[ib];
-	d2.size = sort_ksizes[ib];
+	d1.data = r1->key;
+	d1.size = r1->ksize;
+	d2.data = r2->key;
+	d2.size = r2->ksize;
 
 	return (sort_cmp(&d1, &d2));
 }
 
-int sort_testdata(char **keys, size_t *ksizes, char **values, size_t *vsizes,
-    size_t cnt, VAN_DATUM_CMPFUNC cmp) {
-	char **nkeys, **nvalues;
-	size_t *nksizes, *nvsizes, *idx;
-	size_t i, j;
-
-	if (cnt == 0)
+/*
+ * A record holds both its key and its value, so qsort() can reorder the
+ * array in place; no permutation of parallel arrays is needed.
+ */
+int sort_testdata(TESTDATA *td, VAN_DATUM_CMPFUNC cmp) {
+	if (td == NULL || td->count == 0)
 		return (0);
 	if (cmp == NULL)
 		cmp = van_datum_defcmp;
 
-	idx = (size_t *)malloc(cnt * sizeof(size_t));
-	nkeys = (char **)malloc(cnt * sizeof(char *));
-	nvalues = (char **)malloc(cnt * sizeof(char *));
-	nksizes = (size_t *)malloc(cnt * sizeof(size_t));
-	nvsizes = (size_t *)malloc(cnt * sizeof(size_t));
-	TEST_ASSERT(idx != NULL && nkeys != NULL && nvalues != NULL &&
-	    nksizes != NULL && nvsizes != NULL);
-
-	for (i = 0; i < cnt; i++)
-		idx[i] = i;
-
-	sort_keys = keys;
-	sort_ksizes = ksizes;
 	sort_cmp = cmp;
-	qsort(idx, cnt, sizeof(size_t), sort_idx_cmp);
-
-	for (i = 0; i < cnt; i++) {
-		j = idx[i];
-		nkeys[i] = keys[j];
-		nksizes[i] = ksizes[j];
-		nvalues[i] = values[j];
-		nvsizes[i] = vsizes[j];
-	}
-	for (i = 0; i < cnt; i++) {
-		keys[i] = nkeys[i];
-		ksizes[i] = nksizes[i];
-		values[i] = nvalues[i];
-		vsizes[i] = nvsizes[i];
-	}
-
-	free(idx);
-	free(nkeys);
-	free(nvalues);
-	free(nksizes);
-	free(nvsizes);
+	qsort(td->records, td->count, sizeof(RECORD), sort_rec_cmp);
 
 	return (0);
 }
@@ -1456,16 +1395,14 @@ int verify_table_cursor_border(VAN_TABLE *table,
  * Walk the object in the given direction and check both the number of
  * records and every single record against the expected ones.
  *
- * keys / ksizes / values / vsizes must be sorted ascending by key with the
- * compare function of the object under test, see sort_testdata().
+ * td must be sorted ascending by key with the compare function of the
+ * object under test, see sort_testdata().
  *
  * For a table the walk is table->traverse(): VAN_NEXT reads it forward,
  * VAN_PREV backward.
  */
 static int verify_cursor_direction_full(void *obj, flags_t direction,
-    flags_t cflags, size_t *rcntp,
-    char **keys, size_t *ksizes, char **values, size_t *vsizes, size_t cnt,
-    int otype) {
+    flags_t cflags, size_t *rcntp, TESTDATA *td, int otype) {
 	INMEM_TREE *imtree;
 	INMEM_TREECURSOR *imcursor;
 	ONDISK_TREE *odtree;
@@ -1474,8 +1411,11 @@ static int verify_cursor_direction_full(void *obj, flags_t direction,
 	VAN_DATUM key, value;
 	const char *info;
 	int ret, ret1, backward;
-	size_t rcnt, idx;
+	size_t rcnt, idx, cnt;
+	RECORD *rec;
 	time_t t1, t2;
+
+	cnt = td->count;
 
 	imtree = (INMEM_TREE *)obj;
 	odtree = (ONDISK_TREE *)obj;
@@ -1493,11 +1433,7 @@ static int verify_cursor_direction_full(void *obj, flags_t direction,
 
 		memset(&dctx, 0, sizeof(dctx));
 		dctx.backward = backward;
-		dctx.cnt = cnt;
-		dctx.keys = keys;
-		dctx.ksizes = ksizes;
-		dctx.values = values;
-		dctx.vsizes = vsizes;
+		dctx.td = td;
 		ret = table->traverse(table, backward ?
 		    VAN_TRAVERSE_BACKWARD : VAN_TRAVERSE_FORWARD,
 		    NULL, dirfull_cb, &dctx);
@@ -1552,22 +1488,23 @@ static int verify_cursor_direction_full(void *obj, flags_t direction,
 			    "more records than expected (%lu)",
 			    (unsigned long)cnt);
 			idx = backward ? (cnt - 1 - rcnt) : rcnt;
+			rec = &td->records[idx];
 
-			TEST_ASSERT2(key.size == ksizes[idx],
+			TEST_ASSERT2(key.size == rec->ksize,
 			    "record %lu: key size %lu, expected %lu",
 			    (unsigned long)idx, (unsigned long)key.size,
-			    (unsigned long)ksizes[idx]);
-			TEST_ASSERT2(memcmp(key.data, keys[idx],
+			    (unsigned long)rec->ksize);
+			TEST_ASSERT2(memcmp(key.data, rec->key,
 			    key.size) == 0,
 			    "record %lu: key does not match",
 			    (unsigned long)idx);
 			if (value.data != NULL) {
-				TEST_ASSERT2(value.size == vsizes[idx],
+				TEST_ASSERT2(value.size == rec->vsize,
 				    "record %lu: value size %lu, "
 				    "expected %lu", (unsigned long)idx,
 				    (unsigned long)value.size,
-				    (unsigned long)vsizes[idx]);
-				TEST_ASSERT2(memcmp(value.data, values[idx],
+				    (unsigned long)rec->vsize);
+				TEST_ASSERT2(memcmp(value.data, rec->value,
 				    value.size) == 0,
 				    "record %lu: value does not match",
 				    (unsigned long)idx);
@@ -1600,24 +1537,21 @@ err:
 }
 
 int verify_inmemtree_cursor_direction_full(INMEM_TREE *tree,
-    flags_t direction, flags_t cflags, size_t *rcntp,
-    char **keys, size_t *ksizes, char **values, size_t *vsizes, size_t cnt) {
+    flags_t direction, flags_t cflags, size_t *rcntp, TESTDATA *td) {
 	return verify_cursor_direction_full(tree, direction, cflags, rcntp,
-	    keys, ksizes, values, vsizes, cnt, OP_INMEMTREE);
+	    td, OP_INMEMTREE);
 }
 
 int verify_ondisktree_cursor_direction_full(ONDISK_TREE *tree,
-    flags_t direction, flags_t cflags, size_t *rcntp,
-    char **keys, size_t *ksizes, char **values, size_t *vsizes, size_t cnt) {
+    flags_t direction, flags_t cflags, size_t *rcntp, TESTDATA *td) {
 	return verify_cursor_direction_full(tree, direction, cflags, rcntp,
-	    keys, ksizes, values, vsizes, cnt, OP_ONDISKTREE);
+	    td, OP_ONDISKTREE);
 }
 
 int verify_table_cursor_direction_full(VAN_TABLE *table,
-    flags_t direction, flags_t cflags, size_t *rcntp,
-    char **keys, size_t *ksizes, char **values, size_t *vsizes, size_t cnt) {
+    flags_t direction, flags_t cflags, size_t *rcntp, TESTDATA *td) {
 	return verify_cursor_direction_full(table, direction, cflags, rcntp,
-	    keys, ksizes, values, vsizes, cnt, OP_TABLE);
+	    td, OP_TABLE);
 }
 
 /*
@@ -1625,8 +1559,7 @@ int verify_table_cursor_direction_full(VAN_TABLE *table,
  * returns is also compared with the expected first / last record.
  */
 static int verify_cursor_border_full(void *obj, flags_t direction,
-    flags_t cflags, char *key, size_t ksize, char *value, size_t vsize,
-    int otype) {
+    flags_t cflags, RECORD *rec, int otype) {
 	char kbuf[MAX_BUF_LEN], vbuf[MAX_BUF_LEN];
 	size_t klen, vlen;
 	int ret;
@@ -1647,98 +1580,98 @@ static int verify_cursor_border_full(void *obj, flags_t direction,
 	if (ret != 0)
 		return (ret);
 
-	TEST_ASSERT2(klen == ksize && memcmp(kbuf, key, ksize) == 0,
+	TEST_ASSERT2(klen == rec->ksize && memcmp(kbuf, rec->key,
+	    rec->ksize) == 0,
 	    "border record: key does not match the expected one "
 	    "(got %lu bytes, expected %lu)", (unsigned long)klen,
-	    (unsigned long)ksize);
-	TEST_ASSERT2(vlen == vsize && memcmp(vbuf, value, vsize) == 0,
+	    (unsigned long)rec->ksize);
+	TEST_ASSERT2(vlen == rec->vsize && memcmp(vbuf, rec->value,
+	    rec->vsize) == 0,
 	    "border record: value does not match the expected one "
 	    "(got %lu bytes, expected %lu)", (unsigned long)vlen,
-	    (unsigned long)vsize);
+	    (unsigned long)rec->vsize);
 
 	return (0);
 }
 
 int verify_inmemtree_cursor_border_full(INMEM_TREE *tree,
-    flags_t direction, flags_t cflags,
-    char *key, size_t ksize, char *value, size_t vsize) {
+    flags_t direction, flags_t cflags, RECORD *rec) {
 	return verify_cursor_border_full(tree, direction, cflags,
-	    key, ksize, value, vsize, OP_INMEMTREE);
+	    rec, OP_INMEMTREE);
 }
 
 int verify_ondisktree_cursor_border_full(ONDISK_TREE *tree,
-    flags_t direction, flags_t cflags,
-    char *key, size_t ksize, char *value, size_t vsize) {
+    flags_t direction, flags_t cflags, RECORD *rec) {
 	return verify_cursor_border_full(tree, direction, cflags,
-	    key, ksize, value, vsize, OP_ONDISKTREE);
+	    rec, OP_ONDISKTREE);
 }
 
 int verify_table_cursor_border_full(VAN_TABLE *table,
-    flags_t direction, flags_t cflags,
-    char *key, size_t ksize, char *value, size_t vsize) {
+    flags_t direction, flags_t cflags, RECORD *rec) {
 	return verify_cursor_border_full(table, direction, cflags,
-	    key, ksize, value, vsize, OP_TABLE);
+	    rec, OP_TABLE);
 }
 
-int generate_string_testdata(char **keys, size_t *ksizes, int kmin, int kmax,
-    char **values, size_t *vsizes, int vmin, int vmax, size_t cnt) {
+int generate_string_testdata(TESTDATA *td,
+    int kmin, int kmax, int vmin, int vmax) {
 	size_t i;
 	char kbuf[MAX_BUF_LEN], vbuf[MAX_BUF_LEN];
 
-	for (i = 0; i < cnt; i++) {
+	for (i = 0; i < td->count; i++) {
 		getrandomstring2(kbuf, kmin, kmax);
 		getrandomstring2(vbuf, vmin, vmax);
-		ksizes[i] = strlen(kbuf) + 1;
-		vsizes[i] = strlen(vbuf) + 1;
-		keys[i] = (char *)malloc(ksizes[i]);
-		TEST_ASSERT(keys[i] != NULL);
-		memcpy(keys[i], kbuf, ksizes[i]);
-		values[i] = (char *)malloc(vsizes[i]);
-		TEST_ASSERT(values[i] != NULL);
-		memcpy(values[i], vbuf, vsizes[i]);
+		td->records[i].ksize = strlen(kbuf) + 1;
+		td->records[i].vsize = strlen(vbuf) + 1;
+		td->records[i].key = (char *)malloc(td->records[i].ksize);
+		TEST_ASSERT(td->records[i].key != NULL);
+		memcpy(td->records[i].key, kbuf, td->records[i].ksize);
+		td->records[i].value = (char *)malloc(td->records[i].vsize);
+		TEST_ASSERT(td->records[i].value != NULL);
+		memcpy(td->records[i].value, vbuf, td->records[i].vsize);
 	}
 
 	return (0);
 }
 
-int generate_string_testdata2(char **keys, size_t *ksizes, char *kpref,
-    char **values, size_t *vsizes, char *vpref, size_t cnt, int start) {
+int generate_string_testdata2(TESTDATA *td, char *kpref, char *vpref,
+    int start) {
 	size_t i;
 	char kbuf[MAX_BUF_LEN], vbuf[MAX_BUF_LEN];
 
-	for (i = 0; i < cnt; i++) {
+	for (i = 0; i < td->count; i++) {
 		sprintf(kbuf, "%s_%d", kpref, (int)i+start);
 		sprintf(vbuf, "%s_%d", vpref, (int)i+start);
-		ksizes[i] = strlen(kbuf) + 1;
-		vsizes[i] = strlen(vbuf) + 1;
-		keys[i] = (char *)malloc(ksizes[i]);
-		TEST_ASSERT(keys[i] != NULL);
-		memcpy(keys[i], kbuf, ksizes[i]);
-		values[i] = (char *)malloc(vsizes[i]);
-		TEST_ASSERT(values[i] != NULL);
-		memcpy(values[i], vbuf, vsizes[i]);
+		td->records[i].ksize = strlen(kbuf) + 1;
+		td->records[i].vsize = strlen(vbuf) + 1;
+		td->records[i].key = (char *)malloc(td->records[i].ksize);
+		TEST_ASSERT(td->records[i].key != NULL);
+		memcpy(td->records[i].key, kbuf, td->records[i].ksize);
+		td->records[i].value = (char *)malloc(td->records[i].vsize);
+		TEST_ASSERT(td->records[i].value != NULL);
+		memcpy(td->records[i].value, vbuf, td->records[i].vsize);
 	}
 
 	return (0);
 }
 
-int free_string_testdata(char **keys, size_t *ksizes,
-    char **values, size_t *vsizes, size_t cnt) {
+int free_string_testdata(TESTDATA *td) {
 	size_t i;
-	for (i = 0; i < cnt; i++) {
-		if (keys[i] != NULL) {
-			free(keys[i]);
-			keys[i] = NULL;
+
+	if (td == NULL || td->records == NULL)
+		return (0);
+	for (i = 0; i < td->count; i++) {
+		if (td->records[i].key != NULL) {
+			free(td->records[i].key);
+			td->records[i].key = NULL;
 		}
-		if (values[i] != NULL) {
-			free(values[i]);
-			values[i] = NULL;
+		if (td->records[i].value != NULL) {
+			free(td->records[i].value);
+			td->records[i].value = NULL;
 		}
 	}
-	free(keys);
-	free(values);
-	free(ksizes);
-	free(vsizes);
+	free(td->records);
+	td->records = NULL;
+	td->count = 0;
 
 	return (0);
 }

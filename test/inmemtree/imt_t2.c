@@ -16,15 +16,23 @@
 #include "test_common.h"
 /* Multi-threaded inmemtree test */
 
+/*
+ * What the populate threads get: the tree plus the slice of the test data
+ * they have to put.
+ */
+typedef struct {
+	INMEM_TREE *tree;
+	TESTDATA    td;
+} imt_t2_pop_t;
+
 static void *imt_t2_1_popthread(void *obj) {
-	POPULATE_DATA *dataobj;
+	imt_t2_pop_t *dataobj;
 	INMEM_TREE *tree;
 	int ret;
 
-	dataobj = (POPULATE_DATA *)obj;
-	tree = (INMEM_TREE *)dataobj->handle;
-	ret = populate_inmemtree(tree, dataobj->keys, dataobj->ksizes,
-	    dataobj->values, dataobj->vsizes, dataobj->cnt);
+	dataobj = (imt_t2_pop_t *)obj;
+	tree = dataobj->tree;
+	ret = populate_inmemtree(tree, &dataobj->td);
 	CHK_RET(ret, "populate_inmemtree");
 
 	return (NULL);
@@ -39,10 +47,8 @@ static void *imt_t2_1_popthread(void *obj) {
  */
 typedef struct {
 	INMEM_TREE *tree;
-	char      **keys, **values;
-	size_t     *ksizes, *vsizes;
-	size_t      base;   /* index of keys[0] in the whole data set */
-	size_t      cnt;
+	TESTDATA    td;
+	size_t      base;   /* index of td.records[0] in the whole set */
 	int         mod;    /* act on the records whose index is this % 3 */
 } imt_t2_op_t;
 
@@ -51,22 +57,18 @@ typedef struct {
  * records the division leaves over.
  */
 static void imt_t2_1_slices(imt_t2_op_t *objs, int n, INMEM_TREE *tree,
-    char **keys, size_t *ksizes, char **values, size_t *vsizes, int cnt,
-    int mod) {
+    TESTDATA *td, int mod) {
 	int i, each;
 
-	each = cnt / n;
+	each = (int)td->count / n;
 	for (i = 0; i < n; i++) {
 		objs[i].tree = tree;
-		objs[i].keys = keys + i * each;
-		objs[i].ksizes = ksizes + i * each;
-		objs[i].values = values + i * each;
-		objs[i].vsizes = vsizes + i * each;
+		TESTDATA_SLICE(&objs[i].td, td, (size_t)(i * each),
+		    (size_t)each);
 		objs[i].base = (size_t)(i * each);
-		objs[i].cnt = (size_t)each;
 		objs[i].mod = mod;
 	}
-	objs[n - 1].cnt += (size_t)(cnt - each * n);
+	objs[n - 1].td.count += (size_t)((int)td->count - each * n);
 }
 
 /*
@@ -80,16 +82,16 @@ static void *imt_t2_1_updthread(void *obj) {
 	int ret;
 
 	d = (imt_t2_op_t *)obj;
-	for (j = 0; j < d->cnt; j++) {
+	for (j = 0; j < d->td.count; j++) {
 		if ((int)((d->base + j) % 3) != d->mod)
 			continue;
 
 		memset(&k, 0, sizeof(k));
 		memset(&v, 0, sizeof(v));
-		k.data = d->keys[j];
-		k.size = d->ksizes[j];
-		v.data = d->values[j];
-		v.size = d->vsizes[j];
+		k.data = d->td.records[j].key;
+		k.size = d->td.records[j].ksize;
+		v.data = d->td.records[j].value;
+		v.size = d->td.records[j].vsize;
 		ret = d->tree->put(d->tree, &k, &v, 0);
 		CHK_RET(ret, "tree->put (update)");
 	}
@@ -104,13 +106,13 @@ static void *imt_t2_1_delthread(void *obj) {
 	int ret;
 
 	d = (imt_t2_op_t *)obj;
-	for (j = 0; j < d->cnt; j++) {
+	for (j = 0; j < d->td.count; j++) {
 		if ((int)((d->base + j) % 3) != d->mod)
 			continue;
 
 		memset(&k, 0, sizeof(k));
-		k.data = d->keys[j];
-		k.size = d->ksizes[j];
+		k.data = d->td.records[j].key;
+		k.size = d->td.records[j].ksize;
 		ret = d->tree->del(d->tree, &k, 0);
 		CHK_RET(ret, "tree->del");
 	}
@@ -129,19 +131,18 @@ static void *imt_t2_1_delthread(void *obj) {
  * record whose return value differs from the expected one and then goes on,
  * so a wrong result would not fail the test.
  */
-static int imt_t2_1_verify_ops(INMEM_TREE *tree, char **keys, size_t *ksizes,
-    char **values, size_t *vsizes, size_t cnt) {
+static int imt_t2_1_verify_ops(INMEM_TREE *tree, TESTDATA *td) {
 	VAN_DATUM k, v;
 	size_t i, alive, gone;
 	int ret, expect;
 
 	alive = 0;
 	gone = 0;
-	for (i = 0; i < cnt; i++) {
+	for (i = 0; i < td->count; i++) {
 		memset(&k, 0, sizeof(k));
 		memset(&v, 0, sizeof(v));
-		k.data = keys[i];
-		k.size = ksizes[i];
+		k.data = td->records[i].key;
+		k.size = td->records[i].ksize;
 
 		ret = tree->get(tree, &k, &v, 0);
 		expect = ((i % 3) == 2) ? VAN_NOTFOUND : 0;
@@ -150,10 +151,12 @@ static int imt_t2_1_verify_ops(INMEM_TREE *tree, char **keys, size_t *ksizes,
 		    i, (int)(i % 3), expect, ret);
 
 		if (ret == 0) {
-			TEST_ASSERT2(v.size == vsizes[i],
+			TEST_ASSERT2(v.size == td->records[i].vsize,
 			    "record %zu: value size %lu, expected %lu", i,
-			    (unsigned long)v.size, (unsigned long)vsizes[i]);
-			TEST_ASSERT2(memcmp(v.data, values[i], v.size) == 0,
+			    (unsigned long)v.size,
+			    (unsigned long)td->records[i].vsize);
+			TEST_ASSERT2(memcmp(v.data, td->records[i].value,
+			    v.size) == 0,
 			    "record %zu: value does not match", i);
 			alive++;
 		} else
@@ -178,13 +181,13 @@ int imt_t2_1() {
 	INMEM_TREE *tree;
 	pthread_t threads[IMT_T2_1_NUM];
 	pthread_t opthreads[IMT_T2_1_OPNUM];
-	POPULATE_DATA objs[IMT_T2_1_NUM], *objp;
+	imt_t2_pop_t objs[IMT_T2_1_NUM], *objp;
 	imt_t2_op_t opobjs[IMT_T2_1_OPNUM];
 	size_t each_cnt;
 	int i, ret, cnt;
 	void *rptr;
 	time_t t1, t2;
-	STRING_TESTDATA_DEFINE;
+	TESTDATA td;
 
 	memset(&table, 0, sizeof(VAN_TABLE));
 	ret = van_inmemtree_create(&table, &table.active);
@@ -196,21 +199,17 @@ int imt_t2_1() {
 
 	memset(threads, 0, sizeof(threads));
 	cnt = 100000;
-	STRING_TESTDATA_INIT;
+	TESTDATA_INIT(&td, (size_t)cnt);
 	each_cnt = cnt / IMT_T2_1_NUM;
 	memset(objs, 0, sizeof(objs));
 	for (i = 0; i < IMT_T2_1_NUM; i++) {
 		objp = &objs[i];
-		objp->handle = tree;
-		objp->keys = keys + i * each_cnt;
-		objp->ksizes = ksizes + i * each_cnt;
-		objp->values = values + i * each_cnt;
-		objp->vsizes = vsizes + i * each_cnt;
-		objp->cnt = each_cnt;
+		objp->tree = tree;
+		TESTDATA_SLICE(&objp->td, &td, (size_t)(i * each_cnt),
+		    each_cnt);
 	}
 
-	(void)generate_string_testdata(keys, ksizes, 5, 15, values, vsizes,
-	    10, 20, cnt);
+	(void)generate_string_testdata(&td, 5, 15, 10, 20);
 
 	fprintf(stderr, "============ 1 Try to put %lu records using %d threads =========\n",
 	    (unsigned long)cnt, IMT_T2_1_NUM);
@@ -228,7 +227,7 @@ int imt_t2_1() {
 	fprintf(stderr, "========== 2 Get using tree->get() ============\n");
 	van_alloc_stat_reset();
 	van_rwlock_stat_reset();
-	ret = verify_inmemtree_data(tree, keys, ksizes, values, vsizes, cnt);
+	ret = verify_inmemtree_data(tree, &td);
 	CHK_RET(ret, "verify_inmemtree_data");
 	van_rwlock_stat_print(stderr, " ");
 	fprintf(stderr, "**** Malloc Statistics ****\n");
@@ -237,8 +236,7 @@ int imt_t2_1() {
 	fprintf(stderr, "========== 3 Get using cursor->get(VAN_SET) ============\n");
 	van_alloc_stat_reset();
 	van_rwlock_stat_reset();
-	ret = verify_inmemtree_data_withcursor(tree, keys, ksizes,
-	    values, vsizes, cnt);
+	ret = verify_inmemtree_data_withcursor(tree, &td);
 	CHK_RET(ret, "verify_inmemtree_data_withcursor");
 	van_rwlock_stat_print(stderr, " ");
 	fprintf(stderr, "**** Malloc Statistics ****\n");
@@ -267,17 +265,16 @@ int imt_t2_1() {
 		TEST_ASSERT(p != NULL);
 		memcpy(p, vbuf, (size_t)len);
 		p[len] = '\0';
-		free(values[i]);
-		values[i] = p;
+		free(td.records[i].value);
+		td.records[i].value = p;
 		/* Like the initial data, the value carries its NUL. */
-		vsizes[i] = (size_t)len + 1;
+		td.records[i].vsize = (size_t)len + 1;
 	}
 
 	fprintf(stderr,
 	    "========== 5 Update them using %d threads =========\n",
 	    IMT_T2_1_OPNUM);
-	imt_t2_1_slices(opobjs, IMT_T2_1_OPNUM, tree, keys, ksizes,
-	    values, vsizes, cnt, 1);
+	imt_t2_1_slices(opobjs, IMT_T2_1_OPNUM, tree, &td, 1);
 	for (i = 0; i < IMT_T2_1_OPNUM; i++) {
 		ret = pthread_create(&opthreads[i], NULL,
 		    imt_t2_1_updthread, &opobjs[i]);
@@ -289,8 +286,7 @@ int imt_t2_1() {
 	fprintf(stderr,
 	    "========== 6 Delete the records with i %% 3 == 2 using %d threads =========\n",
 	    IMT_T2_1_OPNUM);
-	imt_t2_1_slices(opobjs, IMT_T2_1_OPNUM, tree, keys, ksizes,
-	    values, vsizes, cnt, 2);
+	imt_t2_1_slices(opobjs, IMT_T2_1_OPNUM, tree, &td, 2);
 	for (i = 0; i < IMT_T2_1_OPNUM; i++) {
 		ret = pthread_create(&opthreads[i], NULL,
 		    imt_t2_1_delthread, &opobjs[i]);
@@ -303,11 +299,10 @@ int imt_t2_1() {
 
 	fprintf(stderr,
 	    "========== 7 Verify the update and the delete ============\n");
-	ret = imt_t2_1_verify_ops(tree, keys, ksizes, values, vsizes,
-	    (size_t)cnt);
+	ret = imt_t2_1_verify_ops(tree, &td);
 	CHK_RET(ret, "imt_t2_1_verify_ops");
 
-	(void)free_string_testdata(keys, ksizes, values, vsizes, cnt);
+	(void)free_string_testdata(&td);
 
 	fprintf(stderr, "========== 8 Destroy the tree ============\n");
 	time(&t1);

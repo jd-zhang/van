@@ -14,15 +14,23 @@
  * limitations under the License.
  */
 #include "test_common.h"
+/*
+ * What the populate threads get: the table plus the slice of the test data
+ * they have to put.
+ */
+typedef struct {
+	VAN_TABLE *table;
+	TESTDATA   td;
+} tb_t1_pop_t;
+
 static void *tb_t1_popthread(void *obj) {
-	POPULATE_DATA *dataobj;
+	tb_t1_pop_t *dataobj;
 	VAN_TABLE *table;
 	int ret;
 
-	dataobj = (POPULATE_DATA *)obj;
-	table = (VAN_TABLE *)dataobj->handle;
-	ret = populate_table(table, dataobj->keys, dataobj->ksizes,
-	    dataobj->values, dataobj->vsizes, dataobj->cnt);
+	dataobj = (tb_t1_pop_t *)obj;
+	table = dataobj->table;
+	ret = populate_table(table, &dataobj->td);
 	CHK_RET(ret, "populate_table");
 
 	return (NULL);
@@ -112,11 +120,11 @@ int table_t1_1() {
 	VAN_TABLE *table;
 	VAN_STORE *store;
 	pthread_t threads[TB_T1_NUM];
-	POPULATE_DATA objs[TB_T1_NUM], *objp;
+	tb_t1_pop_t objs[TB_T1_NUM], *objp;
 	size_t each_cnt;
 	int i, ret, cnt;
 	void *rptr;
-	STRING_TESTDATA_DEFINE;
+	TESTDATA td;
 
 	system("rm -fr test1*");
 	system("rm -fr vanlog.*");
@@ -134,21 +142,17 @@ int table_t1_1() {
 
 	memset(threads, 0, sizeof(threads));
 	cnt = 1000000;
-	STRING_TESTDATA_INIT;
+	TESTDATA_INIT(&td, (size_t)cnt);
 	each_cnt = cnt / TB_T1_NUM;
 	memset(objs, 0, sizeof(objs));
 	for (i = 0; i < TB_T1_NUM; i++) {
 		objp = &objs[i];
-		objp->handle = table;
-		objp->keys = keys + i * each_cnt;
-		objp->ksizes = ksizes + i * each_cnt;
-		objp->values = values + i * each_cnt;
-		objp->vsizes = vsizes + i * each_cnt;
-		objp->cnt = each_cnt;
+		objp->table = table;
+		TESTDATA_SLICE(&objp->td, &td, (size_t)(i * each_cnt),
+		    each_cnt);
 	}
 
-	(void)generate_string_testdata(keys, ksizes, 20, 30, values, vsizes,
-	    50, 120, cnt);
+	(void)generate_string_testdata(&td, 20, 30, 50, 120);
 
 	for (i = 0; i < TB_T1_NUM; i++) {
 		ret = pthread_create(&threads[i], NULL,
@@ -159,7 +163,7 @@ int table_t1_1() {
 		ret = pthread_join(threads[i], &rptr);
 	}
 
-	(void)free_string_testdata(keys, ksizes, values, vsizes, cnt);
+	(void)free_string_testdata(&td);
 
 	ret = table->close(table, 0);
 	CHK_RET(ret, "table->close");
@@ -188,7 +192,7 @@ int table_t1_1b() {
 	VAN_TABLE *table;
 	VAN_STORE *store;
 	int ret, cnt;
-	STRING_TESTDATA_DEFINE;
+	TESTDATA td;
 
 	system("rm -fr test1*");
 	system("rm -fr vanlog.*");
@@ -206,15 +210,14 @@ int table_t1_1b() {
 	CHK_RET(ret, "table->start_threads");
 
 	cnt = 200000;
-	STRING_TESTDATA_INIT;
+	TESTDATA_INIT(&td, (size_t)cnt);
 
-	(void)generate_string_testdata(keys, ksizes, 20, 30, values, vsizes,
-	    50, 120, cnt);
+	(void)generate_string_testdata(&td, 20, 30, 50, 120);
 
-	ret = populate_table(table, keys, ksizes, values, vsizes, cnt);
+	ret = populate_table(table, &td);
 	CHK_RET(ret, "populate_table");
 
-	(void)free_string_testdata(keys, ksizes, values, vsizes, cnt);
+	(void)free_string_testdata(&td);
 
 	ret = table->close(table, 0);
 	CHK_RET(ret, "table->close");
@@ -236,11 +239,11 @@ int table_t1_1c() {
 	VAN_TABLE *table;
 	VAN_STORE *store;
 	pthread_t threads[TB_T1_NUM];
-	POPULATE_DATA objs[TB_T1_NUM], *objp;
+	tb_t1_pop_t objs[TB_T1_NUM], *objp;
 	size_t each_cnt;
 	int i, ret, cnt;
 	void *rptr;
-	STRING_TESTDATA_DEFINE;
+	TESTDATA td;
 
 	system("rm -fr test1*");
 	system("rm -fr vanlog.*");
@@ -264,23 +267,19 @@ int table_t1_1c() {
 	} else {
 		cnt = 1000000;
 	}
-	STRING_TESTDATA_INIT;
+	TESTDATA_INIT(&td, (size_t)cnt);
 	each_cnt = cnt / TB_T1_NUM;
 	memset(objs, 0, sizeof(objs));
 	for (i = 0; i < TB_T1_NUM; i++) {
 		objp = &objs[i];
-		objp->handle = table;
-		objp->keys = keys + i * each_cnt;
-		objp->ksizes = ksizes + i * each_cnt;
-		objp->values = values + i * each_cnt;
-		objp->vsizes = vsizes + i * each_cnt;
-		objp->cnt = each_cnt;
+		objp->table = table;
+		TESTDATA_SLICE(&objp->td, &td, (size_t)(i * each_cnt),
+		    each_cnt);
 	}
 
 	fprintf(stderr, "============ 1 generate %lu records =========\n",
 	    (unsigned long)cnt);
-	(void)generate_string_testdata(keys, ksizes, 20, 30, values, vsizes,
-	    50, 120, cnt);
+	(void)generate_string_testdata(&td, 20, 30, 50, 120);
 
 	fprintf(stderr, "============ 2 populate %lu records =========\n",
 	    (unsigned long)cnt);
@@ -295,10 +294,10 @@ int table_t1_1c() {
 
 	fprintf(stderr, "============ 3 verify %lu records using table =========\n",
 	    (unsigned long)cnt);
-	ret = verify_table_data(table, keys, ksizes, values, vsizes, cnt);
+	ret = verify_table_data(table, &td);
 	CHK_RET(ret, "verify_table_data");
 
-	(void)free_string_testdata(keys, ksizes, values, vsizes, cnt);
+	(void)free_string_testdata(&td);
 
 	ret = table->close(table, 0);
 	CHK_RET(ret, "table->close");
@@ -319,11 +318,11 @@ int table_t1_1d() {
 	VAN_TABLE *table;
 	VAN_STORE *store;
 	pthread_t threads[TB_T1_NUM];
-	POPULATE_DATA objs[TB_T1_NUM], *objp;
+	tb_t1_pop_t objs[TB_T1_NUM], *objp;
 	size_t each_cnt;
 	int i, ret, cnt;
 	void *rptr;
-	STRING_TESTDATA_DEFINE;
+	TESTDATA td;
 
 	system("rm -fr test1*");
 	system("rm -fr vanlog.*");
@@ -347,23 +346,19 @@ int table_t1_1d() {
 	} else {
 		cnt = 1000000;
 	}
-	STRING_TESTDATA_INIT;
+	TESTDATA_INIT(&td, (size_t)cnt);
 	each_cnt = cnt / TB_T1_NUM;
 	memset(objs, 0, sizeof(objs));
 	for (i = 0; i < TB_T1_NUM; i++) {
 		objp = &objs[i];
-		objp->handle = table;
-		objp->keys = keys + i * each_cnt;
-		objp->ksizes = ksizes + i * each_cnt;
-		objp->values = values + i * each_cnt;
-		objp->vsizes = vsizes + i * each_cnt;
-		objp->cnt = each_cnt;
+		objp->table = table;
+		TESTDATA_SLICE(&objp->td, &td, (size_t)(i * each_cnt),
+		    each_cnt);
 	}
 
 	fprintf(stderr, "============ 1 generate %lu records =========\n",
 	    (unsigned long)cnt);
-	(void)generate_string_testdata(keys, ksizes, 20, 30, values, vsizes,
-	    50, 120, cnt);
+	(void)generate_string_testdata(&td, 20, 30, 50, 120);
 
 	fprintf(stderr, "============ 2 populate %lu records =========\n",
 	    (unsigned long)cnt);
@@ -381,16 +376,16 @@ int table_t1_1d() {
 	for (i = 0; i < 30; i++) {
 		fprintf(stderr, "============ loop.%d verify %lu records using table =========\n",
 		    i, (unsigned long)cnt);
-		ret = verify_table_data(table, keys, ksizes, values, vsizes, cnt);
+		ret = verify_table_data(table, &td);
 		CHK_RET_NOEXIT(ret, "verify_table_data");
 		table->show_odt_items(table, stderr);
 	}
 	/*
-	ret = verify_table_data(table, keys, ksizes, values, vsizes, cnt);
+	ret = verify_table_data(table, &td);
 	CHK_RET(ret, "verify_table_data");
 	*/
 
-	(void)free_string_testdata(keys, ksizes, values, vsizes, cnt);
+	(void)free_string_testdata(&td);
 
 	ret = table->close(table, 0);
 	CHK_RET(ret, "table->close");
@@ -405,7 +400,8 @@ int table_t1_1d() {
  *
  * The records are put through table->put(), then the expected arrays are
  * sorted with the compare function of the table, so that a forward
- * traversal has to hand back keys[0] .. keys[cnt - 1] and a backward one
+ * traversal has to hand back records[0] .. records[count - 1] and a
+ * backward one
  * the same records in reverse.
  *
  * A table has no cursor, so verify_table_cursor_direction_full() and
@@ -417,7 +413,7 @@ int table_t1_1e() {
 	VAN_STORE *store;
 	int ret, cnt;
 	size_t rcnt;
-	STRING_TESTDATA_DEFINE;
+	TESTDATA td;
 
 	system("rm -fr test1*");
 	system("rm -fr vanlog.*");
@@ -436,25 +432,23 @@ int table_t1_1e() {
 	CHK_RET(ret, "table->open");
 
 	cnt = 100000;
-	STRING_TESTDATA_INIT;
-	(void)generate_string_testdata(keys, ksizes, 20, 30, values, vsizes,
-	    50, 120, cnt);
+	TESTDATA_INIT(&td, (size_t)cnt);
+	(void)generate_string_testdata(&td, 20, 30, 50, 120);
 
 	fprintf(stderr, "============ 1 put %lu records =========\n",
 	    (unsigned long)cnt);
-	ret = populate_table(table, keys, ksizes, values, vsizes, cnt);
+	ret = populate_table(table, &td);
 	CHK_RET(ret, "populate_table");
 
 	fprintf(stderr, "============ 2 Sort the expected records =========\n");
-	ret = sort_testdata(keys, ksizes, values, vsizes, (size_t)cnt,
-	    table->cmp_func);
+	ret = sort_testdata(&td, table->cmp_func);
 	CHK_RET(ret, "sort_testdata");
 
 	fprintf(stderr,
 	    "============ 3 traverse forward (VAN_NEXT) =========\n");
 	rcnt = 0;
 	ret = verify_table_cursor_direction_full(table, VAN_NEXT, 0, &rcnt,
-	    keys, ksizes, values, vsizes, (size_t)cnt);
+	    &td);
 	CHK_RET(ret, "verify_table_cursor_direction_full(VAN_NEXT)");
 	TEST_ASSERT2(rcnt == (size_t)cnt, "expected %d records, walked %lu",
 	    cnt, (unsigned long)rcnt);
@@ -463,23 +457,22 @@ int table_t1_1e() {
 	    "============ 4 traverse backward (VAN_PREV) =========\n");
 	rcnt = 0;
 	ret = verify_table_cursor_direction_full(table, VAN_PREV, 0, &rcnt,
-	    keys, ksizes, values, vsizes, (size_t)cnt);
+	    &td);
 	CHK_RET(ret, "verify_table_cursor_direction_full(VAN_PREV)");
 	TEST_ASSERT2(rcnt == (size_t)cnt, "expected %d records, walked %lu",
 	    cnt, (unsigned long)rcnt);
 
 	fprintf(stderr, "============ 5 VAN_FIRST is the first record =====\n");
 	ret = verify_table_cursor_border_full(table, VAN_FIRST, 0,
-	    keys[0], ksizes[0], values[0], vsizes[0]);
+	    &td.records[0]);
 	CHK_RET(ret, "verify_table_cursor_border_full(VAN_FIRST)");
 
 	fprintf(stderr, "============ 6 VAN_LAST is the last record ======\n");
 	ret = verify_table_cursor_border_full(table, VAN_LAST, 0,
-	    keys[cnt - 1], ksizes[cnt - 1],
-	    values[cnt - 1], vsizes[cnt - 1]);
+	    &td.records[td.count - 1]);
 	CHK_RET(ret, "verify_table_cursor_border_full(VAN_LAST)");
 
-	(void)free_string_testdata(keys, ksizes, values, vsizes, cnt);
+	(void)free_string_testdata(&td);
 
 	ret = table->close(table, 0);
 	CHK_RET(ret, "table->close");
@@ -508,14 +501,14 @@ static char tbl_neg_val[] = "zzzz-bogus-value-that-is-not-in-the-table";
 typedef struct {
 	VAN_TABLE *table;
 	flags_t    direction;
-	char     **keys, **values;
-	size_t    *ksizes, *vsizes;
-	size_t     cnt;
+	TESTDATA   td;
 	int        mode;
 } tbl_neg_t;
 
 static int tbl_neg_check(void *arg) {
 	tbl_neg_t *c;
+	TESTDATA short_td;
+	RECORD rec;
 	size_t rcnt, idx;
 	int backward;
 
@@ -523,50 +516,49 @@ static int tbl_neg_check(void *arg) {
 	rcnt = 0;
 	backward = (c->direction == VAN_PREV || c->direction == VAN_LAST);
 	/* Corrupt the record the traversal reads first. */
-	idx = backward ? c->cnt - 1 : 0;
+	idx = backward ? c->td.count - 1 : 0;
+	rec = c->td.records[idx];
 
 	switch (c->mode) {
 	case TBL_NEG_KEY:
-		c->keys[idx] = tbl_neg_key;
-		c->ksizes[idx] = strlen(tbl_neg_key);
+		c->td.records[idx].key = tbl_neg_key;
+		c->td.records[idx].ksize = strlen(tbl_neg_key);
 		break;
 	case TBL_NEG_VALUE:
-		c->values[idx] = tbl_neg_val;
-		c->vsizes[idx] = strlen(tbl_neg_val);
+		c->td.records[idx].value = tbl_neg_val;
+		c->td.records[idx].vsize = strlen(tbl_neg_val);
 		break;
 	case TBL_NEG_COUNT:
+		/* One record less than the table holds. */
+		TESTDATA_SLICE(&short_td, &c->td, 0, c->td.count - 1);
 		return verify_table_cursor_direction_full(c->table,
-		    c->direction, 0, &rcnt, c->keys, c->ksizes,
-		    c->values, c->vsizes, c->cnt - 1);
+		    c->direction, 0, &rcnt, &short_td);
 	case TBL_NEG_BORDERK:
+		rec.key = tbl_neg_key;
+		rec.ksize = strlen(tbl_neg_key);
 		return verify_table_cursor_border_full(c->table,
-		    c->direction, 0, tbl_neg_key, strlen(tbl_neg_key),
-		    c->values[idx], c->vsizes[idx]);
+		    c->direction, 0, &rec);
 	case TBL_NEG_BORDERV:
+		rec.value = tbl_neg_val;
+		rec.vsize = strlen(tbl_neg_val);
 		return verify_table_cursor_border_full(c->table,
-		    c->direction, 0, c->keys[idx], c->ksizes[idx],
-		    tbl_neg_val, strlen(tbl_neg_val));
+		    c->direction, 0, &rec);
 	default:
 		return (0);
 	}
 
 	return verify_table_cursor_direction_full(c->table, c->direction,
-	    0, &rcnt, c->keys, c->ksizes, c->values, c->vsizes, c->cnt);
+	    0, &rcnt, &c->td);
 }
 
-static int tbl_neg_one(VAN_TABLE *table, char **keys, size_t *ksizes,
-    char **values, size_t *vsizes, size_t cnt, flags_t direction, int mode,
-    const char *what) {
+static int tbl_neg_one(VAN_TABLE *table, TESTDATA *td, flags_t direction,
+    int mode, const char *what) {
 	tbl_neg_t ctx;
 
 	memset(&ctx, 0, sizeof(ctx));
 	ctx.table = table;
 	ctx.direction = direction;
-	ctx.keys = keys;
-	ctx.ksizes = ksizes;
-	ctx.values = values;
-	ctx.vsizes = vsizes;
-	ctx.cnt = cnt;
+	ctx.td = *td;
 	ctx.mode = mode;
 
 	TEST_ASSERT2(verify_child_fails(tbl_neg_check, &ctx),
@@ -584,7 +576,7 @@ int table_t1_1f() {
 	VAN_TABLE *table;
 	VAN_STORE *store;
 	int ret, cnt;
-	STRING_TESTDATA_DEFINE;
+	TESTDATA td;
 
 	system("rm -fr test1*");
 	system("rm -fr vanlog.*");
@@ -599,47 +591,45 @@ int table_t1_1f() {
 	CHK_RET(ret, "table->open");
 
 	cnt = 10000;
-	STRING_TESTDATA_INIT;
-	(void)generate_string_testdata(keys, ksizes, 20, 30, values, vsizes,
-	    50, 120, cnt);
+	TESTDATA_INIT(&td, (size_t)cnt);
+	(void)generate_string_testdata(&td, 20, 30, 50, 120);
 
 	fprintf(stderr, "============ 1 put %lu records =========\n",
 	    (unsigned long)cnt);
-	ret = populate_table(table, keys, ksizes, values, vsizes, cnt);
+	ret = populate_table(table, &td);
 	CHK_RET(ret, "populate_table");
 
 	fprintf(stderr, "============ 2 Sort the expected records =========\n");
-	ret = sort_testdata(keys, ksizes, values, vsizes, (size_t)cnt,
-	    table->cmp_func);
+	ret = sort_testdata(&td, table->cmp_func);
 	CHK_RET(ret, "sort_testdata");
 
 	fprintf(stderr, "============ 3 A wrong record must be caught =====\n");
-	ret = tbl_neg_one(table, keys, ksizes, values, vsizes, (size_t)cnt,
-	    VAN_NEXT, TBL_NEG_KEY, "VAN_NEXT, wrong key");
-	ret = tbl_neg_one(table, keys, ksizes, values, vsizes, (size_t)cnt,
-	    VAN_PREV, TBL_NEG_KEY, "VAN_PREV, wrong key");
-	ret = tbl_neg_one(table, keys, ksizes, values, vsizes, (size_t)cnt,
-	    VAN_NEXT, TBL_NEG_VALUE, "VAN_NEXT, wrong value");
-	ret = tbl_neg_one(table, keys, ksizes, values, vsizes, (size_t)cnt,
-	    VAN_PREV, TBL_NEG_VALUE, "VAN_PREV, wrong value");
+	ret = tbl_neg_one(table, &td, VAN_NEXT, TBL_NEG_KEY,
+	    "VAN_NEXT, wrong key");
+	ret = tbl_neg_one(table, &td, VAN_PREV, TBL_NEG_KEY,
+	    "VAN_PREV, wrong key");
+	ret = tbl_neg_one(table, &td, VAN_NEXT, TBL_NEG_VALUE,
+	    "VAN_NEXT, wrong value");
+	ret = tbl_neg_one(table, &td, VAN_PREV, TBL_NEG_VALUE,
+	    "VAN_PREV, wrong value");
 
 	fprintf(stderr, "============ 4 A wrong count must be caught ======\n");
-	ret = tbl_neg_one(table, keys, ksizes, values, vsizes, (size_t)cnt,
-	    VAN_NEXT, TBL_NEG_COUNT, "VAN_NEXT, one record too few");
-	ret = tbl_neg_one(table, keys, ksizes, values, vsizes, (size_t)cnt,
-	    VAN_PREV, TBL_NEG_COUNT, "VAN_PREV, one record too few");
+	ret = tbl_neg_one(table, &td, VAN_NEXT, TBL_NEG_COUNT,
+	    "VAN_NEXT, one record too few");
+	ret = tbl_neg_one(table, &td, VAN_PREV, TBL_NEG_COUNT,
+	    "VAN_PREV, one record too few");
 
 	fprintf(stderr, "============ 5 A wrong border must be caught =====\n");
-	ret = tbl_neg_one(table, keys, ksizes, values, vsizes, (size_t)cnt,
-	    VAN_FIRST, TBL_NEG_BORDERK, "VAN_FIRST, wrong key");
-	ret = tbl_neg_one(table, keys, ksizes, values, vsizes, (size_t)cnt,
-	    VAN_LAST, TBL_NEG_BORDERK, "VAN_LAST, wrong key");
-	ret = tbl_neg_one(table, keys, ksizes, values, vsizes, (size_t)cnt,
-	    VAN_FIRST, TBL_NEG_BORDERV, "VAN_FIRST, wrong value");
-	ret = tbl_neg_one(table, keys, ksizes, values, vsizes, (size_t)cnt,
-	    VAN_LAST, TBL_NEG_BORDERV, "VAN_LAST, wrong value");
+	ret = tbl_neg_one(table, &td, VAN_FIRST, TBL_NEG_BORDERK,
+	    "VAN_FIRST, wrong key");
+	ret = tbl_neg_one(table, &td, VAN_LAST, TBL_NEG_BORDERK,
+	    "VAN_LAST, wrong key");
+	ret = tbl_neg_one(table, &td, VAN_FIRST, TBL_NEG_BORDERV,
+	    "VAN_FIRST, wrong value");
+	ret = tbl_neg_one(table, &td, VAN_LAST, TBL_NEG_BORDERV,
+	    "VAN_LAST, wrong value");
 
-	(void)free_string_testdata(keys, ksizes, values, vsizes, cnt);
+	(void)free_string_testdata(&td);
 
 	ret = table->close(table, 0);
 	CHK_RET(ret, "table->close");
@@ -661,11 +651,11 @@ int table_t1_2() {
 	VAN_TABLE *table;
 	VAN_STORE *store;
 	pthread_t threads[TB_T1_NUM];
-	POPULATE_DATA objs[TB_T1_NUM], *objp;
+	tb_t1_pop_t objs[TB_T1_NUM], *objp;
 	size_t each_cnt;
 	int i, ret, cnt;
 	void *rptr;
-	STRING_TESTDATA_DEFINE;
+	TESTDATA td;
 
 	system("rm -fr test1*");
 	system("rm -fr vanlog.*");
@@ -683,23 +673,19 @@ int table_t1_2() {
 
 	memset(threads, 0, sizeof(threads));
 	cnt = 200000;
-	STRING_TESTDATA_INIT;
+	TESTDATA_INIT(&td, (size_t)cnt);
 	each_cnt = cnt / TB_T1_NUM;
 	memset(objs, 0, sizeof(objs));
 	for (i = 0; i < TB_T1_NUM; i++) {
 		objp = &objs[i];
-		objp->handle = table;
-		objp->keys = keys + i * each_cnt;
-		objp->ksizes = ksizes + i * each_cnt;
-		objp->values = values + i * each_cnt;
-		objp->vsizes = vsizes + i * each_cnt;
-		objp->cnt = each_cnt;
+		objp->table = table;
+		TESTDATA_SLICE(&objp->td, &td, (size_t)(i * each_cnt),
+		    each_cnt);
 	}
 
 	fprintf(stderr, "============ 1 generate %lu records =========\n",
 	    (unsigned long)cnt);
-	(void)generate_string_testdata(keys, ksizes, 20, 30, values, vsizes,
-	    50, 120, cnt);
+	(void)generate_string_testdata(&td, 20, 30, 50, 120);
 
 	fprintf(stderr, "============ 2 populate %lu records =========\n",
 	    (unsigned long)cnt);
@@ -714,7 +700,7 @@ int table_t1_2() {
 
 	fprintf(stderr, "============ 3 verify %lu records using table =========\n",
 	    (unsigned long)cnt);
-	ret = verify_table_data(table, keys, ksizes, values, vsizes, cnt);
+	ret = verify_table_data(table, &td);
 	CHK_RET(ret, "verify_table_data");
 
 	fprintf(stderr, "============ 4 close table =========\n");
@@ -737,10 +723,10 @@ int table_t1_2() {
 
 	fprintf(stderr, "============ 6 verify %lu records after reopen =========\n",
 	    (unsigned long)cnt);
-	ret = verify_table_data(table, keys, ksizes, values, vsizes, cnt);
+	ret = verify_table_data(table, &td);
 	CHK_RET(ret, "verify_table_data");
 
-	(void)free_string_testdata(keys, ksizes, values, vsizes, cnt);
+	(void)free_string_testdata(&td);
 
 	fprintf(stderr, "============ 7 print log file names =========\n");
 	ret = van_strarray_print(store->log_handle->lognames, stderr, "\n");
@@ -787,7 +773,7 @@ int table_t1_3() {
 	size_t cnt;
 	char keybuf[64];
 	char valbuf[64];
-	STRING_TESTDATA_DEFINE;
+	TESTDATA td;
 
 	failcnt = 0;
 	system("rm -fr test1*");
@@ -811,21 +797,21 @@ int table_t1_3() {
 	CHK_RET(ret, "table->open");
 
 	cnt = TB_T1_3_NKEYS;
-	STRING_TESTDATA_INIT;
+	TESTDATA_INIT(&td, (size_t)cnt);
 	fprintf(stderr, "============ 1 generate %lu ordered keys =========\n",
 	    (unsigned long)cnt);
 	for (i = 0; i < (int)cnt; i++) {
 		(void)snprintf(keybuf, sizeof(keybuf), "key%05d", i);
-		ksizes[i] = strlen(keybuf);
-		keys[i] = (char *)malloc(ksizes[i] + 1);
-		TEST_ASSERT(keys[i] != NULL);
-		memcpy(keys[i], keybuf, ksizes[i] + 1);
+		td.records[i].ksize = strlen(keybuf);
+		td.records[i].key = (char *)malloc(td.records[i].ksize + 1);
+		TEST_ASSERT(td.records[i].key != NULL);
+		memcpy(td.records[i].key, keybuf, td.records[i].ksize + 1);
 
 		(void)snprintf(valbuf, sizeof(valbuf), "value%05d-00", i);
-		vsizes[i] = strlen(valbuf);
-		values[i] = (char *)malloc(vsizes[i] + 1);
-		TEST_ASSERT(values[i] != NULL);
-		memcpy(values[i], valbuf, vsizes[i] + 1);
+		td.records[i].vsize = strlen(valbuf);
+		td.records[i].value = (char *)malloc(td.records[i].vsize + 1);
+		TEST_ASSERT(td.records[i].value != NULL);
+		memcpy(td.records[i].value, valbuf, td.records[i].vsize + 1);
 	}
 
 	fprintf(stderr,
@@ -837,10 +823,11 @@ int table_t1_3() {
 		for (i = 0; i < (int)cnt; i++) {
 			(void)snprintf(valbuf, sizeof(valbuf),
 			    "value%05d-%02d", i, g);
-			vsizes[i] = strlen(valbuf);
-			memcpy(values[i], valbuf, vsizes[i] + 1);
+			td.records[i].vsize = strlen(valbuf);
+			memcpy(td.records[i].value, valbuf,
+			    td.records[i].vsize + 1);
 		}
-		ret = populate_table(table, keys, ksizes, values, vsizes, cnt);
+		ret = populate_table(table, &td);
 		CHK_RET(ret, "populate_table");
 		ret = table->dump_inmem(table);
 		CHK_RET(ret, "table->dump_inmem");
@@ -861,8 +848,7 @@ int table_t1_3() {
 		}
 		fprintf(stderr, "--- verify round %d/%d ---\n",
 		    v + 1, TB_T1_3_VERIFY_TIMES);
-		ret = verify_table_data(table, keys, ksizes,
-		    values, vsizes, cnt);
+		ret = verify_table_data(table, &td);
 		CHK_RET_NOEXIT(ret, "verify_table_data");
 		if (ret != 0)
 			failcnt++;
@@ -891,7 +877,7 @@ int table_t1_3() {
 	ret = store->close(store);
 	CHK_RET(ret, "store->close");
 
-	(void)free_string_testdata(keys, ksizes, values, vsizes, cnt);
+	(void)free_string_testdata(&td);
 
 	return ((failcnt > 0) ? (-1) : (0));
 }
@@ -939,7 +925,7 @@ int table_t1_4() {
 	size_t cnt;
 	char kbuf[MAX_BUF_LEN];
 	char vbuf[MAX_BUF_LEN];
-	STRING_TESTDATA_DEFINE;
+	TESTDATA td;
 
 	failcnt = 0;
 	system("rm -fr test1*");
@@ -963,7 +949,7 @@ int table_t1_4() {
 	CHK_RET(ret, "table->open");
 
 	cnt = TB_T1_4_NKEYS;
-	STRING_TESTDATA_INIT;
+	TESTDATA_INIT(&td, (size_t)cnt);
 	fprintf(stderr,
 	    "============ 1 generate %lu unique random keys =========\n",
 	    (unsigned long)cnt);
@@ -975,18 +961,18 @@ int table_t1_4() {
 			    TB_T1_4_KEY_MAXLEN);
 			kbuf[len] = '\0';
 		} while (tb_t1_strset_add(&strset, kbuf) == 0);
-		ksizes[i] = (size_t)len;
-		keys[i] = (char *)malloc((size_t)len + 1);
-		TEST_ASSERT(keys[i] != NULL);
-		memcpy(keys[i], kbuf, (size_t)len + 1);
+		td.records[i].ksize = (size_t)len;
+		td.records[i].key = (char *)malloc((size_t)len + 1);
+		TEST_ASSERT(td.records[i].key != NULL);
+		memcpy(td.records[i].key, kbuf, (size_t)len + 1);
 
 		len = getrandomstring2(vbuf, TB_T1_4_VAL_MINLEN,
 		    TB_T1_4_VAL_MAXLEN);
 		vbuf[len] = '\0';
-		vsizes[i] = (size_t)len;
-		values[i] = (char *)malloc((size_t)len + 1);
-		TEST_ASSERT(values[i] != NULL);
-		memcpy(values[i], vbuf, (size_t)len + 1);
+		td.records[i].vsize = (size_t)len;
+		td.records[i].value = (char *)malloc((size_t)len + 1);
+		TEST_ASSERT(td.records[i].value != NULL);
+		memcpy(td.records[i].value, vbuf, (size_t)len + 1);
 	}
 	tb_t1_strset_destroy(&strset);
 
@@ -1000,10 +986,10 @@ int table_t1_4() {
 			len = getrandomstring2(vbuf, TB_T1_4_VAL_MINLEN,
 			    TB_T1_4_VAL_MAXLEN);
 			vbuf[len] = '\0';
-			vsizes[i] = (size_t)len;
-			memcpy(values[i], vbuf, (size_t)len + 1);
+			td.records[i].vsize = (size_t)len;
+			memcpy(td.records[i].value, vbuf, (size_t)len + 1);
 		}
-		ret = populate_table(table, keys, ksizes, values, vsizes, cnt);
+		ret = populate_table(table, &td);
 		CHK_RET(ret, "populate_table");
 		ret = table->dump_inmem(table);
 		CHK_RET(ret, "table->dump_inmem");
@@ -1024,8 +1010,7 @@ int table_t1_4() {
 		}
 		fprintf(stderr, "--- verify round %d/%d ---\n",
 		    v + 1, TB_T1_4_VERIFY_TIMES);
-		ret = verify_table_data(table, keys, ksizes,
-		    values, vsizes, cnt);
+		ret = verify_table_data(table, &td);
 		CHK_RET_NOEXIT(ret, "verify_table_data");
 		if (ret != 0)
 			failcnt++;
@@ -1054,7 +1039,7 @@ int table_t1_4() {
 	ret = store->close(store);
 	CHK_RET(ret, "store->close");
 
-	(void)free_string_testdata(keys, ksizes, values, vsizes, cnt);
+	(void)free_string_testdata(&td);
 
 	return ((failcnt > 0) ? (-1) : (0));
 }

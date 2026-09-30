@@ -22,7 +22,7 @@ int imt_t1_1() {
 	VAN_TABLE table;
 	INMEM_TREE *tree;
 	int ret, cnt;
-	STRING_TESTDATA_DEFINE;
+	TESTDATA td;
 
 	memset(&table, 0, sizeof(VAN_TABLE));
 	ret = van_inmemtree_create(&table, &table.active);
@@ -30,15 +30,14 @@ int imt_t1_1() {
 	tree = table.active;
 
 	cnt = 10000;
-	STRING_TESTDATA_INIT;
+	TESTDATA_INIT(&td, (size_t)cnt);
 
-	(void)generate_string_testdata(keys, ksizes, 5, 15, values, vsizes,
-	    10, 20, cnt);
+	(void)generate_string_testdata(&td, 5, 15, 10, 20);
 
-	ret = populate_inmemtree(tree, keys, ksizes, values, vsizes, cnt);
+	ret = populate_inmemtree(tree, &td);
 	CHK_RET(ret, "populate_inmemtree");
 
-	(void)free_string_testdata(keys, ksizes, values, vsizes, cnt);
+	(void)free_string_testdata(&td);
 
 	ret = tree->destroy(tree);
 	CHK_RET(ret, "tree->destroy");
@@ -56,7 +55,7 @@ int imt_t1_2(int verbose) {
 	size_t rcnt;
 	FILE *outf;
 	time_t t1, t2;
-	STRING_TESTDATA_DEFINE;
+	TESTDATA td;
 
 	memset(&table, 0, sizeof(VAN_TABLE));
 	ret = van_inmemtree_create(&table, &table.active);
@@ -74,9 +73,8 @@ int imt_t1_2(int verbose) {
 	 * the memory.
 	 */
 	cnt = 100000;
-	STRING_TESTDATA_INIT;
-	(void)generate_string_testdata2(keys, ksizes, "KEY",
-	    values, vsizes, "DATA", cnt, 1);
+	TESTDATA_INIT(&td, (size_t)cnt);
+	(void)generate_string_testdata2(&td, "KEY", "DATA", 1);
 
 	/*
 	 * 1 Put records
@@ -94,7 +92,7 @@ int imt_t1_2(int verbose) {
 	    (unsigned long)cnt);
 	van_alloc_stat_reset();
 	van_rwlock_stat_reset();
-	ret = populate_inmemtree(tree, keys, ksizes, values, vsizes, cnt);
+	ret = populate_inmemtree(tree, &td);
 	CHK_RET(ret, "populate_inmemtree");
 	van_rwlock_stat_print(stderr, " ");
 	fprintf(stderr, "**** Malloc Statistics ****\n");
@@ -110,7 +108,7 @@ int imt_t1_2(int verbose) {
 	fprintf(stderr, "========== 3 Get using tree->get() ============\n");
 	van_alloc_stat_reset();
 	van_rwlock_stat_reset();
-	ret = verify_inmemtree_data(tree, keys, ksizes, values, vsizes, cnt);
+	ret = verify_inmemtree_data(tree, &td);
 	CHK_RET(ret, "verify_inmemtree_data");
 	van_rwlock_stat_print(stderr, " ");
 	fprintf(stderr, "**** Malloc Statistics ****\n");
@@ -119,8 +117,7 @@ int imt_t1_2(int verbose) {
 	fprintf(stderr, "========== 4 Get using cursor->get(VAN_SET) ============\n");
 	van_alloc_stat_reset();
 	van_rwlock_stat_reset();
-	ret = verify_inmemtree_data_withcursor(tree, keys, ksizes,
-	    values, vsizes, cnt);
+	ret = verify_inmemtree_data_withcursor(tree, &td);
 	CHK_RET(ret, "verify_inmemtree_data_withcursor");
 	van_rwlock_stat_print(stderr, " ");
 	fprintf(stderr, "**** Malloc Statistics ****\n");
@@ -202,7 +199,7 @@ int imt_t1_2(int verbose) {
 	CHK_RET(ret, "tree->destroy");
 	if (verbose)
 		fclose(outf);
-	free_string_testdata(keys, ksizes, values, vsizes, cnt);
+	free_string_testdata(&td);
 
 	return (ret);
 }
@@ -217,7 +214,7 @@ int imt_t1_3() {
 	int ret, cnt;
 	size_t rcnt;
 	time_t t1, t2;
-	STRING_TESTDATA_DEFINE;
+	TESTDATA td;
 
 	memset(&table, 0, sizeof(VAN_TABLE));
 	ret = van_inmemtree_create(&table, &table.active);
@@ -228,16 +225,15 @@ int imt_t1_3() {
 	tree->threshold = 1*GIGABYTE;
 
 	cnt = 1000000;
-	STRING_TESTDATA_INIT;
-	(void)generate_string_testdata(keys, ksizes, 20, 30,
-	    values, vsizes, 50, 120, cnt);
+	TESTDATA_INIT(&td, (size_t)cnt);
+	(void)generate_string_testdata(&td, 20, 30, 50, 120);
 
 
 	fprintf(stderr, "============ 1 Try to put %lu records =========\n",
 	    (unsigned long)cnt);
 	van_alloc_stat_reset();
 	van_rwlock_stat_reset();
-	ret = populate_inmemtree(tree, keys, ksizes, values, vsizes, cnt);
+	ret = populate_inmemtree(tree, &td);
 	CHK_RET(ret, "populate_inmemtree");
 	van_rwlock_stat_print(stderr, " ");
 	fprintf(stderr, "**** Malloc Statistics ****\n");
@@ -249,7 +245,7 @@ int imt_t1_3() {
 	fprintf(stderr, "========== 3 Get using tree->get() ============\n");
 	van_alloc_stat_reset();
 	van_rwlock_stat_reset();
-	ret = verify_inmemtree_data(tree, keys, ksizes, values, vsizes, cnt);
+	ret = verify_inmemtree_data(tree, &td);
 	CHK_RET(ret, "verify_inmemtree_data");
 	van_rwlock_stat_print(stderr, " ");
 	fprintf(stderr, "**** Malloc Statistics ****\n");
@@ -258,8 +254,7 @@ int imt_t1_3() {
 	fprintf(stderr, "========== 4 Get using cursor->get(VAN_SET) ============\n");
 	van_alloc_stat_reset();
 	van_rwlock_stat_reset();
-	ret = verify_inmemtree_data_withcursor(tree, keys, ksizes,
-	    values, vsizes, cnt);
+	ret = verify_inmemtree_data_withcursor(tree, &td);
 	CHK_RET(ret, "verify_inmemtree_data_withcursor");
 	van_rwlock_stat_print(stderr, " ");
 	fprintf(stderr, "**** Malloc Statistics ****\n");
@@ -335,7 +330,7 @@ int imt_t1_3() {
 	fprintf(stderr, "**** Malloc Statistics ****\n");
 	van_alloc_stat_print(stderr, " ");
 	CHK_RET(ret, "tree->destroy");
-	free_string_testdata(keys, ksizes, values, vsizes, cnt);
+	free_string_testdata(&td);
 
 	return (ret);
 }
@@ -345,9 +340,9 @@ int imt_t1_3() {
  * instead of only counting them.
  *
  * The data is sorted with the compare function of the tree first, so a
- * forward walk has to hand back exactly keys[0] .. keys[cnt - 1] and a
- * backward walk the same records in reverse.  VAN_FIRST has to be keys[0]
- * and VAN_LAST keys[cnt - 1].
+ * forward walk has to hand back exactly records[0] .. records[count - 1]
+ * and a backward walk the same records in reverse.  VAN_FIRST has to be
+ * records[0] and VAN_LAST records[count - 1].
  *
  * The plain counting version is imt_t1_3().
  */
@@ -356,7 +351,7 @@ int imt_t1_3b() {
 	INMEM_TREE *tree;
 	int ret, cnt;
 	size_t rcnt;
-	STRING_TESTDATA_DEFINE;
+	TESTDATA td;
 
 	memset(&table, 0, sizeof(VAN_TABLE));
 	ret = van_inmemtree_create(&table, &table.active);
@@ -366,24 +361,22 @@ int imt_t1_3b() {
 	tree->threshold = 1*GIGABYTE;
 
 	cnt = 100000;
-	STRING_TESTDATA_INIT;
-	(void)generate_string_testdata(keys, ksizes, 20, 30,
-	    values, vsizes, 50, 120, cnt);
+	TESTDATA_INIT(&td, (size_t)cnt);
+	(void)generate_string_testdata(&td, 20, 30, 50, 120);
 
 	fprintf(stderr, "============ 1 Try to put %lu records =========\n",
 	    (unsigned long)cnt);
-	ret = populate_inmemtree(tree, keys, ksizes, values, vsizes, cnt);
+	ret = populate_inmemtree(tree, &td);
 	CHK_RET(ret, "populate_inmemtree");
 
 	fprintf(stderr, "========== 2 Sort the expected records ==========\n");
-	ret = sort_testdata(keys, ksizes, values, vsizes, (size_t)cnt,
-	    tree->config->cmp_func);
+	ret = sort_testdata(&td, tree->config->cmp_func);
 	CHK_RET(ret, "sort_testdata");
 
 	fprintf(stderr, "========== 3 Walk forward using VAN_NEXT ==========\n");
 	rcnt = 0;
 	ret = verify_inmemtree_cursor_direction_full(tree, VAN_NEXT, 0, &rcnt,
-	    keys, ksizes, values, vsizes, (size_t)cnt);
+	    &td);
 	CHK_RET(ret, "verify_inmemtree_cursor_direction_full(VAN_NEXT)");
 	TEST_ASSERT2(rcnt == (size_t)cnt, "expected %d records, walked %lu",
 	    cnt, (unsigned long)rcnt);
@@ -391,7 +384,7 @@ int imt_t1_3b() {
 	fprintf(stderr, "========== 4 Walk backward using VAN_PREV ==========\n");
 	rcnt = 0;
 	ret = verify_inmemtree_cursor_direction_full(tree, VAN_PREV, 0, &rcnt,
-	    keys, ksizes, values, vsizes, (size_t)cnt);
+	    &td);
 	CHK_RET(ret, "verify_inmemtree_cursor_direction_full(VAN_PREV)");
 	TEST_ASSERT2(rcnt == (size_t)cnt, "expected %d records, walked %lu",
 	    cnt, (unsigned long)rcnt);
@@ -404,7 +397,7 @@ int imt_t1_3b() {
 	    "========== 5 Walk forward using VAN_NEXT(VAN_WRITECURSOR) ==\n");
 	rcnt = 0;
 	ret = verify_inmemtree_cursor_direction_full(tree, VAN_NEXT,
-	    VAN_WRITECURSOR, &rcnt, keys, ksizes, values, vsizes, (size_t)cnt);
+	    VAN_WRITECURSOR, &rcnt, &td);
 	CHK_RET(ret, "verify_inmemtree_cursor_direction_full"
 	    "(VAN_NEXT, VAN_WRITECURSOR)");
 	TEST_ASSERT2(rcnt == (size_t)cnt, "expected %d records, walked %lu",
@@ -414,7 +407,7 @@ int imt_t1_3b() {
 	    "========== 6 Walk backward using VAN_PREV(VAN_WRITECURSOR) ==\n");
 	rcnt = 0;
 	ret = verify_inmemtree_cursor_direction_full(tree, VAN_PREV,
-	    VAN_WRITECURSOR, &rcnt, keys, ksizes, values, vsizes, (size_t)cnt);
+	    VAN_WRITECURSOR, &rcnt, &td);
 	CHK_RET(ret, "verify_inmemtree_cursor_direction_full"
 	    "(VAN_PREV, VAN_WRITECURSOR)");
 	TEST_ASSERT2(rcnt == (size_t)cnt, "expected %d records, walked %lu",
@@ -422,25 +415,23 @@ int imt_t1_3b() {
 
 	fprintf(stderr, "========== 7 VAN_FIRST is the first record ==========\n");
 	ret = verify_inmemtree_cursor_border_full(tree, VAN_FIRST, 0,
-	    keys[0], ksizes[0], values[0], vsizes[0]);
+	    &td.records[0]);
 	CHK_RET(ret, "verify_inmemtree_cursor_border_full(VAN_FIRST)");
 
 	fprintf(stderr, "========== 8 VAN_LAST is the last record ==========\n");
 	ret = verify_inmemtree_cursor_border_full(tree, VAN_LAST, 0,
-	    keys[cnt - 1], ksizes[cnt - 1],
-	    values[cnt - 1], vsizes[cnt - 1]);
+	    &td.records[td.count - 1]);
 	CHK_RET(ret, "verify_inmemtree_cursor_border_full(VAN_LAST)");
 
 	fprintf(stderr, "========== 9 VAN_FIRST(VAN_WRITECURSOR) ============\n");
 	ret = verify_inmemtree_cursor_border_full(tree, VAN_FIRST,
-	    VAN_WRITECURSOR, keys[0], ksizes[0], values[0], vsizes[0]);
+	    VAN_WRITECURSOR, &td.records[0]);
 	CHK_RET(ret, "verify_inmemtree_cursor_border_full"
 	    "(VAN_FIRST, VAN_WRITECURSOR)");
 
 	fprintf(stderr, "========== 10 VAN_LAST(VAN_WRITECURSOR) =============\n");
 	ret = verify_inmemtree_cursor_border_full(tree, VAN_LAST,
-	    VAN_WRITECURSOR, keys[cnt - 1], ksizes[cnt - 1],
-	    values[cnt - 1], vsizes[cnt - 1]);
+	    VAN_WRITECURSOR, &td.records[td.count - 1]);
 	CHK_RET(ret, "verify_inmemtree_cursor_border_full"
 	    "(VAN_LAST, VAN_WRITECURSOR)");
 
@@ -448,7 +439,7 @@ int imt_t1_3b() {
 	ret = tree->destroy(tree);
 	CHK_RET(ret, "tree->destroy");
 
-	(void)free_string_testdata(keys, ksizes, values, vsizes, cnt);
+	(void)free_string_testdata(&td);
 
 	return (ret);
 }
@@ -470,18 +461,18 @@ typedef struct {
 	INMEM_TREE *tree;
 	flags_t     direction;
 	flags_t     cflags;
-	char      **keys, **values;
-	size_t     *ksizes, *vsizes;
-	size_t      cnt;
+	TESTDATA    td;
 	int         mode;
 } imt_neg_t;
 
 /*
- * Runs in a child process, so it may corrupt the expected arrays: fork()
+ * Runs in a child process, so it may corrupt the expected records: fork()
  * gives it a copy on write of everything the test owns.
  */
 static int imt_neg_check(void *arg) {
 	imt_neg_t *c;
+	TESTDATA short_td;
+	RECORD rec;
 	size_t rcnt, idx;
 	int backward;
 
@@ -489,40 +480,42 @@ static int imt_neg_check(void *arg) {
 	rcnt = 0;
 	backward = (c->direction == VAN_PREV || c->direction == VAN_LAST);
 	/* Corrupt the record the walk reads first. */
-	idx = backward ? c->cnt - 1 : 0;
+	idx = backward ? c->td.count - 1 : 0;
+	rec = c->td.records[idx];
 
 	switch (c->mode) {
 	case IMT_NEG_KEY:
-		c->keys[idx] = imt_neg_key;
-		c->ksizes[idx] = strlen(imt_neg_key);
+		c->td.records[idx].key = imt_neg_key;
+		c->td.records[idx].ksize = strlen(imt_neg_key);
 		break;
 	case IMT_NEG_VALUE:
-		c->values[idx] = imt_neg_val;
-		c->vsizes[idx] = strlen(imt_neg_val);
+		c->td.records[idx].value = imt_neg_val;
+		c->td.records[idx].vsize = strlen(imt_neg_val);
 		break;
 	case IMT_NEG_COUNT:
+		/* One record less than the tree holds. */
+		TESTDATA_SLICE(&short_td, &c->td, 0, c->td.count - 1);
 		return verify_inmemtree_cursor_direction_full(c->tree,
-		    c->direction, c->cflags, &rcnt, c->keys, c->ksizes,
-		    c->values, c->vsizes, c->cnt - 1);
+		    c->direction, c->cflags, &rcnt, &short_td);
 	case IMT_NEG_BORDERK:
+		rec.key = imt_neg_key;
+		rec.ksize = strlen(imt_neg_key);
 		return verify_inmemtree_cursor_border_full(c->tree,
-		    c->direction, c->cflags, imt_neg_key,
-		    strlen(imt_neg_key), c->values[idx], c->vsizes[idx]);
+		    c->direction, c->cflags, &rec);
 	case IMT_NEG_BORDERV:
+		rec.value = imt_neg_val;
+		rec.vsize = strlen(imt_neg_val);
 		return verify_inmemtree_cursor_border_full(c->tree,
-		    c->direction, c->cflags, c->keys[idx], c->ksizes[idx],
-		    imt_neg_val, strlen(imt_neg_val));
+		    c->direction, c->cflags, &rec);
 	default:
 		return (0);
 	}
 
 	return verify_inmemtree_cursor_direction_full(c->tree, c->direction,
-	    c->cflags, &rcnt, c->keys, c->ksizes, c->values, c->vsizes,
-	    c->cnt);
+	    c->cflags, &rcnt, &c->td);
 }
 
-static int imt_neg_one(INMEM_TREE *tree, char **keys, size_t *ksizes,
-    char **values, size_t *vsizes, size_t cnt, flags_t direction,
+static int imt_neg_one(INMEM_TREE *tree, TESTDATA *td, flags_t direction,
     flags_t cflags, int mode, const char *what) {
 	imt_neg_t ctx;
 
@@ -530,11 +523,7 @@ static int imt_neg_one(INMEM_TREE *tree, char **keys, size_t *ksizes,
 	ctx.tree = tree;
 	ctx.direction = direction;
 	ctx.cflags = cflags;
-	ctx.keys = keys;
-	ctx.ksizes = ksizes;
-	ctx.values = values;
-	ctx.vsizes = vsizes;
-	ctx.cnt = cnt;
+	ctx.td = *td;
 	ctx.mode = mode;
 
 	TEST_ASSERT2(verify_child_fails(imt_neg_check, &ctx),
@@ -559,7 +548,7 @@ int imt_t1_3c() {
 	VAN_TABLE table;
 	INMEM_TREE *tree;
 	int ret, cnt;
-	STRING_TESTDATA_DEFINE;
+	TESTDATA td;
 
 	memset(&table, 0, sizeof(VAN_TABLE));
 	ret = van_inmemtree_create(&table, &table.active);
@@ -568,57 +557,53 @@ int imt_t1_3c() {
 	tree->threshold = 1*GIGABYTE;
 
 	cnt = 10000;
-	STRING_TESTDATA_INIT;
-	(void)generate_string_testdata(keys, ksizes, 20, 30,
-	    values, vsizes, 50, 120, cnt);
+	TESTDATA_INIT(&td, (size_t)cnt);
+	(void)generate_string_testdata(&td, 20, 30, 50, 120);
 
 	fprintf(stderr, "============ 1 Try to put %lu records =========\n",
 	    (unsigned long)cnt);
-	ret = populate_inmemtree(tree, keys, ksizes, values, vsizes, cnt);
+	ret = populate_inmemtree(tree, &td);
 	CHK_RET(ret, "populate_inmemtree");
 
 	fprintf(stderr, "========== 2 Sort the expected records ==========\n");
-	ret = sort_testdata(keys, ksizes, values, vsizes, (size_t)cnt,
-	    tree->config->cmp_func);
+	ret = sort_testdata(&td, tree->config->cmp_func);
 	CHK_RET(ret, "sort_testdata");
 
 	fprintf(stderr, "========== 3 A wrong record must be caught ======\n");
-	ret = imt_neg_one(tree, keys, ksizes, values, vsizes, (size_t)cnt,
-	    VAN_NEXT, 0, IMT_NEG_KEY, "VAN_NEXT, wrong key");
-	ret = imt_neg_one(tree, keys, ksizes, values, vsizes, (size_t)cnt,
-	    VAN_PREV, 0, IMT_NEG_KEY, "VAN_PREV, wrong key");
-	ret = imt_neg_one(tree, keys, ksizes, values, vsizes, (size_t)cnt,
-	    VAN_NEXT, 0, IMT_NEG_VALUE, "VAN_NEXT, wrong value");
-	ret = imt_neg_one(tree, keys, ksizes, values, vsizes, (size_t)cnt,
-	    VAN_PREV, 0, IMT_NEG_VALUE, "VAN_PREV, wrong value");
-	ret = imt_neg_one(tree, keys, ksizes, values, vsizes, (size_t)cnt,
-	    VAN_NEXT, VAN_WRITECURSOR, IMT_NEG_KEY,
+	ret = imt_neg_one(tree, &td, VAN_NEXT, 0, IMT_NEG_KEY,
+	    "VAN_NEXT, wrong key");
+	ret = imt_neg_one(tree, &td, VAN_PREV, 0, IMT_NEG_KEY,
+	    "VAN_PREV, wrong key");
+	ret = imt_neg_one(tree, &td, VAN_NEXT, 0, IMT_NEG_VALUE,
+	    "VAN_NEXT, wrong value");
+	ret = imt_neg_one(tree, &td, VAN_PREV, 0, IMT_NEG_VALUE,
+	    "VAN_PREV, wrong value");
+	ret = imt_neg_one(tree, &td, VAN_NEXT, VAN_WRITECURSOR, IMT_NEG_KEY,
 	    "VAN_NEXT(VAN_WRITECURSOR), wrong key");
-	ret = imt_neg_one(tree, keys, ksizes, values, vsizes, (size_t)cnt,
-	    VAN_PREV, VAN_WRITECURSOR, IMT_NEG_VALUE,
+	ret = imt_neg_one(tree, &td, VAN_PREV, VAN_WRITECURSOR, IMT_NEG_VALUE,
 	    "VAN_PREV(VAN_WRITECURSOR), wrong value");
 
 	fprintf(stderr, "========== 4 A wrong count must be caught =======\n");
-	ret = imt_neg_one(tree, keys, ksizes, values, vsizes, (size_t)cnt,
-	    VAN_NEXT, 0, IMT_NEG_COUNT, "VAN_NEXT, one record too few");
-	ret = imt_neg_one(tree, keys, ksizes, values, vsizes, (size_t)cnt,
-	    VAN_PREV, 0, IMT_NEG_COUNT, "VAN_PREV, one record too few");
+	ret = imt_neg_one(tree, &td, VAN_NEXT, 0, IMT_NEG_COUNT,
+	    "VAN_NEXT, one record too few");
+	ret = imt_neg_one(tree, &td, VAN_PREV, 0, IMT_NEG_COUNT,
+	    "VAN_PREV, one record too few");
 
 	fprintf(stderr, "========== 5 A wrong border must be caught ======\n");
-	ret = imt_neg_one(tree, keys, ksizes, values, vsizes, (size_t)cnt,
-	    VAN_FIRST, 0, IMT_NEG_BORDERK, "VAN_FIRST, wrong key");
-	ret = imt_neg_one(tree, keys, ksizes, values, vsizes, (size_t)cnt,
-	    VAN_LAST, 0, IMT_NEG_BORDERK, "VAN_LAST, wrong key");
-	ret = imt_neg_one(tree, keys, ksizes, values, vsizes, (size_t)cnt,
-	    VAN_FIRST, 0, IMT_NEG_BORDERV, "VAN_FIRST, wrong value");
-	ret = imt_neg_one(tree, keys, ksizes, values, vsizes, (size_t)cnt,
-	    VAN_LAST, 0, IMT_NEG_BORDERV, "VAN_LAST, wrong value");
+	ret = imt_neg_one(tree, &td, VAN_FIRST, 0, IMT_NEG_BORDERK,
+	    "VAN_FIRST, wrong key");
+	ret = imt_neg_one(tree, &td, VAN_LAST, 0, IMT_NEG_BORDERK,
+	    "VAN_LAST, wrong key");
+	ret = imt_neg_one(tree, &td, VAN_FIRST, 0, IMT_NEG_BORDERV,
+	    "VAN_FIRST, wrong value");
+	ret = imt_neg_one(tree, &td, VAN_LAST, 0, IMT_NEG_BORDERV,
+	    "VAN_LAST, wrong value");
 
 	fprintf(stderr, "========== 6 Destroy the tree ===========\n");
 	ret = tree->destroy(tree);
 	CHK_RET(ret, "tree->destroy");
 
-	(void)free_string_testdata(keys, ksizes, values, vsizes, cnt);
+	(void)free_string_testdata(&td);
 
 	return (ret);
 }
@@ -630,7 +615,7 @@ int imt_t1_4() {
 	VAN_TABLE table;
 	INMEM_TREE *tree;
 	int ret, cnt;
-	STRING_TESTDATA_DEFINE;
+	TESTDATA td;
 
 	memset(&table, 0, sizeof(VAN_TABLE));
 	ret = van_inmemtree_create(&table, &table.active);
@@ -638,45 +623,40 @@ int imt_t1_4() {
 	tree = table.active;
 
 	cnt = 10000;
-	STRING_TESTDATA_INIT;
+	TESTDATA_INIT(&td, (size_t)cnt);
 
 	fprintf(stderr, "========== 1 generate test data ============\n");
-	(void)generate_string_testdata(keys, ksizes, 5, 15, values, vsizes,
-	    10, 20, cnt);
+	(void)generate_string_testdata(&td, 5, 15, 10, 20);
 
 	fprintf(stderr, "========== 2 populate tree ============\n");
-	ret = populate_inmemtree(tree, keys, ksizes, values, vsizes, cnt);
+	ret = populate_inmemtree(tree, &td);
 	CHK_RET(ret, "populate_inmemtree");
 
 	fprintf(stderr, "========== 3 delete from tree ============\n");
-	ret = delete_inmemtree_with_expected(tree, keys, ksizes, cnt, 0, 3, 0);
+	ret = delete_inmemtree_with_expected(tree, &td, 0, 3, 0);
 
 	fprintf(stderr, "========== 4 delete records deleted from tree ============\n");
-	ret = delete_inmemtree_with_expected(tree, keys, ksizes, cnt, 0, 3, VAN_NOTFOUND);
+	ret = delete_inmemtree_with_expected(tree, &td, 0, 3, VAN_NOTFOUND);
 
 	fprintf(stderr, "========== 5 verify the tree does not contain deleted data ============\n");
-	ret = verify_inmemtree_with_expected(tree, keys, ksizes, values, vsizes,
-	    cnt, 0, 3, VAN_NOTFOUND);
+	ret = verify_inmemtree_with_expected(tree, &td, 0, 3, VAN_NOTFOUND);
 	
 	fprintf(stderr, "========== 6 verify the tree contains non-deleted data ============\n");
-	ret = verify_inmemtree_with_expected(tree, keys, ksizes, values, vsizes,
-	    cnt, 1, 3, 0);
-	ret = verify_inmemtree_with_expected(tree, keys, ksizes, values, vsizes,
-	    cnt, 2, 3, 0);
+	ret = verify_inmemtree_with_expected(tree, &td, 1, 3, 0);
+	ret = verify_inmemtree_with_expected(tree, &td, 2, 3, 0);
 
 	fprintf(stderr, "========== 7 freeze the tree ============\n");
 	ret = tree->freeze(tree);
 	CHK_RET(ret, "tree->freeze");
 
 	fprintf(stderr, "========== 8 populate frozen tree with expected ============\n");
-	ret = populate_inmemtree_with_expected(tree, 
-		keys, ksizes, values, vsizes,  cnt, VAN_FROZEN);
+	ret = populate_inmemtree_with_expected(tree, &td, VAN_FROZEN);
 
 	fprintf(stderr, "========== 9 delete from frozen tree with expected ============\n");
-	ret = delete_inmemtree_with_expected(tree, keys, ksizes, cnt, 0, 1, VAN_FROZEN);
+	ret = delete_inmemtree_with_expected(tree, &td, 0, 1, VAN_FROZEN);
 
 	fprintf(stderr, "========== 10 cleanup test data ============\n");
-	(void)free_string_testdata(keys, ksizes, values, vsizes, cnt);
+	(void)free_string_testdata(&td);
 
 	fprintf(stderr, "========== 11 destroy the tree ============\n");
 	ret = tree->destroy(tree);

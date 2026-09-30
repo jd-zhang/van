@@ -21,7 +21,7 @@ int odt_t1_1() {
 	INMEM_TREE *tree;
 	ONDISK_TREE *odtree;
 	int ret, cnt;
-	STRING_TESTDATA_DEFINE;
+	TESTDATA td;
 	const char *odtpath;
 	size_t rcnt;
 	time_t t1, t2;
@@ -42,16 +42,15 @@ int odt_t1_1() {
 	CHK_RET(ret, "van_inmemtree_create");
 
 	cnt = 100000;
-	STRING_TESTDATA_INIT;
+	TESTDATA_INIT(&td, (size_t)cnt);
 
-	(void)generate_string_testdata(keys, ksizes, 20, 30, values, vsizes,
-	    50, 120, cnt);
+	(void)generate_string_testdata(&td, 20, 30, 50, 120);
 
 	fprintf(stderr, "============ 1 Try to put %lu records =========\n",
 	    (unsigned long)cnt);
 	van_alloc_stat_reset();
 	van_rwlock_stat_reset();
-	ret = populate_inmemtree(tree, keys, ksizes, values, vsizes, cnt);
+	ret = populate_inmemtree(tree, &td);
 	CHK_RET(ret, "populate_inmemtree");
 	van_rwlock_stat_print(stderr, " ");
 	fprintf(stderr, "**** Malloc Statistics ****\n");
@@ -115,7 +114,7 @@ int odt_t1_1() {
 	CHK_RET(ret, "odtree->open(0)");
 
 	fprintf(stderr, "======== 6 trasverse ondisk tree using cursor(VAN_SET) =======\n");
-	ret = verify_ondisktree_data(odtree, keys, ksizes, values, vsizes, cnt);
+	ret = verify_ondisktree_data(odtree, &td);
 	CHK_RET(ret, "verify_ondisktree_data");
 
 	/* We close and reopen the tree here */
@@ -145,7 +144,7 @@ int odt_t1_1() {
 	fprintf(stderr, "**** Malloc Statistics ****\n");
 	van_alloc_stat_print(stderr, " ");
 
-	(void)free_string_testdata(keys, ksizes, values, vsizes, cnt);
+	(void)free_string_testdata(&td);
 
 	ret = table->close(table, 0);
 	CHK_RET(ret, "table->close");
@@ -167,8 +166,8 @@ int odt_t1_1() {
  * The records go into an in-memory tree first and are then stored into the
  * on-disk tree, exactly as odt_t1_1() does.  The expected records are
  * sorted with the compare function the on-disk tree compares keys with, so
- * that walking it has to hand back keys[0] .. keys[cnt - 1] forward and the
- * reverse order backward.
+ * that walking it has to hand back records[0] .. records[count - 1] forward
+ * and the reverse order backward.
  */
 int odt_t1_1b() {
 	VAN_TABLE *table;
@@ -177,7 +176,7 @@ int odt_t1_1b() {
 	ONDISK_TREE *odtree;
 	int ret, cnt;
 	size_t rcnt;
-	STRING_TESTDATA_DEFINE;
+	TESTDATA td;
 	const char *odtpath;
 
 	odtpath = "test1.ondisk.odt_t1b";
@@ -196,13 +195,12 @@ int odt_t1_1b() {
 	CHK_RET(ret, "van_inmemtree_create");
 
 	cnt = 100000;
-	STRING_TESTDATA_INIT;
-	(void)generate_string_testdata(keys, ksizes, 20, 30, values, vsizes,
-	    50, 120, cnt);
+	TESTDATA_INIT(&td, (size_t)cnt);
+	(void)generate_string_testdata(&td, 20, 30, 50, 120);
 
 	fprintf(stderr, "============ 1 Try to put %lu records =========\n",
 	    (unsigned long)cnt);
-	ret = populate_inmemtree(tree, keys, ksizes, values, vsizes, cnt);
+	ret = populate_inmemtree(tree, &td);
 	CHK_RET(ret, "populate_inmemtree");
 
 	fprintf(stderr, "========== 2 Build the ondisk tree ============\n");
@@ -215,14 +213,13 @@ int odt_t1_1b() {
 	CHK_RET(ret, "odtree->store_inmem");
 
 	fprintf(stderr, "========== 3 Sort the expected records ==========\n");
-	ret = sort_testdata(keys, ksizes, values, vsizes, (size_t)cnt,
-	    odtree->table->cmp_func);
+	ret = sort_testdata(&td, odtree->table->cmp_func);
 	CHK_RET(ret, "sort_testdata");
 
 	fprintf(stderr, "======== 4 Walk forward using VAN_NEXT ========\n");
 	rcnt = 0;
 	ret = verify_ondisktree_cursor_direction_full(odtree, VAN_NEXT, 0,
-	    &rcnt, keys, ksizes, values, vsizes, (size_t)cnt);
+	    &rcnt, &td);
 	CHK_RET(ret, "verify_ondisktree_cursor_direction_full(VAN_NEXT)");
 	TEST_ASSERT2(rcnt == (size_t)cnt, "expected %d records, walked %lu",
 	    cnt, (unsigned long)rcnt);
@@ -230,20 +227,19 @@ int odt_t1_1b() {
 	fprintf(stderr, "======== 5 Walk backward using VAN_PREV ========\n");
 	rcnt = 0;
 	ret = verify_ondisktree_cursor_direction_full(odtree, VAN_PREV, 0,
-	    &rcnt, keys, ksizes, values, vsizes, (size_t)cnt);
+	    &rcnt, &td);
 	CHK_RET(ret, "verify_ondisktree_cursor_direction_full(VAN_PREV)");
 	TEST_ASSERT2(rcnt == (size_t)cnt, "expected %d records, walked %lu",
 	    cnt, (unsigned long)rcnt);
 
 	fprintf(stderr, "======== 6 VAN_FIRST is the first record ========\n");
 	ret = verify_ondisktree_cursor_border_full(odtree, VAN_FIRST, 0,
-	    keys[0], ksizes[0], values[0], vsizes[0]);
+	    &td.records[0]);
 	CHK_RET(ret, "verify_ondisktree_cursor_border_full(VAN_FIRST)");
 
 	fprintf(stderr, "======== 7 VAN_LAST is the last record ========\n");
 	ret = verify_ondisktree_cursor_border_full(odtree, VAN_LAST, 0,
-	    keys[cnt - 1], ksizes[cnt - 1],
-	    values[cnt - 1], vsizes[cnt - 1]);
+	    &td.records[td.count - 1]);
 	CHK_RET(ret, "verify_ondisktree_cursor_border_full(VAN_LAST)");
 
 	fprintf(stderr, "====== 8 Destroy the tree(ondisk and inmemory) =====\n");
@@ -252,7 +248,7 @@ int odt_t1_1b() {
 	ret = tree->destroy(tree);
 	CHK_RET(ret, "tree->destroy");
 
-	(void)free_string_testdata(keys, ksizes, values, vsizes, cnt);
+	(void)free_string_testdata(&td);
 
 	ret = table->close(table, 0);
 	CHK_RET(ret, "table->close");
@@ -281,14 +277,14 @@ static char odt_neg_val[] = "zzzz-bogus-value-that-is-not-in-the-tree";
 typedef struct {
 	ONDISK_TREE *tree;
 	flags_t      direction;
-	char       **keys, **values;
-	size_t      *ksizes, *vsizes;
-	size_t       cnt;
+	TESTDATA     td;
 	int          mode;
 } odt_neg_t;
 
 static int odt_neg_check(void *arg) {
 	odt_neg_t *c;
+	TESTDATA short_td;
+	RECORD rec;
 	size_t rcnt, idx;
 	int backward;
 
@@ -296,50 +292,49 @@ static int odt_neg_check(void *arg) {
 	rcnt = 0;
 	backward = (c->direction == VAN_PREV || c->direction == VAN_LAST);
 	/* Corrupt the record the walk reads first. */
-	idx = backward ? c->cnt - 1 : 0;
+	idx = backward ? c->td.count - 1 : 0;
+	rec = c->td.records[idx];
 
 	switch (c->mode) {
 	case ODT_NEG_KEY:
-		c->keys[idx] = odt_neg_key;
-		c->ksizes[idx] = strlen(odt_neg_key);
+		c->td.records[idx].key = odt_neg_key;
+		c->td.records[idx].ksize = strlen(odt_neg_key);
 		break;
 	case ODT_NEG_VALUE:
-		c->values[idx] = odt_neg_val;
-		c->vsizes[idx] = strlen(odt_neg_val);
+		c->td.records[idx].value = odt_neg_val;
+		c->td.records[idx].vsize = strlen(odt_neg_val);
 		break;
 	case ODT_NEG_COUNT:
+		/* One record less than the tree holds. */
+		TESTDATA_SLICE(&short_td, &c->td, 0, c->td.count - 1);
 		return verify_ondisktree_cursor_direction_full(c->tree,
-		    c->direction, 0, &rcnt, c->keys, c->ksizes,
-		    c->values, c->vsizes, c->cnt - 1);
+		    c->direction, 0, &rcnt, &short_td);
 	case ODT_NEG_BORDERK:
+		rec.key = odt_neg_key;
+		rec.ksize = strlen(odt_neg_key);
 		return verify_ondisktree_cursor_border_full(c->tree,
-		    c->direction, 0, odt_neg_key, strlen(odt_neg_key),
-		    c->values[idx], c->vsizes[idx]);
+		    c->direction, 0, &rec);
 	case ODT_NEG_BORDERV:
+		rec.value = odt_neg_val;
+		rec.vsize = strlen(odt_neg_val);
 		return verify_ondisktree_cursor_border_full(c->tree,
-		    c->direction, 0, c->keys[idx], c->ksizes[idx],
-		    odt_neg_val, strlen(odt_neg_val));
+		    c->direction, 0, &rec);
 	default:
 		return (0);
 	}
 
 	return verify_ondisktree_cursor_direction_full(c->tree, c->direction,
-	    0, &rcnt, c->keys, c->ksizes, c->values, c->vsizes, c->cnt);
+	    0, &rcnt, &c->td);
 }
 
-static int odt_neg_one(ONDISK_TREE *tree, char **keys, size_t *ksizes,
-    char **values, size_t *vsizes, size_t cnt, flags_t direction, int mode,
-    const char *what) {
+static int odt_neg_one(ONDISK_TREE *tree, TESTDATA *td, flags_t direction,
+    int mode, const char *what) {
 	odt_neg_t ctx;
 
 	memset(&ctx, 0, sizeof(ctx));
 	ctx.tree = tree;
 	ctx.direction = direction;
-	ctx.keys = keys;
-	ctx.ksizes = ksizes;
-	ctx.values = values;
-	ctx.vsizes = vsizes;
-	ctx.cnt = cnt;
+	ctx.td = *td;
 	ctx.mode = mode;
 
 	TEST_ASSERT2(verify_child_fails(odt_neg_check, &ctx),
@@ -359,7 +354,7 @@ int odt_t1_1c() {
 	INMEM_TREE *tree;
 	ONDISK_TREE *odtree;
 	int ret, cnt;
-	STRING_TESTDATA_DEFINE;
+	TESTDATA td;
 	const char *odtpath;
 
 	odtpath = "test1.ondisk.odt_t1c";
@@ -378,13 +373,12 @@ int odt_t1_1c() {
 	CHK_RET(ret, "van_inmemtree_create");
 
 	cnt = 10000;
-	STRING_TESTDATA_INIT;
-	(void)generate_string_testdata(keys, ksizes, 20, 30, values, vsizes,
-	    50, 120, cnt);
+	TESTDATA_INIT(&td, (size_t)cnt);
+	(void)generate_string_testdata(&td, 20, 30, 50, 120);
 
 	fprintf(stderr, "============ 1 Try to put %lu records =========\n",
 	    (unsigned long)cnt);
-	ret = populate_inmemtree(tree, keys, ksizes, values, vsizes, cnt);
+	ret = populate_inmemtree(tree, &td);
 	CHK_RET(ret, "populate_inmemtree");
 
 	fprintf(stderr, "========== 2 Build the ondisk tree ============\n");
@@ -397,35 +391,34 @@ int odt_t1_1c() {
 	CHK_RET(ret, "odtree->store_inmem");
 
 	fprintf(stderr, "========== 3 Sort the expected records ==========\n");
-	ret = sort_testdata(keys, ksizes, values, vsizes, (size_t)cnt,
-	    odtree->table->cmp_func);
+	ret = sort_testdata(&td, odtree->table->cmp_func);
 	CHK_RET(ret, "sort_testdata");
 
 	fprintf(stderr, "======== 4 A wrong record must be caught ========\n");
-	ret = odt_neg_one(odtree, keys, ksizes, values, vsizes, (size_t)cnt,
-	    VAN_NEXT, ODT_NEG_KEY, "VAN_NEXT, wrong key");
-	ret = odt_neg_one(odtree, keys, ksizes, values, vsizes, (size_t)cnt,
-	    VAN_PREV, ODT_NEG_KEY, "VAN_PREV, wrong key");
-	ret = odt_neg_one(odtree, keys, ksizes, values, vsizes, (size_t)cnt,
-	    VAN_NEXT, ODT_NEG_VALUE, "VAN_NEXT, wrong value");
-	ret = odt_neg_one(odtree, keys, ksizes, values, vsizes, (size_t)cnt,
-	    VAN_PREV, ODT_NEG_VALUE, "VAN_PREV, wrong value");
+	ret = odt_neg_one(odtree, &td, VAN_NEXT, ODT_NEG_KEY,
+	    "VAN_NEXT, wrong key");
+	ret = odt_neg_one(odtree, &td, VAN_PREV, ODT_NEG_KEY,
+	    "VAN_PREV, wrong key");
+	ret = odt_neg_one(odtree, &td, VAN_NEXT, ODT_NEG_VALUE,
+	    "VAN_NEXT, wrong value");
+	ret = odt_neg_one(odtree, &td, VAN_PREV, ODT_NEG_VALUE,
+	    "VAN_PREV, wrong value");
 
 	fprintf(stderr, "======== 5 A wrong count must be caught =========\n");
-	ret = odt_neg_one(odtree, keys, ksizes, values, vsizes, (size_t)cnt,
-	    VAN_NEXT, ODT_NEG_COUNT, "VAN_NEXT, one record too few");
-	ret = odt_neg_one(odtree, keys, ksizes, values, vsizes, (size_t)cnt,
-	    VAN_PREV, ODT_NEG_COUNT, "VAN_PREV, one record too few");
+	ret = odt_neg_one(odtree, &td, VAN_NEXT, ODT_NEG_COUNT,
+	    "VAN_NEXT, one record too few");
+	ret = odt_neg_one(odtree, &td, VAN_PREV, ODT_NEG_COUNT,
+	    "VAN_PREV, one record too few");
 
 	fprintf(stderr, "======== 6 A wrong border must be caught ========\n");
-	ret = odt_neg_one(odtree, keys, ksizes, values, vsizes, (size_t)cnt,
-	    VAN_FIRST, ODT_NEG_BORDERK, "VAN_FIRST, wrong key");
-	ret = odt_neg_one(odtree, keys, ksizes, values, vsizes, (size_t)cnt,
-	    VAN_LAST, ODT_NEG_BORDERK, "VAN_LAST, wrong key");
-	ret = odt_neg_one(odtree, keys, ksizes, values, vsizes, (size_t)cnt,
-	    VAN_FIRST, ODT_NEG_BORDERV, "VAN_FIRST, wrong value");
-	ret = odt_neg_one(odtree, keys, ksizes, values, vsizes, (size_t)cnt,
-	    VAN_LAST, ODT_NEG_BORDERV, "VAN_LAST, wrong value");
+	ret = odt_neg_one(odtree, &td, VAN_FIRST, ODT_NEG_BORDERK,
+	    "VAN_FIRST, wrong key");
+	ret = odt_neg_one(odtree, &td, VAN_LAST, ODT_NEG_BORDERK,
+	    "VAN_LAST, wrong key");
+	ret = odt_neg_one(odtree, &td, VAN_FIRST, ODT_NEG_BORDERV,
+	    "VAN_FIRST, wrong value");
+	ret = odt_neg_one(odtree, &td, VAN_LAST, ODT_NEG_BORDERV,
+	    "VAN_LAST, wrong value");
 
 	fprintf(stderr, "====== 7 Destroy the tree(ondisk and inmemory) ===\n");
 	ret = odtree->close(odtree, 0);
@@ -433,7 +426,7 @@ int odt_t1_1c() {
 	ret = tree->destroy(tree);
 	CHK_RET(ret, "tree->destroy");
 
-	(void)free_string_testdata(keys, ksizes, values, vsizes, cnt);
+	(void)free_string_testdata(&td);
 
 	ret = table->close(table, 0);
 	CHK_RET(ret, "table->close");
@@ -448,9 +441,9 @@ int odt_t1_2() {
 	VAN_STORE *store;
 	VAN_TABLE *table;
 	ONDISK_TREE *odtree, *modtree, *odtrees[TNUM_ODT_T1_2];
-	int ret, cnt, i, j;
+	int ret, cnt, j;
 	time_t t1, t2;
-	STRING_TESTDATA_DEFINE;
+	TESTDATA td, slice;
 
 	const size_t record_cnt = 100000;
 
@@ -458,10 +451,9 @@ int odt_t1_2() {
 	modtree = NULL;
 
 	cnt = TNUM_ODT_T1_2 * record_cnt;
-	STRING_TESTDATA_INIT;
+	TESTDATA_INIT(&td, (size_t)cnt);
 
-	(void)generate_string_testdata(keys, ksizes, 20, 30,
-	    values, vsizes, 50, 120, cnt);
+	(void)generate_string_testdata(&td, 20, 30, 50, 120);
 
 	system("rm -f od_table.ondisk*");
 	system("rm -f od_table.odlist*");
@@ -482,9 +474,10 @@ int odt_t1_2() {
 		    j, (unsigned long)record_cnt, j);
 		van_alloc_stat_reset();
 		van_rwlock_stat_reset();
-		i = j * record_cnt;
-		ret = populate_table(table, keys+i, ksizes+i,
-		    values+i, vsizes+i, record_cnt);
+		/* The slice of the data set this round works on. */
+		TESTDATA_SLICE(&slice, &td, (size_t)(j * record_cnt),
+		    record_cnt);
+		ret = populate_table(table, &slice);
 		CHK_RET(ret, "populate_table");
 		van_rwlock_stat_print(stderr, " ");
 		fprintf(stderr, "**** Malloc Statistics ****\n");
@@ -493,9 +486,7 @@ int odt_t1_2() {
 		fprintf(stderr,
 			"============ %d.2 Try to get %lu records from inmemtree-%d =========\n",
 		    j, (unsigned long)record_cnt, j);
-		i = j * record_cnt;
-		ret = verify_table_data(table, keys+i, ksizes+i,
-		    values+i, vsizes+i, record_cnt);
+		ret = verify_table_data(table, &slice);
 		CHK_RET(ret, "verify_table_data(odtree)");
 
 		if (j+1 < TNUM_ODT_T1_2) {
@@ -510,9 +501,7 @@ int odt_t1_2() {
 			odtrees[j] = odtree;
 			fprintf(stderr, "%d.3.2 Getting records from the odtree:%s\n",
 			    j, odtree->file_path);
-			i = j * record_cnt;
-			ret = verify_ondisktree_data(odtree, keys+i, ksizes+i,
-			    values+i, vsizes+i, record_cnt);
+			ret = verify_ondisktree_data(odtree, &slice);
 			CHK_RET(ret, "verify_ondisktree_data(odtree)");
 		}
 	}
@@ -521,7 +510,7 @@ int odt_t1_2() {
 	CHK_RET(ret, "table->write_odt_paths");
 	table->show_odt_items(table, stderr);
 	fprintf(stderr, "========== 6 Get all using table (1) ==========\n");
-	ret = verify_table_data(table, keys, ksizes, values, vsizes, cnt);
+	ret = verify_table_data(table, &td);
 	CHK_RET(ret, "verify_table_data(1)");
 
 	fprintf(stderr, "========== 6 Merge and get (2) ==========\n");
@@ -531,7 +520,7 @@ int odt_t1_2() {
 	odtrees[TNUM_ODT_T1_2 - 1] = odtree;
 	ret = table->merge_ondisktrees(table, odtrees, TNUM_ODT_T1_2, &modtree);
 	CHK_RET(ret, "table->merge_ondisktrees");
-	ret = verify_ondisktree_data(modtree, keys, ksizes, values, vsizes, cnt);
+	ret = verify_ondisktree_data(modtree, &td);
 	CHK_RET(ret, "verify_ondisktree_data(2, modtree)");
 	ret = table->write_odt_paths(table);
 	CHK_RET(ret, "table->write_odt_paths");
@@ -542,12 +531,12 @@ int odt_t1_2() {
 	table->show_odt_items(table, stderr);
 
 	fprintf(stderr, "========== 6 Get using table again (3) ==========\n");
-	ret = verify_table_data(table, keys, ksizes, values, vsizes, cnt);
+	ret = verify_table_data(table, &td);
 	CHK_RET(ret, "verify_table_data(3)");
 
 	fprintf(stderr, "====== 7 Free the memory and close the table ====\n");
 	time(&t1);
-	(void)free_string_testdata(keys, ksizes, values, vsizes, cnt);
+	(void)free_string_testdata(&td);
 	ret = table->close(table, 0);
 	CHK_RET(ret, "table->close");
 	ret = store->close(store);
@@ -571,21 +560,20 @@ int odt_t1_3() {
 	size_t vsz, opsz, total, dupcount;
 	const size_t record_cnt = 100000;
 	int *ops, *ops_all;
-	STRING_TESTDATA_DEFINE;
+	TESTDATA td;
 
 	memset(odtrees, 0, sizeof(odtrees));
 	modtree = NULL;
 
 	cnt = record_cnt;
-	STRING_TESTDATA_INIT;
+	TESTDATA_INIT(&td, (size_t)cnt);
 	opsz = cnt * sizeof(int);
 	ops = (int *)malloc(opsz);
 	TEST_ASSERT(ops != NULL);
 	ops_all = (int *)malloc(opsz);
 	TEST_ASSERT(ops_all != NULL);
 
-	(void)generate_string_testdata(keys, ksizes, 20, 30,
-	    values, vsizes, 50, 120, cnt);
+	(void)generate_string_testdata(&td, 20, 30, 50, 120);
 	system("rm -f od_table.ondisk*");
 	system("rm -f od_table.odlist*");
 	system("rm -fr vanlog.*");
@@ -603,14 +591,14 @@ int odt_t1_3() {
 	    (unsigned long)record_cnt);
 	van_alloc_stat_reset();
 	van_rwlock_stat_reset();
-	ret = populate_table(table, keys, ksizes, values, vsizes, cnt);
+	ret = populate_table(table, &td);
 	van_rwlock_stat_print(stderr, " ");
 	fprintf(stderr, "**** Malloc Statistics ****\n");
 	van_alloc_stat_print(stderr, " ");
 
 	fprintf(stderr, "============ 2 Intial get %lu records =========\n",
 	    (unsigned long)record_cnt);
-	ret = verify_table_data(table, keys, ksizes, values, vsizes, cnt);
+	ret = verify_table_data(table, &td);
 
 
 	for (j = 0; j < TNUM_ODT_T1_3; j++) {
@@ -630,12 +618,12 @@ int odt_t1_3() {
 			if (ops[k] == OP_NOOP)
 				continue;
 			memset(&key, 0, sizeof(key));
-			key.data = keys[k];
-			key.size = ksizes[k];
+			key.data = td.records[k].key;
+			key.size = td.records[k].ksize;
 			if (ops[k] == OP_DELETE) {
-				free(values[k]);
-				values[k] = NULL;
-				vsizes[k] = 0;
+				free(td.records[k].value);
+				td.records[k].value = NULL;
+				td.records[k].vsize = 0;
 				ret = table->del(table, &key, 0);
 				if (ops_all[k] == OP_DELETE) {
 					TEST_ASSERT(ret == VAN_NOTFOUND || ret == 0);
@@ -643,15 +631,16 @@ int odt_t1_3() {
 					CHK_RET(ret, "table->del");
 				}
 			} else if (ops[k] == OP_UPDATE) {
-				free(values[k]);
+				free(td.records[k].value);
 				getrandomstring2(vbuf, 50, 120);
-				vsizes[k] = vsz = strlen(vbuf) + 1;
-				values[k] = (char *)malloc(vsz);
-				TEST_ASSERT(values[k] != NULL);
-				memcpy(values[k], vbuf, vsz);
+				vsz = strlen(vbuf) + 1;
+				td.records[k].vsize = vsz;
+				td.records[k].value = (char *)malloc(vsz);
+				TEST_ASSERT(td.records[k].value != NULL);
+				memcpy(td.records[k].value, vbuf, vsz);
 				memset(&value, 0, sizeof(value));
-				value.data = values[k];
-				value.size = vsizes[k];
+				value.data = td.records[k].value;
+				value.size = td.records[k].vsize;
 				ret = table->put(table, &key, &value, 0);
 				CHK_RET(ret, "table->put");
 			}
@@ -662,15 +651,16 @@ int odt_t1_3() {
 		/* Verify Operations */
 		for (k = 0; k < record_cnt; k++) {
 			memset(&key, 0, sizeof(key));
-			key.data = keys[k];
-			key.size = ksizes[k];
+			key.data = td.records[k].key;
+			key.size = td.records[k].ksize;
 			memset(&value, 0, sizeof(value));
 			ret = table->get(table, &key, &value, 0);
 			if (ops_all[k] == OP_DELETE) {
 				TEST_ASSERT(ret == VAN_NOTFOUND);
 			} else {
 				CHK_RET(ret, "table->get");
-				cmp = strcmp(values[k], (char *)value.data);
+				cmp = strcmp(td.records[k].value,
+				    (char *)value.data);
 				TEST_ASSERT(cmp == 0);
 			}
 		}
@@ -687,15 +677,16 @@ int odt_t1_3() {
 			/* Verify Operations Again */
 			for (k = 0; k < record_cnt; k++) {
 				memset(&key, 0, sizeof(key));
-				key.data = keys[k];
-				key.size = ksizes[k];
+				key.data = td.records[k].key;
+				key.size = td.records[k].ksize;
 				memset(&value, 0, sizeof(value));
 				ret = table->get(table, &key, &value, 0);
 				if (ops_all[k] == OP_DELETE) {
 					TEST_ASSERT(ret == VAN_NOTFOUND);
 				} else {
 					CHK_RET(ret, "table->get");
-					cmp = strcmp(values[k], (char *)value.data);
+					cmp = strcmp(td.records[k].value,
+					    (char *)value.data);
 					TEST_ASSERT(cmp == 0);
 				}
 			}
@@ -723,8 +714,8 @@ int odt_t1_3() {
 	/* Verify Operations Again */
 	for (k = 0; k < record_cnt; k++) {
 		memset(&key, 0, sizeof(key));
-		key.data = keys[k];
-		key.size = ksizes[k];
+		key.data = td.records[k].key;
+		key.size = td.records[k].ksize;
 		memset(&value, 0, sizeof(value));
 		ret = table->get(table, &key, &value, 0);
 
@@ -732,7 +723,8 @@ int odt_t1_3() {
 			TEST_ASSERT(ret == VAN_NOTFOUND);
 		} else {
 			CHK_RET(ret, "table->get");
-			cmp = strcmp(values[k], (char *)value.data);
+			cmp = strcmp(td.records[k].value,
+			    (char *)value.data);
 			TEST_ASSERT(cmp == 0);
 		}
 	}
@@ -742,7 +734,7 @@ int odt_t1_3() {
 
 	fprintf(stderr, "====== 5 Free the memory and close the table ====\n");
 	time(&t1);
-	(void)free_string_testdata(keys, ksizes, values, vsizes, cnt);
+	(void)free_string_testdata(&td);
 	free(ops);
 	free(ops_all);
 	ret = table->close(table, 0);
