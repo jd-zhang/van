@@ -33,7 +33,6 @@ extern "C" {
 
 struct _ondisk_cache_block {
 	TAILQ_ENTRY(_ondisk_cache_block)	links;
-	TAILQ_ENTRY(_ondisk_cache_block)	tree_links;
 	TAILQ_ENTRY(_ondisk_cache_block)	lru_links;
 	pthread_mutex_t		mtx_load_cond;
 	pthread_cond_t		load_cond;
@@ -68,8 +67,10 @@ struct _ondisk_cache_header {
  * the ones that happen to collide in one bucket.
  *
  * Lock order (always, in every path):
- *	tree->odfile.mtx_head -> store->cache_lru.mtx_lru ->
- *	    store->cache_header[i].mtx_hash
+ *	store->cache_lru.mtx_lru -> store->cache_header[i].mtx_hash
+ *
+ * A block is reachable only through its hash bucket, so dropping one
+ * never leaves a stale pointer behind in another list.
  */
 struct _ondisk_cache_lru {
 	pthread_mutex_t	mtx_lru;

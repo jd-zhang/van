@@ -50,7 +50,7 @@ static int tb3_setup(VAN_STORE **storep, VAN_TABLE **tablep,
 	system("rm -fr vanlog.*");
 	ret = van_test_store_create(&store);
 	CHK_RET(ret, "van_store_create");
-	store->set_cachesize(store, 100*MEGABYTE);
+	store->set_cachesize(store, 1*GIGABYTE);
 	ret = store->open(store, ".", 0);
 	CHK_RET(ret, "store->open");
 	ret = van_table_create(store, &table);
@@ -213,34 +213,43 @@ static void testdata_free_shallow(TESTDATA *td) {
 }
 
 /*
- * Is small a subset of big?  Both must be sorted ascending by
- * (key, value).  Returns 0 on success, else 1 + the position of the
- * first record of small that is missing from big (or has a different
- * value there).
+ * How many records of small are not in big?  Both must be sorted
+ * ascending by (key, value).  A record counts as missing when its key
+ * is absent from big, or when the value stored there differs.
+ *
+ * The whole set is walked rather than stopping at the first miss: how
+ * much is missing is far more telling than where the first miss is.
  */
-static size_t testdata_is_subset(TESTDATA *small, TESTDATA *big) {
-	size_t i, j;
+static size_t testdata_count_missing(TESTDATA *small, TESTDATA *big) {
+	size_t i, j, missing;
 	int cmp;
 
 	i = 0;
 	j = 0;
+	missing = 0;
 	while (i < small->count) {
-		if (j == big->count)
-			return (i + 1);
+		if (j == big->count) {
+			/* Everything left of small is past big's end. */
+			missing += small->count - i;
+			break;
+		}
 		cmp = rec_keycmp(&small->records[i], &big->records[j]);
-		if (cmp < 0)
-			return (i + 1);
+		if (cmp < 0) {
+			missing++;
+			i++;
+			continue;
+		}
 		if (cmp > 0) {
 			j++;
 			continue;
 		}
 		/* Same key: the value has to match as well. */
 		if (!rec_full_equal(&small->records[i], &big->records[j]))
-			return (i + 1);
+			missing++;
 		i++;
 		j++;
 	}
-	return (0);
+	return (missing);
 }
 
 /*
@@ -516,15 +525,16 @@ static void tb3_view(coll_t *c, TESTDATA *td) {
 
 static void assert_subset(TESTDATA *small, TESTDATA *big, const char *what,
     const char *whichtd) {
-	size_t miss;
+	size_t missing;
 
-	miss = testdata_is_subset(small, big);
-	if (miss != 0)
-		fprintf(stderr, "%s: %s first missing record %lu, key '%s'\n",
-		    what, whichtd, (unsigned long)(miss - 1),
-		    (char *)small->records[miss - 1].key);
-	TEST_ASSERT2(miss == 0, "%s: %s is not a subset, first miss %lu",
-	    what, whichtd, (unsigned long)(miss - 1));
+	missing = testdata_count_missing(small, big);
+	if (missing != 0)
+		fprintf(stderr, "%s: %s is missing %lu of %lu records\n",
+		    what, whichtd, (unsigned long)missing,
+		    (unsigned long)small->count);
+	TEST_ASSERT2(missing == 0, "%s: %s is missing %lu of %lu records",
+	    what, whichtd, (unsigned long)missing,
+	    (unsigned long)small->count);
 }
 
 /*

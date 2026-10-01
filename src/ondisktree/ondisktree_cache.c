@@ -29,9 +29,14 @@
  *
  * Lock order, followed by every path in this file:
  *
- *	tree->odfile.mtx_head
- *	  -> store->cache_lru.mtx_lru
- *	    -> store->cache_header[i].mtx_hash
+ *	store->cache_lru.mtx_lru
+ *	  -> store->cache_header[i].mtx_hash
+ *
+ * A cached block hangs off exactly one hash bucket and one LRU list,
+ * nothing else.  It has no per tree links: a tree that closes finds its
+ * blocks by scanning for its file identity, see
+ * _van_ondisk_cache_discard_fileid(), so freeing a block can never
+ * leave a stale pointer in a list somewhere else.
  *
  * Reference counting: refcount is atomic so that it can be observed
  * without a lock, but every modification happens under the bucket lock
@@ -80,15 +85,16 @@ static void cache_lru_promote(VAN_STORE *store, ONDISK_CACHE_BLOCK *block) {
 	store->cache_lru.stat_promotions++;
 }
 
-/* The least recently used block of the protected list, NULL when empty. */
+/*
+ * The least recently used block of the protected list, NULL when empty.
+ *
+ * TAILQ keeps a pointer to its last element, so this is O(1); walking
+ * the list for it made every demotion -- and through it every cache
+ * hit that has to cap the protected segment -- cost O(protected).
+ */
 static ONDISK_CACHE_BLOCK *cache_prot_tail(VAN_STORE *store) {
-	ONDISK_CACHE_BLOCK *block, *last;
 
-	last = NULL;
-	TAILQ_FOREACH(block, &store->cache_lru.protected, lru_links)
-		last = block;
-
-	return (last);
+	return (TAILQ_LAST(&store->cache_lru.protected, _odprot));
 }
 
 /*
@@ -429,18 +435,6 @@ int _van_ondisk_cache_get(ONDISK_TREE *tree, uint32 blkid,
 			owned = 0;
 			block = found;
 		} else {
-			/*
-			 * Lock order: the tree lock is outermost, it is
-			 * taken alone here, nothing else is held.
-			 */
-			VAN_MUTEX_LOCK(&tree->odfile, mtx_head, ret);
-			CHK_ERR(ret);
-			TAILQ_INSERT_HEAD(&tree->odfile.head, block,
-			    tree_links);
-			VAN_MUTEX_UNLOCK(&tree->odfile, mtx_head, ret1);
-			SET_RET(ret1, ret);
-			CHK_ERR(ret);
-
 			VAN_MUTEX_LOCK(block, mtx_load_cond, ret);
 			CHK_ERR(ret);
 			block->load = 1;
@@ -538,36 +532,58 @@ err:
 }
 
 /*
- * Drop one block: remove it from the hash table and from the LRU lists,
- * then destroy it.  Used when a tree is closed, the caller has already
- * detached the block from the tree list and may hold the tree lock.
+ * Drop every cached block of one on disk file, used when a tree is
+ * closed.
  *
- * Lock order: LRU -> bucket (the tree lock, if held, is outermost).
+ * A block carries the identity of the file it belongs to, and the cache
+ * is already keyed by (fileid, blkid), so walking the buckets and
+ * comparing the fileid finds all of them.  This replaces a per tree
+ * list, which the replacement code had no way to unlink a block from:
+ * an evicted block stayed linked to its tree and was freed a second
+ * time when the tree closed.
+ *
+ * Lock order: LRU -> bucket, exactly as cache_evict() uses it.  A block
+ * still referenced by a reader is left alone, its last put reaps it.
  */
-int _van_ondisk_cache_discard(VAN_STORE *store, ONDISK_CACHE_BLOCK *block) {
-	int ret, ret1;
-	size_t indx;
+int _van_ondisk_cache_discard_fileid(VAN_STORE *store, const char *fileid) {
+	ONDISK_CACHE_BLOCK *block, *next;
+	int ret, ret1, i;
 
 	ret = 0;
-	if (block == NULL)
+	if (store == NULL || fileid == NULL)
 		return (ret);
-	indx = block->hash_indx;
 
 	VAN_MUTEX_LOCK(&store->cache_lru, mtx_lru, ret);
 	CHK_ERR(ret);
-	VAN_MUTEX_LOCK(&store->cache_header[indx], mtx_hash, ret1);
-	SET_RET(ret1, ret);
-	if (ret == 0) {
-		TAILQ_REMOVE(&store->cache_header[indx].head, block, links);
-		cache_lru_remove(store, block);
+	for (i = 0; i < store->cache_header_size; i++) {
+		/* No goto from inside the loop, both locks stay balanced. */
+		VAN_MUTEX_LOCK(&store->cache_header[i], mtx_hash, ret1);
+		SET_RET(ret1, ret);
+		if (ret == 0) {
+			block = TAILQ_FIRST(&store->cache_header[i].head);
+			while (block != NULL) {
+				next = TAILQ_NEXT(block, links);
+				if (memcmp(block->fileid, fileid,
+				    OD_FILEID_LEN) != 0 ||
+				    atomic_load(&block->refcount) != 0) {
+					block = next;
+					continue;
+				}
+				TAILQ_REMOVE(&store->cache_header[i].head,
+				    block, links);
+				cache_lru_remove(store, block);
+				ret1 = _van_ondisk_cache_block_destory(block);
+				SET_RET(ret1, ret);
+				block = next;
+			}
+		}
+		VAN_MUTEX_UNLOCK(&store->cache_header[i], mtx_hash, ret1);
+		SET_RET(ret1, ret);
+		if (ret != 0)
+			break;
 	}
-	VAN_MUTEX_UNLOCK(&store->cache_header[indx], mtx_hash, ret1);
-	SET_RET(ret1, ret);
 	VAN_MUTEX_UNLOCK(&store->cache_lru, mtx_lru, ret1);
 	SET_RET(ret1, ret);
-	CHK_ERR(ret);
-
-	ret = _van_ondisk_cache_block_destory(block);
 
 err:
 	return (ret);

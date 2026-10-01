@@ -63,6 +63,7 @@ int _van_ondisktree_buildinfo_clean(ONDISK_TREE *od_tree) {
 				_van_free(NULL, bi->reserved_keys[i]);
 		}
 		_van_free(NULL, bi->reserved_keys);
+		bi->reserved_keys = NULL;
 		for (i = 0; i <= OD_MAX_LEVEL; i++) {
 			if (bi->nodes[i][0] != NULL)
 				_van_free(NULL, bi->nodes[i][0]);
@@ -70,6 +71,7 @@ int _van_ondisktree_buildinfo_clean(ONDISK_TREE *od_tree) {
 				_van_free(NULL, bi->nodes[i][1]);
 		}
 		_van_free(NULL, bi->nodes);
+		bi->nodes = NULL;
 		_van_free(NULL, bi);
 		od_tree->buildinfo = NULL;
 	}
@@ -144,6 +146,7 @@ int _van_ondisktree_store_finalize(ONDISK_TREE *od_tree) {
 	memcpy(sumbuf, meta, meta->metasize);
 	memcpy(sumbuf + sumtotal - sumsize,
 	    od_tree->meta_summary, sumsize);
+	(void)_van_ondisktree_buildinfo_clean(od_tree);
 
 	ret = _van_file_append(od_tree->tree_fid, sumbuf, sumtotal);
 	/* TODO: change to error handling */

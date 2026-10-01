@@ -715,6 +715,7 @@ int table_t2_9() {
 	coll_t c;
 	VAN_DATUM sk, ek;
 	VAN_TRAVERSE_OPT opt;
+	char lastk[32];
 	int ret, missing, expect;
 
 	/* key00100 and key00200 are absent from this data set. */
@@ -722,6 +723,8 @@ int table_t2_9() {
 	CHK_RET(ret, "setup");
 
 	missing = TB2_N - 2;
+	/* The highest key of the data set, "key%05d" of the last record. */
+	(void)snprintf(lastk, sizeof(lastk), "key%05d", TB2_N - 1);
 
 	vd_from_str("key00100", &sk);
 	vd_from_str("key00200", &ek);
@@ -753,9 +756,13 @@ int table_t2_9() {
 	chk_seq(&c, 101, 199, 1, "absent boundaries backward");
 	rcoll_release(&c);
 
-	/* A start key past every record selects nothing, and is not a bug. */
+	/*
+	 * A start key past every record selects nothing, and is not a
+	 * bug.  It has to sort above the highest key of the data set,
+	 * which is why it is not a "key%05d" string at all.
+	 */
 	rcoll_alloc(&c, TB2_N + 16);
-	vd_from_str("key99999", &sk);
+	vd_from_str("zzzzzz", &sk);
 	opt.start_key = &sk;
 	opt.start_inclusive = 1;
 	opt.end_key = NULL;
@@ -768,7 +775,7 @@ int table_t2_9() {
 
 	/*
 	 * An end key past every record is simply an open range.  This data
-	 * set also misses key00200, so [101, 999] is not contiguous and
+	 * set also misses key00200, so [101, last] is not contiguous and
 	 * cannot be checked with chk_seq().
 	 */
 	rcoll_alloc(&c, TB2_N + 16);
@@ -780,13 +787,13 @@ int table_t2_9() {
 	opt.end_inclusive = 0;
 	ret = table->traverse(table, VAN_TRAVERSE_FORWARD, &opt, coll_cb, &c);
 	CHK_RET(ret != 0, "open end must return 0");
-	expect = (TB2_N - 1 - 101 + 1) - 1;	/* [101, 999] less key00200 */
+	expect = (TB2_N - 1 - 101 + 1) - 1;	/* [101, last] less key00200 */
 	TEST_ASSERT2(c.n == expect, "open end: expected %d keys, got %d",
 	    expect, c.n);
 	TEST_ASSERT2(strcmp(c.keys[0], "key00101") == 0,
 	    "open end must start at key00101, got '%s'", c.keys[0]);
-	TEST_ASSERT2(strcmp(c.keys[c.n - 1], "key00999") == 0,
-	    "open end must end at key00999, got '%s'", c.keys[c.n - 1]);
+	TEST_ASSERT2(strcmp(c.keys[c.n - 1], lastk) == 0,
+	    "open end must end at %s, got '%s'", lastk, c.keys[c.n - 1]);
 	TEST_ASSERT2(coll_find(&c, "key00200") == NULL,
 	    "open end must skip the absent key00200");
 	rcoll_release(&c);
@@ -802,8 +809,8 @@ int table_t2_9() {
 	    "full scan: expected %d keys, got %d", missing, c.n);
 	TEST_ASSERT2(strcmp(c.keys[0], "key00000") == 0,
 	    "full scan must start at key00000, got '%s'", c.keys[0]);
-	TEST_ASSERT2(strcmp(c.keys[c.n - 1], "key00999") == 0,
-	    "full scan must end at key00999, got '%s'", c.keys[c.n - 1]);
+	TEST_ASSERT2(strcmp(c.keys[c.n - 1], lastk) == 0,
+	    "full scan must end at %s, got '%s'", lastk, c.keys[c.n - 1]);
 	rcoll_release(&c);
 
 	rcoll_alloc(&c, TB2_N + 16);
@@ -811,8 +818,9 @@ int table_t2_9() {
 	CHK_RET(ret != 0, "backward full scan must return 0");
 	TEST_ASSERT2(c.n == missing,
 	    "backward full scan: expected %d keys, got %d", missing, c.n);
-	TEST_ASSERT2(strcmp(c.keys[0], "key00999") == 0,
-	    "backward full scan must start at key00999, got '%s'", c.keys[0]);
+	TEST_ASSERT2(strcmp(c.keys[0], lastk) == 0,
+	    "backward full scan must start at %s, got '%s'", lastk,
+	    c.keys[0]);
 	TEST_ASSERT2(strcmp(c.keys[c.n - 1], "key00000") == 0,
 	    "backward full scan must end at key00000, got '%s'",
 	    c.keys[c.n - 1]);

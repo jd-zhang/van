@@ -442,6 +442,8 @@ int _van_table_traverse(VAN_TABLE *table, flags_t flags,
 	INMEM_TREE *active, *frozen;
 	ONDISK_TREE *odtree;
 	VAN_TABLE_ODT_ITEM *item;
+	VAN_OPERATION *op;
+	ticks_t tk;
 	flags_t nextflag;
 	int empty, cmp;
 	int ret, ret1;
@@ -450,6 +452,27 @@ int _van_table_traverse(VAN_TABLE *table, flags_t flags,
 		return (VAN_INVALID);
 	if (table->cmp_func == NULL)
 		return (VAN_INVALID);
+
+	/*
+	 * A scan is an operation like a get or a put, and it has to say
+	 * so: the dump and merge barriers only know about the trees they
+	 * may reclaim through table->min_op_ticks, the ticks of the
+	 * oldest operation still running.  Without an operation of its
+	 * own the scan is invisible to them, and a frozen tree it is
+	 * walking gets destroyed underneath it -- see
+	 * _van_table_frozen_free_thread().
+	 *
+	 * Registering the scan pins every tree that is frozen from here
+	 * on: a frozen tree is only reclaimed once its dumped_ticks is
+	 * older than the oldest live operation, and dumped_ticks is
+	 * taken when the dump finishes, which cannot happen before the
+	 * scan published its own ticks.
+	 */
+	op = NULL;
+	ret = _van_table_curticks(table, &tk);
+	CHK_ERR(ret);
+	ret = _van_table_op_create(table, &op, 0, tk);
+	CHK_ERR(ret);
 
 	memset(&tv, 0, sizeof(tv));
 	/*
@@ -652,6 +675,16 @@ err:
 	}
 	if (heap != NULL)
 		_van_free(NULL, heap);
+
+	/*
+	 * Close the operation last: everything the scan pinned stays
+	 * pinned until the sources above are gone, and only then may the
+	 * dump and merge barriers reclaim what the scan was reading.
+	 */
+	if (op != NULL) {
+		ret1 = _van_table_op_close(op);
+		SET_RET(ret1, ret);
+	}
 
 	return (ret);
 }

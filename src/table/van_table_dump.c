@@ -287,16 +287,38 @@ void *_van_table_frozen_free_thread(void *arg) {
 		frozen = TAILQ_FIRST(&table->im_dump_trees);
 		VAN_MUTEX_UNLOCK(table, im_dump_mtx, ret);
 
-		VAN_MUTEX_LOCK(table, op_mtx, ret);
-		minopticks = table->min_op_ticks;
-		VAN_MUTEX_UNLOCK(table, op_mtx, ret);
+		/*
+		 * Re-sample min_op_ticks for every candidate tree instead of
+		 * once per wakeup.  A single sample taken in a gap between two
+		 * operations (e.g. the idle window between phase-1 puts) reads
+		 * MAX_TICKS and would let this thread free trees that a
+		 * concurrent traversal has already pinned.  Sampling per tree
+		 * keeps the barrier correct: a tree whose dumped_ticks is newer
+		 * than the youngest live operation must stay.
+		 */
+		while (frozen != NULL) {
+			VAN_MUTEX_LOCK(table, op_mtx, ret);
+			minopticks = table->min_op_ticks;
+			VAN_MUTEX_UNLOCK(table, op_mtx, ret);
 
-		while (frozen != NULL && minopticks > frozen->dumped_ticks) {
+			if (minopticks <= frozen->dumped_ticks)
+				break;
+
 			tofree = frozen;
 			VAN_MUTEX_LOCK(table, im_dump_mtx, ret);
 			TAILQ_REMOVE(&table->im_dump_trees, frozen, links);
 			frozen = TAILQ_FIRST(&table->im_dump_trees);
 			VAN_MUTEX_UNLOCK(table, im_dump_mtx, ret);
+
+			/*
+			 * Wait for in-flight operations (e.g. a traversal that
+			 * has pinned this frozen tree) to drop their reference
+			 * before tearing the tree down.  Mirrors the refcount
+			 * wait in _van_ondisktree_close().
+			 */
+			while (atomic_load(&tofree->refcount) > 0)
+				_van_sleep(1, 0);
+
 			ret = _van_inmemtree_destory(tofree);
 		}
 

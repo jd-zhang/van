@@ -25,7 +25,7 @@ common_objs=  flags_common.o test_common.o van_flags_common.o
 
 db_common_objs=   flags_common.o test_common.o van_flags_common.o
 
-imt_tmain_objs=  imt_t1.o imt_t2.o imt_tmain.o
+imt_tmain_objs=  imt_t1.o imt_t2.o imt_t3.o imt_tmain.o
 
 log_tmain_objs=  log_t1.o log_tmain.o
 
@@ -71,6 +71,9 @@ imt_t1.o: ./inmemtree/imt_t1.c
 	$(CC) -c -o $@ $(CPPFLAGS) $(CFLAGS) $?
 
 imt_t2.o: ./inmemtree/imt_t2.c
+	$(CC) -c -o $@ $(CPPFLAGS) $(CFLAGS) $?
+
+imt_t3.o: ./inmemtree/imt_t3.c
 	$(CC) -c -o $@ $(CPPFLAGS) $(CFLAGS) $?
 
 imt_tmain.o: ./inmemtree/imt_tmain.c

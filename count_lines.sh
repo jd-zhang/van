@@ -1,0 +1,1 @@
+find . -name "*.c" -o -name "*.h"  | xargs wc -l

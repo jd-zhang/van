@@ -79,9 +79,6 @@ int _van_ondisktree_init(ONDISK_TREE *tree) {
 	tree->refcount = 0;
 	VAN_MUTEX_INIT(tree, tree_mutex, ret);
 
-	VAN_MUTEX_INIT(&tree->odfile, mtx_head, ret);
-	TAILQ_INIT(&tree->odfile.head);
-
 	tree->get = _van_ondisktree_get;
 	tree->getraw = _van_ondisktree_getraw;
 	tree->open = _van_ondisktree_open;
@@ -89,20 +86,6 @@ int _van_ondisktree_init(ONDISK_TREE *tree) {
 	tree->store_inmem = _van_ondisktree_store_inmem;
 	tree->dump = _van_ondisktree_dump;
 	tree->cursor = _van_ondisktree_cursor_init;
-
-	return (ret);
-}
-
-int _van_ondisktree_init_cache(ONDISK_TREE *tree) {
-	int ret;
-
-	/*
-	 * No real work here: the block cache is owned by the store and
-	 * shared by every tree of that store, so there is nothing to set
-	 * up per tree.  The cache size comes from store->cache_size.
-	 */
-	ret = 0;
-	(void)tree;
 
 	return (ret);
 }
@@ -151,7 +134,6 @@ int _van_ondisktree_open(ONDISK_TREE *tree, const char *file_path,
 	    tree->omode, &tree->tree_fid);
 	if (ret != 0)
 		goto err;
-	tree->odfile.fid = tree->tree_fid;
 
 	if (!LF_ISSET(VAN_OPEN_TRUNC)) {
 		ret = _van_ondisktree_read(tree);
@@ -201,7 +183,6 @@ err:
 
 int _van_ondisktree_close(ONDISK_TREE *tree, flags_t flags) {
 	int ret, ret1;
-	ONDISK_CACHE_BLOCK *block;
 	VAN_STORE *store;
 
 	ret = 0;
@@ -218,19 +199,21 @@ int _van_ondisktree_close(ONDISK_TREE *tree, flags_t flags) {
 	 */
 	while (atomic_load(&tree->refcount) > 0)
 		_van_sleep(1, 0);
+
 	/*
-	 * Put the cache.
+	 * Drop the cached blocks of this file.  A block is a copy of a
+	 * page that is also on disk, so losing it costs a re-read at
+	 * worst, and keeping it would hold memory for a file that may
+	 * be unlinked below.
 	 *
-	 * _van_ondisk_cache_discard() removes the block from its hash
-	 * bucket and from the LRU lists, so both are left consistent.
-	 * The tree lock is the outermost in the lock order
-	 * (tree -> LRU -> bucket) and is held across the loop.
+	 * The blocks are found through the cache hash table, which is
+	 * keyed by the file identity: dropping every block of this file
+	 * is a scan of the buckets, and this is the only time it runs.
 	 */
-	while ((block = TAILQ_FIRST(&tree->odfile.head)) != NULL) {
-		TAILQ_REMOVE(&tree->odfile.head, block, tree_links);
-		ret = _van_ondisk_cache_discard(store, block);
-		/* panic handing */
-		VAN_ASSERT(ret == 0);
+	if (tree->meta != NULL) {
+		ret1 = _van_ondisk_cache_discard_fileid(store,
+		    tree->meta->fileid);
+		SET_RET(ret1, ret);
 	}
 
 	if (tree->tree_fid != -1) {

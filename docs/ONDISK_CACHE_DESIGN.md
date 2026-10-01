@@ -174,9 +174,14 @@ struct _ondisk_cache_lru {
 **全局加锁顺序（唯一，代码注释中已标注）**
 
 ```
-tree->odfile.mtx_head  ->  store->cache_lru.mtx_lru  ->  cache_header[i].mtx_hash
-      (最外层)                     (中间)                        (最内层)
+store->cache_lru.mtx_lru  ->  cache_header[i].mtx_hash
+        (外层)                        (内层)
 ```
+
+> 2026-10 修订：原先最外层还有 `tree->odfile.mtx_head`（每棵树一条块链表）。该链表已删除——
+> 淘汰路径拿不到"该块属于哪棵树"，无法在销毁前摘链，导致已释放的块仍挂在树链表上
+> （`_van_ondisk_cache_get()` 插入时写悬空的 `tqe_prev`、关树时二次释放）。现在块只挂在
+> 哈希桶与 SLRU 链表上，关树时按 `fileid` 扫桶清理，见 4.5。
 
 三条硬规则：
 
@@ -201,7 +206,7 @@ tree->odfile.mtx_head  ->  store->cache_lru.mtx_lru  ->  cache_header[i].mtx_has
 | `_van_ondisk_cache_destroy()` | 遍历桶时**同步摘除 LRU 链表** |
 | `_van_ondisk_cache_get()` | 重写：命中/未命中两条路径 |
 | `_van_ondisk_cache_put()` | 引用计数原子化 + **条件触发**淘汰 |
-| `_van_ondisk_cache_discard()` | **新增**：供关闭路径一次性摘除块（哈希桶 + LRU） |
+| `_van_ondisk_cache_discard_fileid()` | **替代 `discard()`**：关树时按 `fileid` 扫全部桶，摘除并销毁该文件的所有块 |
 | `_van_ondisk_cache_block_destory()` | 不变 |
 
 ### 4.2 `cache_evict` 要点
@@ -266,17 +271,17 @@ if (!block->load) {
 
 ### 4.5 两条清理路径的 LRU 摘除
 
-**`_van_ondisktree_close`（`ondisktree.c`）** —— 改为调用 `_van_ondisk_cache_discard()`，该函数内部按 `LRU -> bucket` 顺序同时摘除哈希桶和 LRU 链表并回退计数：
+**`_van_ondisktree_close`（`ondisktree.c`）** —— 改为调用 `_van_ondisk_cache_discard_fileid()`，该函数按 `LRU -> bucket` 顺序扫每一个桶，`memcmp` 块的 `fileid` 命中后摘除哈希桶与 SLRU 链表并销毁：
 
 ```c
-while ((block = TAILQ_FIRST(&tree->odfile.head)) != NULL) {
-	TAILQ_REMOVE(&tree->odfile.head, block, tree_links);
-	ret = _van_ondisk_cache_discard(store, block);
-	VAN_ASSERT(ret == 0);
-}
+if (tree->meta != NULL)
+	ret1 = _van_ondisk_cache_discard_fileid(store, tree->meta->fileid);
 ```
 
-调用者持有树锁（最外层），顺序为 `tree -> LRU -> bucket` ✅
+- 块只挂在哈希桶 + SLRU 链表上，销毁后不会在任何链表留下悬空指针 —— 这是原先 `tree->odfile.head`
+  链表做不到的事（淘汰者无法摘链），也是本次修订的重点。
+- 被读者持有（`refcount > 0`）的块跳过，交给它最后一次 `put` 回收，避免引入新的 UAF。
+- 关树是低频操作；代价从"O(该树的块数)"变为"O(缓存总块数)"，默认 64MB / 1MB ≈ 64 个块，可忽略。
 
 **`_van_ondisk_cache_destroy`（`ondisktree_cache.c`）** —— 遍历每个桶时先取 LRU 锁再取桶锁，逐块 `cache_lru_remove()` + 摘哈希桶 + 销毁；最后销毁 `mtx_lru`。顺序 `LRU -> bucket` ✅
 

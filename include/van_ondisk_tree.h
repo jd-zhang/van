@@ -116,18 +116,11 @@ struct _ondisk_item {
 	char	data[1];
 };
 
-struct _ondisk_file {
-	int	fid;
-	pthread_mutex_t	mtx_head;
-	TAILQ_HEAD(_odchf, _ondisk_cache_block) head;
-};
-
 struct _ondisk_tree {
 	TAILQ_ENTRY(_ondisk_tree)	links;
 	VAN_TABLE	*table;
 	ONDISK_META	*meta;
 	ONDISK_META_SUMMARY	*meta_summary;
-	ONDISK_FILE	odfile;
 	int		tree_fid;
 	int		bloom_fid;
 	uint32		metasize;

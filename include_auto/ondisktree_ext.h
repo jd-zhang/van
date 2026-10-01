@@ -24,7 +24,6 @@ extern "C" {
 extern int _van_ondisktree_create(VAN_TABLE *table,
     ONDISK_TREE **treep);
 extern int _van_ondisktree_init(ONDISK_TREE *tree);
-extern int _van_ondisktree_init_cache(ONDISK_TREE *tree);
 extern int _van_ondisktree_open(ONDISK_TREE *tree,
     const char *file_path, flags_t flags);
 extern int _van_ondisktree_close(ONDISK_TREE *tree, flags_t flags);
@@ -68,8 +67,8 @@ extern int _van_ondisk_cache_destroy(VAN_STORE *store);
 extern int _van_ondisk_cache_get(ONDISK_TREE *tree,
     uint32 blkid, void *cachep);
 extern int _van_ondisk_cache_put(ONDISK_TREE *tree, void *cache);
-extern int _van_ondisk_cache_discard(VAN_STORE *store,
-    ONDISK_CACHE_BLOCK *block);
+extern int _van_ondisk_cache_discard_fileid(VAN_STORE *store,
+    const char *fileid);
 extern int _van_ondisk_cache_block_destory(ONDISK_CACHE_BLOCK *block);
 
 /* src/ondisktree/ondisktree_compare.c */
