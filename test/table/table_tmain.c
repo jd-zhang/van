@@ -54,172 +54,83 @@ extern int table_t3_2g();
 extern int table_t3_2h();
 extern int table_t3_2i();
 extern int table_t3_2j();
+
+typedef int (*test_func_t)(void);
+
+static struct {
+	const char *name;
+	test_func_t func;
+} test_cases[] = {
+	{"table_t1_1", (test_func_t)table_t1_1},
+	{"table_t1_1b", (test_func_t)table_t1_1b},
+	{"table_t1_1c", (test_func_t)table_t1_1c},
+	{"table_t1_1d", (test_func_t)table_t1_1d},
+	{"table_t1_1e", (test_func_t)table_t1_1e},
+	{"table_t1_1f", (test_func_t)table_t1_1f},
+	{"table_t1_2", (test_func_t)table_t1_2},
+	{"table_t1_3", (test_func_t)table_t1_3},
+	{"table_t1_4", (test_func_t)table_t1_4},
+	{"table_t2_1", (test_func_t)table_t2_1},
+	{"table_t2_2", (test_func_t)table_t2_2},
+	{"table_t2_3", (test_func_t)table_t2_3},
+	{"table_t2_4", (test_func_t)table_t2_4},
+	{"table_t2_5", (test_func_t)table_t2_5},
+	{"table_t2_6", (test_func_t)table_t2_6},
+	{"table_t2_7", (test_func_t)table_t2_7},
+	{"table_t2_8", (test_func_t)table_t2_8},
+	{"table_t2_9", (test_func_t)table_t2_9},
+	{"table_t2_10", (test_func_t)table_t2_10},
+	{"table_t3_1a", (test_func_t)table_t3_1a},
+	{"table_t3_1b", (test_func_t)table_t3_1b},
+	{"table_t3_1c", (test_func_t)table_t3_1c},
+	{"table_t3_1d", (test_func_t)table_t3_1d},
+	{"table_t3_1e", (test_func_t)table_t3_1e},
+	{"table_t3_1f", (test_func_t)table_t3_1f},
+	{"table_t3_1g", (test_func_t)table_t3_1g},
+	{"table_t3_1h", (test_func_t)table_t3_1h},
+	{"table_t3_1i", (test_func_t)table_t3_1i},
+	{"table_t3_1j", (test_func_t)table_t3_1j},
+	{"table_t3_2a", (test_func_t)table_t3_2a},
+	{"table_t3_2b", (test_func_t)table_t3_2b},
+	{"table_t3_2c", (test_func_t)table_t3_2c},
+	{"table_t3_2d", (test_func_t)table_t3_2d},
+	{"table_t3_2e", (test_func_t)table_t3_2e},
+	{"table_t3_2f", (test_func_t)table_t3_2f},
+	{"table_t3_2g", (test_func_t)table_t3_2g},
+	{"table_t3_2h", (test_func_t)table_t3_2h},
+	{"table_t3_2i", (test_func_t)table_t3_2i},
+	{"table_t3_2j", (test_func_t)table_t3_2j},
+	{NULL, NULL}
+};
+
 int main(int argc, char *argv[]) {
+	size_t i;
 	int ret;
-	ret = 0;
 
 	srand((unsigned int)time(NULL));
 
-	if (strcmp(argv[1], "table_t1_1") == 0) {
-		fprintf(stderr, "============ table_t1_1() ===========\n");
-		ret = table_t1_1();
-		fprintf(stderr, "\n");
-	} else if (strcmp(argv[1], "table_t1_1b") == 0) {
-		fprintf(stderr, "============ table_t1_1b() ===========\n");
-		ret = table_t1_1b();
-		fprintf(stderr, "\n");
-	}  else if (strcmp(argv[1], "table_t1_1c") == 0) {
-		fprintf(stderr, "============ table_t1_1c() ===========\n");
-		ret = table_t1_1c();
-		fprintf(stderr, "\n");
-	} else if (strcmp(argv[1], "table_t1_1d") == 0) {
-		fprintf(stderr, "============ table_t1_1d() ===========\n");
-		ret = table_t1_1d();
-		fprintf(stderr, "\n");
-	} else if (strcmp(argv[1], "table_t1_1e") == 0) {
-		fprintf(stderr, "============ table_t1_1e() ===========\n");
-		ret = table_t1_1e();
-		fprintf(stderr, "\n");
-	} else if (strcmp(argv[1], "table_t1_1f") == 0) {
-		fprintf(stderr, "============ table_t1_1f() ===========\n");
-		ret = table_t1_1f();
-		fprintf(stderr, "\n");
-	} else if (strcmp(argv[1], "table_t1_2") == 0) {
-		fprintf(stderr, "============ table_t1_2() ===========\n");
-		ret = table_t1_2();
-		fprintf(stderr, "\n");
-	} else if (strcmp(argv[1], "table_t1_3") == 0) {
-		fprintf(stderr, "============ table_t1_3() ===========\n");
-		ret = table_t1_3();
-		fprintf(stderr, "\n");
-	} else if (strcmp(argv[1], "table_t1_4") == 0) {
-		fprintf(stderr, "============ table_t1_4() ===========\n");
-		ret = table_t1_4();
-		fprintf(stderr, "\n");
-	} else if (strcmp(argv[1], "table_t2_1") == 0) {
-		fprintf(stderr, "============ table_t2_1() ===========\n");
-		ret = table_t2_1();
-		fprintf(stderr, "\n");
-	} else if (strcmp(argv[1], "table_t2_2") == 0) {
-		fprintf(stderr, "============ table_t2_2() ===========\n");
-		ret = table_t2_2();
-		fprintf(stderr, "\n");
-	} else if (strcmp(argv[1], "table_t2_3") == 0) {
-		fprintf(stderr, "============ table_t2_3() ===========\n");
-		ret = table_t2_3();
-		fprintf(stderr, "\n");
-	} else if (strcmp(argv[1], "table_t2_4") == 0) {
-		fprintf(stderr, "============ table_t2_4() ===========\n");
-		ret = table_t2_4();
-		fprintf(stderr, "\n");
-	} else if (strcmp(argv[1], "table_t2_5") == 0) {
-		fprintf(stderr, "============ table_t2_5() ===========\n");
-		ret = table_t2_5();
-		fprintf(stderr, "\n");
-	} else if (strcmp(argv[1], "table_t2_6") == 0) {
-		fprintf(stderr, "============ table_t2_6() ===========\n");
-		ret = table_t2_6();
-		fprintf(stderr, "\n");
-	} else if (strcmp(argv[1], "table_t2_7") == 0) {
-		fprintf(stderr, "============ table_t2_7() ===========\n");
-		ret = table_t2_7();
-		fprintf(stderr, "\n");
-	} else if (strcmp(argv[1], "table_t2_8") == 0) {
-		fprintf(stderr, "============ table_t2_8() ===========\n");
-		ret = table_t2_8();
-		fprintf(stderr, "\n");
-	} else if (strcmp(argv[1], "table_t2_9") == 0) {
-		fprintf(stderr, "============ table_t2_9() ===========\n");
-		ret = table_t2_9();
-		fprintf(stderr, "\n");
-	} else if (strcmp(argv[1], "table_t2_10") == 0) {
-		fprintf(stderr, "============ table_t2_10() ===========\n");
-		ret = table_t2_10();
-		fprintf(stderr, "\n");
-	} else if (strcmp(argv[1], "table_t3_1a") == 0) {
-		fprintf(stderr, "============ table_t3_1a() ===========\n");
-		ret = table_t3_1a();
-		fprintf(stderr, "\n");
-	} else if (strcmp(argv[1], "table_t3_1b") == 0) {
-		fprintf(stderr, "============ table_t3_1b() ===========\n");
-		ret = table_t3_1b();
-		fprintf(stderr, "\n");
-	} else if (strcmp(argv[1], "table_t3_1c") == 0) {
-		fprintf(stderr, "============ table_t3_1c() ===========\n");
-		ret = table_t3_1c();
-		fprintf(stderr, "\n");
-	} else if (strcmp(argv[1], "table_t3_1d") == 0) {
-		fprintf(stderr, "============ table_t3_1d() ===========\n");
-		ret = table_t3_1d();
-		fprintf(stderr, "\n");
-	} else if (strcmp(argv[1], "table_t3_1e") == 0) {
-		fprintf(stderr, "============ table_t3_1e() ===========\n");
-		ret = table_t3_1e();
-		fprintf(stderr, "\n");
-	} else if (strcmp(argv[1], "table_t3_1f") == 0) {
-		fprintf(stderr, "============ table_t3_1f() ===========\n");
-		ret = table_t3_1f();
-		fprintf(stderr, "\n");
-	} else if (strcmp(argv[1], "table_t3_1g") == 0) {
-		fprintf(stderr, "============ table_t3_1g() ===========\n");
-		ret = table_t3_1g();
-		fprintf(stderr, "\n");
-	} else if (strcmp(argv[1], "table_t3_1h") == 0) {
-		fprintf(stderr, "============ table_t3_1h() ===========\n");
-		ret = table_t3_1h();
-		fprintf(stderr, "\n");
-	} else if (strcmp(argv[1], "table_t3_1i") == 0) {
-		fprintf(stderr, "============ table_t3_1i() ===========\n");
-		ret = table_t3_1i();
-		fprintf(stderr, "\n");
-	} else if (strcmp(argv[1], "table_t3_1j") == 0) {
-		fprintf(stderr, "============ table_t3_1j() ===========\n");
-		ret = table_t3_1j();
-		fprintf(stderr, "\n");
-	} else if (strcmp(argv[1], "table_t3_2a") == 0) {
-		fprintf(stderr, "============ table_t3_2a() ===========\n");
-		ret = table_t3_2a();
-		fprintf(stderr, "\n");
-	} else if (strcmp(argv[1], "table_t3_2b") == 0) {
-		fprintf(stderr, "============ table_t3_2b() ===========\n");
-		ret = table_t3_2b();
-		fprintf(stderr, "\n");
-	} else if (strcmp(argv[1], "table_t3_2c") == 0) {
-		fprintf(stderr, "============ table_t3_2c() ===========\n");
-		ret = table_t3_2c();
-		fprintf(stderr, "\n");
-	} else if (strcmp(argv[1], "table_t3_2d") == 0) {
-		fprintf(stderr, "============ table_t3_2d() ===========\n");
-		ret = table_t3_2d();
-		fprintf(stderr, "\n");
-	} else if (strcmp(argv[1], "table_t3_2e") == 0) {
-		fprintf(stderr, "============ table_t3_2e() ===========\n");
-		ret = table_t3_2e();
-		fprintf(stderr, "\n");
-	} else if (strcmp(argv[1], "table_t3_2f") == 0) {
-		fprintf(stderr, "============ table_t3_2f() ===========\n");
-		ret = table_t3_2f();
-		fprintf(stderr, "\n");
-	} else if (strcmp(argv[1], "table_t3_2g") == 0) {
-		fprintf(stderr, "============ table_t3_2g() ===========\n");
-		ret = table_t3_2g();
-		fprintf(stderr, "\n");
-	} else if (strcmp(argv[1], "table_t3_2h") == 0) {
-		fprintf(stderr, "============ table_t3_2h() ===========\n");
-		ret = table_t3_2h();
-		fprintf(stderr, "\n");
-	} else if (strcmp(argv[1], "table_t3_2i") == 0) {
-		fprintf(stderr, "============ table_t3_2i() ===========\n");
-		ret = table_t3_2i();
-		fprintf(stderr, "\n");
-	} else if (strcmp(argv[1], "table_t3_2j") == 0) {
-		fprintf(stderr, "============ table_t3_2j() ===========\n");
-		ret = table_t3_2j();
-		fprintf(stderr, "\n");
-	} else {
-		fprintf(stderr, "Unknown test case: %s\n", argv[1]);
-		ret = -1;
+	if (argc < 2) {
+		fprintf(stderr, "Usage: %s <case|list>\n", argv[0]);
+		return (1);
 	}
 
-	return (ret);
+	if (strcmp(argv[1], "list") == 0) {
+		for (i = 0; test_cases[i].name != NULL; i++)
+			printf("%s\n", test_cases[i].name);
+		return (0);
+	}
+
+	ret = 0;
+	for (i = 0; test_cases[i].name != NULL; i++) {
+		if (strcmp(argv[1], test_cases[i].name) == 0) {
+			fprintf(stderr, "============ %s() ===========\n",
+			    test_cases[i].name);
+			ret = test_cases[i].func();
+			fprintf(stderr, "\n");
+			return (ret);
+		}
+	}
+
+	fprintf(stderr, "no such test: %s\n", argv[1]);
+	return (-1);
 }

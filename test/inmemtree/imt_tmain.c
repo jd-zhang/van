@@ -43,171 +43,71 @@ extern int imt_t3_2h();
 extern int imt_t3_2i();
 extern int imt_t3_2j();
 
+/* imt_t1_2 takes a verbose flag; adapt it to the no-arg dispatch. */
+static int imt_t1_2_wrap(void) { return (imt_t1_2(0)); }
+
+typedef int (*test_func_t)(void);
+
+static struct {
+	const char *name;
+	test_func_t func;
+} test_cases[] = {
+	{"imt_t1_1", (test_func_t)imt_t1_1},
+	{"imt_t1_2", (test_func_t)imt_t1_2_wrap},
+	{"imt_t1_3", (test_func_t)imt_t1_3},
+	{"imt_t1_3b", (test_func_t)imt_t1_3b},
+	{"imt_t1_3c", (test_func_t)imt_t1_3c},
+	{"imt_t1_4", (test_func_t)imt_t1_4},
+	{"imt_t2_1", (test_func_t)imt_t2_1},
+	{"imt_t3_1a", (test_func_t)imt_t3_1a},
+	{"imt_t3_1b", (test_func_t)imt_t3_1b},
+	{"imt_t3_1c", (test_func_t)imt_t3_1c},
+	{"imt_t3_1d", (test_func_t)imt_t3_1d},
+	{"imt_t3_1e", (test_func_t)imt_t3_1e},
+	{"imt_t3_1f", (test_func_t)imt_t3_1f},
+	{"imt_t3_1g", (test_func_t)imt_t3_1g},
+	{"imt_t3_1h", (test_func_t)imt_t3_1h},
+	{"imt_t3_1i", (test_func_t)imt_t3_1i},
+	{"imt_t3_1j", (test_func_t)imt_t3_1j},
+	{"imt_t3_2a", (test_func_t)imt_t3_2a},
+	{"imt_t3_2b", (test_func_t)imt_t3_2b},
+	{"imt_t3_2c", (test_func_t)imt_t3_2c},
+	{"imt_t3_2d", (test_func_t)imt_t3_2d},
+	{"imt_t3_2e", (test_func_t)imt_t3_2e},
+	{"imt_t3_2f", (test_func_t)imt_t3_2f},
+	{"imt_t3_2g", (test_func_t)imt_t3_2g},
+	{"imt_t3_2h", (test_func_t)imt_t3_2h},
+	{"imt_t3_2i", (test_func_t)imt_t3_2i},
+	{"imt_t3_2j", (test_func_t)imt_t3_2j},
+	{NULL, NULL}
+};
+
 int main(int argc, char *argv[]) {
+	size_t i;
 	int ret;
+
+	if (argc < 2) {
+		fprintf(stderr, "Usage: %s <case|list>\n", argv[0]);
+		return (1);
+	}
+
+	if (strcmp(argv[1], "list") == 0) {
+		for (i = 0; test_cases[i].name != NULL; i++)
+			printf("%s\n", test_cases[i].name);
+		return (0);
+	}
+
 	ret = 0;
-
-	if (strcmp(argv[1], "imt_t1_1") == 0) {
-		fprintf(stderr, "============ imt_t1_1() ===========\n");
-		ret = imt_t1_1();
-		fprintf(stderr, "\n");
+	for (i = 0; test_cases[i].name != NULL; i++) {
+		if (strcmp(argv[1], test_cases[i].name) == 0) {
+			fprintf(stderr, "============ %s() ===========\n",
+			    test_cases[i].name);
+			ret = test_cases[i].func();
+			fprintf(stderr, "\n");
+			return (ret);
+		}
 	}
 
-	if (strcmp(argv[1], "imt_t1_2") == 0) {
-		fprintf(stderr, "============ imt_t1_2(0) ===========\n");
-		ret = imt_t1_2(0);
-		fprintf(stderr, "\n");
-	}
-
-	if (strcmp(argv[1], "imt_t1_3") == 0) {
-		fprintf(stderr, "============ imt_t1_3() ===========\n");
-		ret = imt_t1_3();
-		fprintf(stderr, "\n");
-	}
-
-	if (strcmp(argv[1], "imt_t1_3b") == 0) {
-		fprintf(stderr, "============ imt_t1_3b() ===========\n");
-		ret = imt_t1_3b();
-		fprintf(stderr, "\n");
-	}
-
-	if (strcmp(argv[1], "imt_t1_3c") == 0) {
-		fprintf(stderr, "============ imt_t1_3c() ===========\n");
-		ret = imt_t1_3c();
-		fprintf(stderr, "\n");
-	}
-
-	if (strcmp(argv[1], "imt_t1_4") == 0) {
-		fprintf(stderr, "============ imt_t1_4() ===========\n");
-		ret = imt_t1_4();
-		fprintf(stderr, "\n");
-	}
-
-	if (strcmp(argv[1], "imt_t2_1") == 0) {
-		fprintf(stderr, "============ imt_t2_1() ===========\n");
-		ret = imt_t2_1();
-		fprintf(stderr, "\n");
-	}
-
-	if (strcmp(argv[1], "imt_t3_1a") == 0) {
-		fprintf(stderr, "============ imt_t3_1a() ===========\n");
-		ret = imt_t3_1a();
-		fprintf(stderr, "\n");
-	}
-
-	if (strcmp(argv[1], "imt_t3_1b") == 0) {
-		fprintf(stderr, "============ imt_t3_1b() ===========\n");
-		ret = imt_t3_1b();
-		fprintf(stderr, "\n");
-	}
-
-	if (strcmp(argv[1], "imt_t3_1c") == 0) {
-		fprintf(stderr, "============ imt_t3_1c() ===========\n");
-		ret = imt_t3_1c();
-		fprintf(stderr, "\n");
-	}
-
-	if (strcmp(argv[1], "imt_t3_1d") == 0) {
-		fprintf(stderr, "============ imt_t3_1d() ===========\n");
-		ret = imt_t3_1d();
-		fprintf(stderr, "\n");
-	}
-
-	if (strcmp(argv[1], "imt_t3_1e") == 0) {
-		fprintf(stderr, "============ imt_t3_1e() ===========\n");
-		ret = imt_t3_1e();
-		fprintf(stderr, "\n");
-	}
-
-	if (strcmp(argv[1], "imt_t3_1f") == 0) {
-		fprintf(stderr, "============ imt_t3_1f() ===========\n");
-		ret = imt_t3_1f();
-		fprintf(stderr, "\n");
-	}
-
-	if (strcmp(argv[1], "imt_t3_1g") == 0) {
-		fprintf(stderr, "============ imt_t3_1g() ===========\n");
-		ret = imt_t3_1g();
-		fprintf(stderr, "\n");
-	}
-
-	if (strcmp(argv[1], "imt_t3_1h") == 0) {
-		fprintf(stderr, "============ imt_t3_1h() ===========\n");
-		ret = imt_t3_1h();
-		fprintf(stderr, "\n");
-	}
-
-	if (strcmp(argv[1], "imt_t3_1i") == 0) {
-		fprintf(stderr, "============ imt_t3_1i() ===========\n");
-		ret = imt_t3_1i();
-		fprintf(stderr, "\n");
-	}
-
-	if (strcmp(argv[1], "imt_t3_1j") == 0) {
-		fprintf(stderr, "============ imt_t3_1j() ===========\n");
-		ret = imt_t3_1j();
-		fprintf(stderr, "\n");
-	}
-
-	if (strcmp(argv[1], "imt_t3_2a") == 0) {
-		fprintf(stderr, "============ imt_t3_2a() ===========\n");
-		ret = imt_t3_2a();
-		fprintf(stderr, "\n");
-	}
-
-	if (strcmp(argv[1], "imt_t3_2b") == 0) {
-		fprintf(stderr, "============ imt_t3_2b() ===========\n");
-		ret = imt_t3_2b();
-		fprintf(stderr, "\n");
-	}
-
-	if (strcmp(argv[1], "imt_t3_2c") == 0) {
-		fprintf(stderr, "============ imt_t3_2c() ===========\n");
-		ret = imt_t3_2c();
-		fprintf(stderr, "\n");
-	}
-
-	if (strcmp(argv[1], "imt_t3_2d") == 0) {
-		fprintf(stderr, "============ imt_t3_2d() ===========\n");
-		ret = imt_t3_2d();
-		fprintf(stderr, "\n");
-	}
-
-	if (strcmp(argv[1], "imt_t3_2e") == 0) {
-		fprintf(stderr, "============ imt_t3_2e() ===========\n");
-		ret = imt_t3_2e();
-		fprintf(stderr, "\n");
-	}
-
-	if (strcmp(argv[1], "imt_t3_2f") == 0) {
-		fprintf(stderr, "============ imt_t3_2f() ===========\n");
-		ret = imt_t3_2f();
-		fprintf(stderr, "\n");
-	}
-
-	if (strcmp(argv[1], "imt_t3_2g") == 0) {
-		fprintf(stderr, "============ imt_t3_2g() ===========\n");
-		ret = imt_t3_2g();
-		fprintf(stderr, "\n");
-	}
-
-	if (strcmp(argv[1], "imt_t3_2h") == 0) {
-		fprintf(stderr, "============ imt_t3_2h() ===========\n");
-		ret = imt_t3_2h();
-		fprintf(stderr, "\n");
-	}
-
-	if (strcmp(argv[1], "imt_t3_2i") == 0) {
-		fprintf(stderr, "============ imt_t3_2i() ===========\n");
-		ret = imt_t3_2i();
-		fprintf(stderr, "\n");
-	}
-
-	if (strcmp(argv[1], "imt_t3_2j") == 0) {
-		fprintf(stderr, "============ imt_t3_2j() ===========\n");
-		ret = imt_t3_2j();
-		fprintf(stderr, "\n");
-	}
-
-	return (ret);
+	fprintf(stderr, "no such test: %s\n", argv[1]);
+	return (-1);
 }

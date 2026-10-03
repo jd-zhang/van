@@ -31,7 +31,7 @@ log_tmain_objs=  log_t1.o log_tmain.o
 
 misc_tmain_objs=  misc_t1.o misc_tmain.o
 
-odt_tmain_objs=  odt_t1.o odt_tmain.o
+odt_tmain_objs=  odt_t1.o odt_t3.o odt_tmain.o
 
 table_tmain_objs=  table_t1.o table_t2.o table_t3.o table_tmain.o
 
@@ -95,6 +95,9 @@ misc_tmain.o: ./misc/misc_tmain.c
 	$(CC) -c -o $@ $(CPPFLAGS) $(CFLAGS) $?
 
 odt_t1.o: ./ondisktree/odt_t1.c
+	$(CC) -c -o $@ $(CPPFLAGS) $(CFLAGS) $?
+
+odt_t3.o: ./ondisktree/odt_t3.c
 	$(CC) -c -o $@ $(CPPFLAGS) $(CFLAGS) $?
 
 odt_tmain.o: ./ondisktree/odt_tmain.c
