@@ -40,17 +40,33 @@
 引擎依赖 pthread、`syslog.h`、`mqueue.h` 等 Linux/POSIX 接口，其他平台需要先让
 VanDB 本身能编译通过。
 
-### 必需组件（下表中的版本为实际验证过的版本）
+### 必需组件
 
-| 组件 | 版本 | 说明 |
-|---|---|---|
-| GCC | 8.5.0（Red Hat 8.5.0-21.0.1） | 编译 wrapper 与 `_kvstore.so`，需要 `-fPIC` |
-| GNU Make | 4.2.1 | 驱动 `kvserver/Makefile` |
-| SWIG | 3.0.12 | 由 `engine/kvstore.i` 生成 `kvstore_wrap.c` |
-| Python | **3.11.13** | 必须是 3.11+：`tomllib` 从 3.11 起进入标准库 |
+| 组件 | 最低要求 | 推荐 | 实测 | 说明 |
+|---|---|---|---|---|
+| Python | **3.11**（硬性） | 3.11 或更高 | 3.11.13 | 代码用了 `tomllib`，见下 |
+| SWIG | 3.0 | 3.0 或更高 | 3.0.12 | 由 `engine/kvstore.i` 生成 `kvstore_wrap.c` |
+| GCC | 8.5 | 8.5 或更高 | 8.5.0（Red Hat 8.5.0-21.0.1） | 编译 wrapper 与 `_kvstore.so`，需要 `-fPIC` |
+| GNU Make | 4.2 | 4.2 或更高 | 4.2.1 | 驱动 `kvserver/Makefile` |
+| Flask | 3.0 | 3.1 或更高 | 3.1.3 | 唯一的第三方 Python 依赖 |
+
+> 只有 **Python** 的最低要求是代码强约束（`tomllib`）。其余组件的最低版本只是
+> “建议不低于”，更低的版本**未做验证**；真正跑通过的组合是“实测”那一列。
+
+### 为什么要求 Python >= 3.11
+
+- `server/config.py` 用标准库 **`tomllib`** 读取 `kvserver.toml`，而 `tomllib`
+  是 **Python 3.11 才引入**的标准库（更早的版本只能用第三方 `tomli`）。
+- 所以 **3.11 以下跑不起来**：进程在导入阶段就会失败
+  （`ModuleNotFoundError: No module named 'tomllib'`）。
+- 3.12 / 3.13 及更高版本都可以用，代码没有依赖 3.11 之后被移除的特性。
+- 当前实现**没有**为 < 3.11 准备 `tomli` 回退，见
+  [已知限制](#9-已知限制)。
 
 > ⚠️ 本机 `/usr/bin/python3` 是 **3.6.8**，没有 `tomllib`，**不能**用来跑本服务。
-> 请始终使用 `python3.11`。Makefile 里的 `PYTHON` 变量也已经写死为 `python3.11`。
+> 这台机器上要用 `python3.11`。另外 Makefile 里的 `PYTHON` 变量当前写死为
+> `python3.11`，它决定扩展模块编译给哪个解释器，必须和运行时的解释器一致
+> （见下方“使用虚拟环境（推荐）”一节）。
 
 ### Python 依赖
 
@@ -72,11 +88,70 @@ Flask>=3.0
 | Blinker | 1.9.0 |
 | MarkupSafe | 3.0.4 |
 
-安装：
+安装方式见下一节（推荐用虚拟环境）。直接装到用户目录：
 
 ```bash
-python3.11 -m pip install --user -r requirements.txt
+python3 -m pip install --user -r requirements.txt
 ```
+
+### 使用虚拟环境（推荐）
+
+推荐用 `venv` 隔离 Python 环境：既不污染系统 Python，也把 Flask 及其依赖关在
+项目里，方便随时删除重建。
+
+**前提**：系统里必须有 **Python >= 3.11**（原因见上一节）。
+
+创建：
+
+```bash
+# 先确认版本 >= 3.11
+python3 --version
+
+# 用当前系统的 python3 创建
+python3 -m venv venv
+
+# 如果系统默认 python3 < 3.11，但装了更高版本，显式指定那个版本即可
+# （前提是系统里已经装了 python3.11 或更高）
+# python3.11 -m venv venv
+```
+
+激活：
+
+```bash
+source venv/bin/activate
+```
+
+安装依赖（激活之后，`pip` 就是虚拟环境里的 `pip`）：
+
+```bash
+pip install -r requirements.txt
+```
+
+退出：
+
+```bash
+deactivate
+```
+
+**重要说明**
+
+- **venv 创建的虚拟环境，其 Python 版本 = 创建时使用的那个 Python 的版本。**
+  `python3 -m venv` 得到的是系统 `python3` 的版本；`python3.11 -m venv` 才是 3.11。
+  所以如果系统 `python3` 是 3.6，`python3 -m venv venv` 建出来的就是 **3.6 的环境，
+  依然跑不了本服务**。
+- **虚拟环境不能“升级” Python 版本**，它只是把某个已存在的 Python 复制/链接出
+  一份。想在 3.6 的环境里得到 3.11 是不可能的。
+- 如果系统没有 Python 3.11+，需要**先**装一个（pyenv、发行版包管理器，或从源码
+  编译），**再**用它创建虚拟环境。
+- 运行 `./kvserver` 之前必须先激活虚拟环境，否则会用到系统 Python，而那里通常
+  没有 Flask。
+- **Makefile 的 `PYTHON` 要和虚拟环境里的解释器一致**：它决定 `_kvstore.so` 编译
+  给哪个解释器。用 A 编译、却在 B 里 `import`，会报
+  `ModuleNotFoundError: No module named '_kvstore'`。不一致时显式指定：
+  ```bash
+  make PYTHON=/path/to/venv/bin/python
+  ```
+- 建议把 `venv/` 加进 `.gitignore`，不要提交到仓库。
 
 ### VanDB 引擎依赖
 
@@ -95,18 +170,91 @@ python3.11 -m pip install --user -r requirements.txt
 
 ### 检查环境
 
+（在激活虚拟环境之后执行；若系统默认 `python3` 不是 3.11+，把下面的
+`python3` 换成对应的解释器，例如 `python3.11`。）
+
 ```bash
-python3.11 --version     # 期望 Python 3.11.x（3.11 以下无 tomllib）
-swig -version            # 期望 SWIG Version 3.0.12
-gcc --version            # 期望 gcc 8.x
-make --version           # 期望 GNU Make 4.x
+python3 --version        # 必须 >= 3.11，否则没有 tomllib
+swig -version            # 实测 3.0.12
+gcc --version            # 实测 8.5.0
+make --version           # 实测 GNU Make 4.2.1
 ls -la ../libvan.a       # 引擎库必须存在
-python3.11 -c "import flask, tomllib; print(flask.__version__)"
+python3 -c "import flask, tomllib; print(flask.__version__)"
 ```
+
+### 环境检查脚本
+
+kvserver 计划提供一个环境检查脚本，用于一次性验证系统是否满足运行要求。
+遇到启动问题时可以先运行：
+
+```bash
+# 待实现
+./check_env.sh
+```
+
+该脚本会检查：
+
+- Python 版本 >= 3.11
+- SWIG 是否安装
+- GCC 是否安装
+- `libvan.a` 是否存在
+- Flask 是否安装
+
+**当前版本尚未提供该脚本**，暂时请用上面的命令手工检查。
 
 ---
 
-## 2. 编译方法
+## 2. 快速开始
+
+把安装、编译、配置、运行串起来的最短路径。
+
+```bash
+# 1. 确认 Python 版本（必须 >= 3.11）
+python3 --version
+# 如果输出的是 3.10 或更低，换用系统里已装的更高版本，例如 python3.11 --version
+
+# 2. 创建并激活虚拟环境（推荐，细节见上一节）
+python3 -m venv venv
+source venv/bin/activate
+
+# 3. 安装 Python 依赖
+pip install -r requirements.txt
+
+# 4. 编译 SWIG 扩展
+make
+# 若第 2 步用的不是系统默认 python3，需要让 Makefile 用同一个解释器：
+# make PYTHON=/path/to/venv/bin/python
+
+# 5. 修改配置文件（可选）
+#    默认配置在 ./kvserver.toml
+#    需要改 host / port / cache_size 等时编辑这个文件
+
+# 6. 启动服务
+./kvserver
+```
+
+服务启动后，**另开一个终端**（记得同样激活虚拟环境，虽然 curl 不需要）：
+
+```bash
+curl "http://localhost:8080/api/v1/put" -X POST \
+     -H "Content-Type: application/json" \
+     -d '{"key":"greeting","value":"aGVsbG8="}'
+
+curl "http://localhost:8080/api/v1/get?key=greeting"
+```
+
+预期输出：
+
+```json
+{"code": 0, "code_name": "VAN_OK"}
+{"code": 0, "code_name": "VAN_OK", "data": "aGVsbG8="}
+```
+
+停止服务：在运行它的终端按 `Ctrl-C`。
+
+---
+
+## 3. 编译方法
 
 ```bash
 cd kvserver
@@ -146,7 +294,7 @@ make clean
 
 ---
 
-## 3. 配置文件说明
+## 4. 配置文件说明
 
 默认读取 `./kvserver.toml`（即 `kvserver/` 目录下的那个）。
 也可以用 `-c` 指定别的位置：
@@ -194,7 +342,7 @@ write_timeout = 30
 
 ---
 
-## 4. 如何运行 kvserver
+## 5. 如何运行 kvserver
 
 ### 启动
 
@@ -204,8 +352,10 @@ cd kvserver
 ./kvserver -c /path/to/config.toml  # 指定配置
 ```
 
-> `python3` 3.6 跑不起来（缺 `tomllib`），请用 `./kvserver`（shebang 已写
-> `#!/usr/bin/env python3.11`）。若直接调用解释器：`python3.11 kvserver -c ...`。
+> 用 `./kvserver` 启动即可，它的 shebang 必须指向一个 **>= 3.11** 的 Python。
+> 当前仓库里写的是 `#!/usr/bin/env python3.11`；如果你系统上的 3.11+ 就是默认的
+> `python3`，或者装成了别的名字，按需改这一行。
+> 直接调用解释器时同理（要求 >= 3.11）：`python3 kvserver -c ...`。
 
 ### 正常启动的输出
 
@@ -230,7 +380,7 @@ Press CTRL+C to quit
 
 ---
 
-## 5. REST API 用法
+## 6. REST API 用法
 
 ### 通用规则
 
@@ -349,7 +499,7 @@ DELETE /api/v1/delete?key=AAEC//4=&key_encoding=base64
 
 ---
 
-## 6. 完整示例
+## 7. 完整示例
 
 以下假设服务已在 `localhost:8080` 运行。
 
@@ -438,7 +588,7 @@ curl -X DELETE "http://localhost:8080/api/v1/delete?key=greeting"
 
 ---
 
-## 7. Python 客户端示例
+## 8. Python 客户端示例
 
 需要 `requests`（`pip install requests`）：
 
@@ -523,21 +673,28 @@ with KVStore(config) as db:
 
 ---
 
-## 8. 已知限制
+## 9. 已知限制
 
-1. **空值不可区分于缺失。**
+1. **只支持 Python >= 3.11。**
+   `server/config.py` 用标准库 `tomllib` 读配置，而 `tomllib` 是 3.11 才引入的。
+   3.11 以下会在导入阶段就失败（`ModuleNotFoundError: No module named 'tomllib'`）。
+   如果需要支持 < 3.11，得改代码加一层回退——先 `import tomllib`，失败时退回第三
+   方的 `tomli`（`import tomli as tomllib`），并把 `tomli` 加进 `requirements.txt`。
+   **当前实现没有做这个回退。**
+
+2. **空值不可区分于缺失。**
    引擎用 `data == NULL` 表示空值，而这正好也是“从没见过这个 key”的返回。
    所以 `kv_put(k, b"")` 能成功，但随后的 `get` 返回 404。HTTP 层对这两种情况
    都回答 404。
 
-2. **`kv_open` 的失败路径不回滚。**
+3. **`kv_open` 的失败路径不回滚。**
    中途失败时无法销毁已经建了一半的 store / table（引擎没有对应的销毁接口），
    因此打开失败被当作致命错误直接返回。
 
-3. **用的是 Flask 自带开发服务器**（`threaded=True`）。
+4. **用的是 Flask 自带开发服务器**（`threaded=True`）。
    不适合生产环境，请换成 gunicorn / uWSGI 之类的 WSGI 服务器。
 
-4. **引擎缺陷：`table->get` 对不存在的 key 返回 0 + 空 datum，而不是 `VAN_NOTFOUND`。**
+5. **引擎缺陷：`table->get` 对不存在的 key 返回 0 + 空 datum，而不是 `VAN_NOTFOUND`。**
    根因在 `_van_table_op_get()`：它在搜索 on-disk 树之前执行
    `VAN_MUTEX_LOCK(table, odt_mtx, ret)`，这个宏把 `ret` 覆盖成了 0，
    于是内存树未命中产生的 `VAN_NOTFOUND` 被吞掉。
@@ -546,24 +703,24 @@ with KVStore(config) as db:
    **本服务的绕过方式**：`engine/kvstore.c` 里同样把 `v.data == NULL`
    判定为 `KV_NOTFOUND`，因此对外的行为是正确的。
 
-5. **`read_timeout` / `write_timeout` 目前不生效。**
+6. **`read_timeout` / `write_timeout` 目前不生效。**
    配置里会解析这两个值，但启动用的是 Flask 开发服务器，没有把它传下去。
    字段保留，等换成生产 WSGI 服务器时再接上。
 
-6. **单库单表。**
+7. **单库单表。**
    `engine/kvstore.c` 用一个静态全局的 store + table，一个进程只能服务配置里
    的那一张表。
 
 ---
 
-## 9. 目录结构
+## 10. 目录结构
 
 ```
 kvserver/
   ├── Makefile              # 编译 SWIG 扩展（生成 _kvstore.so）
   ├── kvserver.toml         # 配置文件
   ├── requirements.txt      # Python 依赖（只有 Flask）
-  ├── kvserver              # 启动脚本（可执行，shebang 为 python3.11）
+  ├── kvserver              # 启动脚本（可执行，shebang 需指向 Python >= 3.11）
   ├── README.md             # 本文档
   ├── engine/
   │   ├── kvstore.i         # SWIG 接口文件（二进制安全的 in/argout typemap）
