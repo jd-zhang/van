@@ -31,8 +31,9 @@ extern "C" {
 #include "van_sql.h"
 
 /*
- * There is no table level cursor in the engine yet, so a full scan walks
- * the synthetic row ids, which are encoded as big endian 64 bit values.
+ * Row ids are the keys of a table, encoded as big endian 64 bit values.
+ * A full scan uses table->traverse(); this encoding is what a scan hands
+ * to the engine when it has to narrow itself to a row id range.
  */
 #define	SQL_KVSIZE		sizeof(uint64)
 #define	SQL_MAXTABLENAME	(SQL_MAX_IDENT_LEN + 16)

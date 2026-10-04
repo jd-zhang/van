@@ -687,10 +687,10 @@ int sql_expr_test(SQL_SESSION *sess, SQL_SCHEMA *schema,
 /********************************************************************
  * Row scanning helpers
  *
- * The engine has no table level cursor, so a scan walks the synthetic
- * row ids from 1 up to the next free id.  Row ids are used as keys, are
- * ascending in insertion order and are never reused, so this yields the
- * rows in insertion order.
+ * Row ids are the keys, are ascending in insertion order and are never
+ * reused, so a forward table->traverse() yields the rows in insertion
+ * order.  SELECT scans the table that way; the helpers below are still
+ * used by the statements that address one row at a time.
  ********************************************************************/
 static int fetch_row(SQL_SESSION *sess, SQL_TABLE *tb, uint64 rowid,
     SQL_VALUE *vals, int *foundp) {
@@ -1157,6 +1157,326 @@ static char *projection_name(const SQL_SELECT_ITEM *item,
 	return (sql_strdup("expr"));
 }
 
+/*
+ * What the traverse callback returns to stop the scan early.
+ *
+ * Every engine error is negative (see van.h), so a positive value can
+ * never be mistaken for one by the caller of table->traverse().
+ */
+#define	SEL_STOP	1
+
+/*
+ * A rowid range that can be handed to table->traverse() as a key range.
+ *
+ * Only the rowid alias column can be pushed down: its stored value is
+ * the row id itself, so a bound on it is a bound on the key.  A table
+ * without such a column has nothing to push.
+ */
+typedef struct _selrange {
+	int	has_start;		/* A lower bound was found	*/
+	int	has_end;		/* An upper bound was found	*/
+	uint64	start;
+	uint64	end;
+	int	start_inc;
+	int	end_inc;
+} SELRANGE;
+
+/*
+ * Everything the traverse callback needs, and everything it produces.
+ *
+ * traverse() hands out no state of its own, so the collected rows and
+ * the first error seen have to live in the caller's argument.
+ */
+typedef struct _selctx {
+	SQL_SESSION	*sess;
+	SQL_STMT	*stmt;
+	SQL_SCHEMA	*schema;
+	SQL_VALUE	*vals;		/* Scratch row, reused per row	*/
+	SELROW		*rows;
+	size_t		nrows;
+	size_t		cap;
+	size_t		nproj;
+	size_t		stop_at;	/* 0 = collect everything	*/
+	int		ret;		/* First error, SQL_OK if none	*/
+} SELCTX;
+
+/*
+ * Build the engine key of a synthetic row id, the same big endian 64
+ * bit encoding the rest of the SQL layer uses for keys.
+ */
+static void sel_datum_key(uint64 rowid, VAN_DATUM *key,
+    unsigned char *keybuf) {
+
+	sql_rowkey_encode(rowid, keybuf);
+	memset(key, 0, sizeof(*key));
+	key->data = keybuf;
+	key->size = SQL_KVSIZE;
+	key->ulen = SQL_KVSIZE;
+	key->flags = 0;
+}
+
+/*
+ * Mirror a comparison so that the column is always on the left: the
+ * constraint "100 < id" is the constraint "id > 100".
+ */
+static sql_op sel_mirror_op(sql_op op) {
+
+	switch (op) {
+	case OP_LT:
+		return (OP_GT);
+	case OP_GT:
+		return (OP_LT);
+	case OP_LE:
+		return (OP_GE);
+	case OP_GE:
+		return (OP_LE);
+	default:
+		return (op);
+	}
+}
+
+static void sel_range_lower(SELRANGE *rng, uint64 v, int inc) {
+
+	/*
+	 * The higher bound wins, and two bounds on the same value are
+	 * only inclusive when both are: "id > 100 AND id >= 100" is
+	 * "id > 100".
+	 */
+	if (!rng->has_start || v > rng->start) {
+		rng->has_start = 1;
+		rng->start = v;
+		rng->start_inc = inc;
+	} else if (v == rng->start)
+		rng->start_inc = (rng->start_inc && inc);
+}
+
+static void sel_range_upper(SELRANGE *rng, uint64 v, int inc) {
+
+	if (!rng->has_end || v < rng->end) {
+		rng->has_end = 1;
+		rng->end = v;
+		rng->end_inc = inc;
+	} else if (v == rng->end)
+		rng->end_inc = (rng->end_inc && inc);
+}
+
+/*
+ * Fold one comparison against the rowid alias into '*rng'.
+ *
+ * Anything that is not such a comparison is simply ignored here: the
+ * WHERE clause is still evaluated in full by the callback, so a range
+ * is always an optimization on top of a correct, complete filter and
+ * can never change the result.
+ */
+static void sel_rowid_bound(SQL_SCHEMA *schema, const SQL_EXPR *e,
+    SELRANGE *rng) {
+	const SQL_EXPR *col, *lit;
+	size_t indx;
+	sql_op op;
+	int64 v;
+
+	if (e == NULL || e->xtype != EX_BINARY)
+		return;
+
+	op = e->op;
+	col = e->left;
+	lit = e->right;
+	if (col != NULL && col->xtype != EX_COLUMN) {
+		col = e->right;
+		lit = e->left;
+		op = sel_mirror_op(op);
+	}
+	if (col == NULL || lit == NULL)
+		return;
+	if (col->xtype != EX_COLUMN || lit->xtype != EX_LITERAL)
+		return;
+	if (schema->pk_indx < 0)
+		return;
+	if (sql_schema_findcol(schema, col->lname, &indx) != SQL_OK)
+		return;
+	if ((int)indx != schema->pk_indx)
+		return;
+	if (!SQL_TYPE_IS_INT(lit->lit.type) || lit->lit.isnull)
+		return;
+	/* Row ids start at 1, a non positive bound selects nothing. */
+	if (lit->lit.ival <= 0)
+		return;
+
+	v = lit->lit.ival;
+	switch (op) {
+	case OP_EQ:
+		sel_range_lower(rng, (uint64)v, 1);
+		sel_range_upper(rng, (uint64)v, 1);
+		break;
+	case OP_GE:
+		sel_range_lower(rng, (uint64)v, 1);
+		break;
+	case OP_GT:
+		sel_range_lower(rng, (uint64)v, 0);
+		break;
+	case OP_LE:
+		sel_range_upper(rng, (uint64)v, 1);
+		break;
+	case OP_LT:
+		sel_range_upper(rng, (uint64)v, 0);
+		break;
+	default:
+		break;
+	}
+}
+
+/*
+ * Walk a WHERE tree and pick up every ANDed comparison against the
+ * rowid alias.
+ */
+static void sel_where_bounds(SQL_SCHEMA *schema, const SQL_EXPR *e,
+    SELRANGE *rng) {
+
+	if (e == NULL)
+		return;
+	if (e->xtype == EX_BINARY && e->op == OP_AND) {
+		sel_where_bounds(schema, e->left, rng);
+		sel_where_bounds(schema, e->right, rng);
+		return;
+	}
+	sel_rowid_bound(schema, e, rng);
+}
+
+/*
+ * One row of a SELECT scan, called by table->traverse().
+ *
+ * Returning 0 keeps the scan going.  Returning SEL_STOP ends it, and
+ * ctx->ret then tells the caller whether that was an error or just
+ * "enough rows collected".
+ */
+static int sel_traverse_cb(void *arg, const VAN_DATUM *key,
+    const VAN_DATUM *value) {
+	SELCTX *ctx;
+	SQL_STMT *stmt;
+	SQL_SCHEMA *schema;
+	SELROW *newv;
+	SQL_VALUE *proj, *keys, tmp;
+	size_t nproj, i, j;
+	int ret, tv, duplicate;
+
+	(void)key;
+	ctx = (SELCTX *)arg;
+	stmt = ctx->stmt;
+	schema = ctx->schema;
+	nproj = ctx->nproj;
+
+	ret = sql_row_decode(schema, value->data, value->size, ctx->vals);
+	if (ret != SQL_OK) {
+		ctx->ret = ret;
+		return (SEL_STOP);
+	}
+
+	if (stmt->where != NULL) {
+		ret = sql_expr_test(ctx->sess, schema, ctx->vals,
+		    stmt->where, &tv);
+		if (ret != SQL_OK) {
+			ctx->ret = ret;
+			return (SEL_STOP);
+		}
+		if (tv != TRI_TRUE)
+			return (0);
+	}
+
+	if (ctx->nrows == ctx->cap) {
+		newv = (SELROW *)realloc(ctx->rows,
+		    (ctx->cap * 2) * sizeof(SELROW));
+		if (newv == NULL) {
+			ctx->ret = SQL_ERR_NOMEM;
+			return (SEL_STOP);
+		}
+		ctx->rows = newv;
+		ctx->cap *= 2;
+	}
+
+	proj = (SQL_VALUE *)sql_calloc(nproj, sizeof(SQL_VALUE));
+	keys = (stmt->norder > 0 ?
+	    (SQL_VALUE *)sql_calloc(stmt->norder,
+	    sizeof(SQL_VALUE)) : NULL);
+	if (proj == NULL || (stmt->norder > 0 && keys == NULL)) {
+		sql_free(proj);
+		sql_free(keys);
+		ctx->ret = SQL_ERR_NOMEM;
+		return (SEL_STOP);
+	}
+
+	for (i = 0; i < nproj; i++) {
+		sql_value_init(&proj[i]);
+		sql_value_init(&tmp);
+		if (stmt->select_star) {
+			ret = sql_value_copy(&ctx->vals[i], &proj[i]);
+			sql_value_clear(&tmp);
+			if (ret != SQL_OK)
+				goto cb_err;
+			continue;
+		}
+		ret = sql_expr_eval(ctx->sess, schema, ctx->vals,
+		    stmt->select_items[i].expr, &tmp);
+		if (ret != SQL_OK) {
+			sql_value_clear(&tmp);
+			goto cb_err;
+		}
+		ret = sql_value_copy(&tmp, &proj[i]);
+		sql_value_clear(&tmp);
+		if (ret != SQL_OK)
+			goto cb_err;
+	}
+	for (i = 0; i < stmt->norder; i++) {
+		ret = sql_expr_eval(ctx->sess, schema, ctx->vals,
+		    stmt->order_by[i].expr, &keys[i]);
+		if (ret != SQL_OK)
+			goto cb_err;
+	}
+
+	/* DISTINCT is applied here, before the ordering. */
+	duplicate = 0;
+	if (stmt->distinct) {
+		for (i = 0; i < ctx->nrows && !duplicate; i++) {
+			for (j = 0; j < nproj; j++)
+				if (sql_value_cmp(&ctx->rows[i].proj[j],
+				    &proj[j]) != 0)
+					break;
+			duplicate = (j == nproj);
+		}
+	}
+	if (duplicate) {
+		for (i = 0; i < nproj; i++)
+			sql_value_clear(&proj[i]);
+		sql_free(proj);
+		for (i = 0; i < stmt->norder; i++)
+			sql_value_clear(&keys[i]);
+		sql_free(keys);
+		return (0);
+	}
+
+	ctx->rows[ctx->nrows].seq = ctx->nrows;
+	ctx->rows[ctx->nrows].proj = proj;
+	ctx->rows[ctx->nrows].keys = keys;
+	ctx->nrows++;
+
+	if (ctx->stop_at > 0 && ctx->nrows >= ctx->stop_at)
+		return (SEL_STOP);
+
+	return (0);
+
+cb_err:
+	for (i = 0; i < nproj; i++)
+		sql_value_clear(&proj[i]);
+	sql_free(proj);
+	if (keys != NULL) {
+		for (i = 0; i < stmt->norder; i++)
+			sql_value_clear(&keys[i]);
+		sql_free(keys);
+	}
+	ctx->ret = ret;
+
+	return (SEL_STOP);
+}
+
 static int exec_select(SQL_SESSION *sess, SQL_STMT *stmt, FILE *out,
     size_t *nrowsp) {
 	SQL_TABLE *tb;
@@ -1165,10 +1485,15 @@ static int exec_select(SQL_SESSION *sess, SQL_STMT *stmt, FILE *out,
 	SELROW *rows;
 	SQL_VALUE *vals, *proj, *keys;
 	SQL_RESULTSET *rs;
+	SELRANGE rng;
+	SELCTX ctx;
+	VAN_TRAVERSE_OPT optv;
+	const VAN_TRAVERSE_OPT *opt;
+	VAN_DATUM startd, endd;
+	unsigned char startbuf[SQL_KVSIZE], endbuf[SQL_KVSIZE];
 	size_t ncols, nproj, nrows, cap, i, j, printed, start, limit, offset;
-	uint64 rid, maxrid;
 	int64 lim, off;
-	int ret, found, tv, has_limit, duplicate;
+	int ret, tvret, has_limit;
 
 	tb = NULL;
 	names = NULL;
@@ -1264,108 +1589,78 @@ static int exec_select(SQL_SESSION *sess, SQL_STMT *stmt, FILE *out,
 		goto err;
 	}
 
-	/* Collect every qualifying row. */
+	/* Collect every qualifying row with a single table->traverse(). */
 	cap = 16;
 	rows = (SELROW *)sql_calloc(cap, sizeof(SELROW));
 	if (rows == NULL) {
 		ret = SQL_ERR_NOMEM;
 		goto err;
 	}
-	maxrid = schema->next_rowid;
-	for (rid = 1; rid < maxrid; rid++) {
-		ret = fetch_row(sess, tb, rid, vals, &found);
-		if (ret != SQL_OK)
-			goto err;
-		if (!found)
-			continue;
-		if (stmt->where != NULL) {
-			ret = sql_expr_test(sess, schema, vals,
-			    stmt->where, &tv);
-			if (ret != SQL_OK)
-				goto err;
-			if (tv != TRI_TRUE)
-				continue;
-		}
-		if (nrows == cap) {
-			SELROW *newv;
-			newv = (SELROW *)realloc(rows,
-			    (cap * 2) * sizeof(SELROW));
-			if (newv == NULL) {
-				ret = SQL_ERR_NOMEM;
-				goto err;
-			}
-			rows = newv;
-			cap *= 2;
-		}
-		proj = (SQL_VALUE *)sql_calloc(nproj, sizeof(SQL_VALUE));
-		keys = (stmt->norder > 0 ?
-		    (SQL_VALUE *)sql_calloc(stmt->norder,
-		    sizeof(SQL_VALUE)) : NULL);
-		if (proj == NULL || (stmt->norder > 0 && keys == NULL)) {
-			sql_free(proj);
-			sql_free(keys);
-			ret = SQL_ERR_NOMEM;
-			goto err;
-		}
-		for (i = 0; i < nproj; i++) {
-			SQL_VALUE tmp;
 
-			sql_value_init(&proj[i]);
-			sql_value_init(&tmp);
-			if (stmt->select_star) {
-				ret = sql_value_copy(&vals[i], &proj[i]);
-				sql_value_clear(&tmp);
-				if (ret != SQL_OK)
-					goto err;
-				continue;
-			}
-			ret = sql_expr_eval(sess, schema, vals,
-			    stmt->select_items[i].expr, &tmp);
-			if (ret != SQL_OK) {
-				sql_value_clear(&tmp);
-				goto err;
-			}
-			ret = sql_value_copy(&tmp, &proj[i]);
-			sql_value_clear(&tmp);
-			if (ret != SQL_OK)
-				goto err;
-		}
-		for (i = 0; i < stmt->norder; i++) {
-			ret = sql_expr_eval(sess, schema, vals,
-			    stmt->order_by[i].expr, &keys[i]);
-			if (ret != SQL_OK)
-				goto err;
-		}
+	memset(&ctx, 0, sizeof(ctx));
+	ctx.sess = sess;
+	ctx.stmt = stmt;
+	ctx.schema = schema;
+	ctx.vals = vals;
+	ctx.rows = rows;
+	ctx.cap = cap;
+	ctx.nproj = nproj;
+	ctx.ret = SQL_OK;
+	/*
+	 * Stopping early is only safe when the rows collected are also
+	 * the rows returned, in order.  ORDER BY reorders everything
+	 * afterwards and DISTINCT drops rows that cannot be counted in
+	 * advance, so either one forces a full scan.
+	 *
+	 * The sum is checked for an overflow, a wrapped one would stop
+	 * the scan too early and lose rows.
+	 */
+	if (has_limit && stmt->norder == 0 && !stmt->distinct &&
+	    offset + limit >= limit)
+		ctx.stop_at = offset + limit;
 
-		/* DISTINCT is applied here, before the ordering. */
-		duplicate = 0;
-		if (stmt->distinct) {
-			for (i = 0; i < nrows && !duplicate; i++) {
-				for (j = 0; j < nproj; j++)
-					if (sql_value_cmp(&rows[i].proj[j],
-					    &proj[j]) != 0)
-						break;
-				duplicate = (j == nproj);
-			}
-		}
-		if (duplicate) {
-			for (i = 0; i < nproj; i++)
-				sql_value_clear(&proj[i]);
-			sql_free(proj);
-			proj = NULL;
-			for (i = 0; i < stmt->norder; i++)
-				sql_value_clear(&keys[i]);
-			sql_free(keys);
-			keys = NULL;
-			continue;
-		}
+	/*
+	 * A WHERE bound on the rowid alias becomes a key range.  The
+	 * clause is still evaluated in the callback, so this only ever
+	 * narrows the scan.
+	 */
+	memset(&rng, 0, sizeof(rng));
+	if (schema->pk_indx >= 0 && stmt->where != NULL)
+		sel_where_bounds(schema, stmt->where, &rng);
 
-		rows[nrows].seq = nrows;
-		rows[nrows].proj = proj;
-		rows[nrows].keys = keys;
-		proj = NULL;
-		keys = NULL;
-		nrows++;
+	opt = NULL;
+	if (rng.has_start || rng.has_end) {
+		memset(&optv, 0, sizeof(optv));
+		if (rng.has_start) {
+			sel_datum_key(rng.start, &startd, startbuf);
+			optv.start_key = &startd;
+			optv.start_inclusive = rng.start_inc;
+		}
+		if (rng.has_end) {
+			sel_datum_key(rng.end, &endd, endbuf);
+			optv.end_key = &endd;
+			optv.end_inclusive = rng.end_inc;
+		}
+		opt = &optv;
+	}
+
+	tvret = tb->table->traverse(tb->table, VAN_TRAVERSE_FORWARD, opt,
+	    sel_traverse_cb, &ctx);
+	rows = ctx.rows;	/* The callback may have grown the array. */
+	cap = ctx.cap;
+	nrows = ctx.nrows;
+
+	if (ctx.ret != SQL_OK) {
+		ret = ctx.ret;
+		goto err;
+	}
+	/*
+	 * traverse() hands the callback's value straight back, and only
+	 * SEL_STOP is ours: anything else is an engine failure.
+	 */
+	if (tvret != 0 && tvret != SEL_STOP) {
+		ret = SQL_ERR_STORE;
+		goto err;
 	}
 
 	/* ORDER BY, then LIMIT / OFFSET. */

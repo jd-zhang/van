@@ -140,7 +140,10 @@
 | `sql_expr_eval(sess, schema, row, expr, res)` | 表达式求值，产出 `SQL_VALUE`。 |
 | `sql_expr_test(..., &tv)` | 表达式作为谓词求值，产出三值 `TRI_*`。 |
 | `eval_compare` / `eval_arith` / `eval_like` / `like_match` / `tri_from_value` / `result_bool`（static） | 求值内部件。 |
-| `fetch_row` / `rowid_key_free` / `row_values_alloc`（static） | 扫描与取行工具。 |
+| `fetch_row` / `rowid_key_free` / `row_values_alloc`（static） | 取行工具（`UPDATE` / `DELETE` 的扫描仍用 `fetch_row`）。 |
+| `sel_where_bounds` / `sel_rowid_bound` / `sel_range_lower` / `sel_range_upper` / `sel_mirror_op`（static） | `WHERE` 中的 rowid 范围 → `VAN_TRAVERSE_OPT`。 |
+| `sel_traverse_cb`（static） | `table->traverse()` 的回调：解码 → 过滤 → 投影 → 去重 → 入数组。 |
+| `sel_datum_key`（static） | rowid → 8 字节大端 `VAN_DATUM`（下推时构造边界键）。 |
 | `selrow_cmp`（static） | `qsort` 比较器，配合文件级静态变量 `sort_order`/`sort_norder`。 |
 | `sql_schema_findcol` | **列名解析**（小写名线性查找）。 |
 
@@ -178,8 +181,8 @@ cli/vansql.c  main
                                           │                              ├─ sql_value_cast (sql_type.c)
                                           │                              ├─ sql_row_encode (sql_row.c)
                                           │                              └─ sql_kv_put ── table->put
-                                          ├─ exec_select ── fetch_row ── sql_kv_get ── table->get
-                                          │                          └─ sql_row_decode
+                                          ├─ exec_select ── sel_where_bounds ── sel_datum_key
+                                          │              ├─ table->traverse ── sel_traverse_cb ── sql_row_decode
                                           │              ├─ sql_expr_test ── sql_expr_eval
                                           │              ├─ qsort ── selrow_cmp ── sql_value_cmp
                                           │              └─ sql_resultset_addrow / _print
@@ -535,7 +538,7 @@ typedef struct _sql_set_item {		/* SET col = expr */
 
 > **如实说明：本实现没有独立的逻辑计划或物理计划。**
 
-执行器是**直接的 AST 解释器（火山模型都没有，连迭代器抽象也没有）**。`exec_select` 是一个函数，按顺序做完"扫描 → 过滤 → 投影 → 去重 → 排序 → 分页"，没有中间表示。
+执行器是**直接的 AST 解释器（火山模型都没有，连迭代器抽象也没有）**。`exec_select` 是一个函数，按顺序做完"扫描（一次 `table->traverse()`，回调内过滤 → 投影 → 去重）→ 排序 → 分页"，没有中间表示。
 
 这不是遗漏，而是刻意的取舍：
 
@@ -1089,10 +1092,12 @@ SELECT id, age * 2 AS doubled FROM users WHERE age >= 25 ORDER BY id DESC LIMIT 
                                    v
    +---------------------------------------------------------------+
    | EXECUTOR    sql_exec.c : sql_stmt_exec() -> exec_select()    |
-   |             扫描 -> 过滤 -> 投影 -> 去重 -> 排序 -> 分页     |
+   |             WHERE 里的 rowid 范围 -> VAN_TRAVERSE_OPT        |
+   |             一次 table->traverse()，回调内做                  |
+   |             解码 -> 过滤 -> 投影 -> 去重 -> 排序 -> 分页     |
    +------------------------------+--------------------------------+
                                    |
-                                   |   逐行求值中：
+                                   |   回调内逐行求值：
                                    |     SQL_VALUE[]  一行（ncols 个，解码自 KV）
                                    |      ├─ [0] id  = { SQL_T_INT,      ival=1  }
                                    |      └─ [2] age = { SQL_T_SMALLINT, ival=30 }
@@ -1104,12 +1109,15 @@ SELECT id, age * 2 AS doubled FROM users WHERE age >= 25 ORDER BY id DESC LIMIT 
                                    |     SQL_RESULTSET { ncols, colnames[], rows[][] }
                                    v
    +---------------------------------------------------------------+
-   | KV          sql_catalog.c : sql_kv_get() -> table->get()     |
+   | KV          sql_exec.c : table->traverse()（引擎内归并扫描）  |
    +------------------------------+--------------------------------+
                                    |
-                                   |   VAN_DATUM（每行一次 get，共 next_rowid-1 次）
+                                   |   VAN_DATUM（一次遍历，每行回调一次）
                                    |    ├─ key = 8 字节大端 rowid
                                    |    └─ val = 行记录字节串 -> sql_row_decode()
+                                   |
+                                   |   引擎合并 active / frozen / 所有 ondisk 树，
+                                   |   墓碑被压制（等价于 get 的"不存在"）
                                    v
                     +------------------+
                     |  结果集输出/返回  |
@@ -1127,7 +1135,7 @@ SELECT id, age * 2 AS doubled FROM users WHERE age >= 25 ORDER BY id DESC LIMIT 
 | 4 | `sql_parse.c` | `parse_select()` | 记号 → 填充 `SQL_STMT`（投影项 / WHERE / ORDER BY / LIMIT） |
 | 5 | `sql_session.c` | `session_run()` | `SQL_STMT` → 交给 `sql_stmt_exec()` |
 | 6 | `sql_exec.c` | `sql_stmt_exec()` | 按 `stmt->type` 分发 |
-| 7 | **`sql_exec.c`** | **`exec_select()`** | `SQL_STMT` → `SQL_VALUE[]` → `SELROW` → `SQL_RESULTSET` |
+| 7 | **`sql_exec.c`** | **`exec_select()`** | `SQL_STMT` → `VAN_TRAVERSE_OPT` → `SQL_VALUE[]` → `SELROW` → `SQL_RESULTSET` |
 
 #### 阶段 A：解析（`sql_parse.c` + `sql_ast.c`）—— 文本 → `SQL_STMT`
 
@@ -1177,24 +1185,48 @@ SELECT id, age * 2 AS doubled FROM users WHERE age >= 25 ORDER BY id DESC LIMIT 
      alias（AS 指定）  >  列名（表达式是纯列引用时）  >  "expr"
      ```
 3. **求值 `LIMIT` / `OFFSET`**：`eval_int_arg()` 把表达式求值后转成 `BIGINT`；必须是非负整数，否则 `SQL_ERR_ARG`。注意这里 `sql_expr_eval` 的 `schema` 和 `row` 都传 `NULL` —— 分页参数不依赖行。
-4. **全表扫描**（核心）：
+4. **rowid 范围下推**（核心优化）：`sel_where_bounds()` 递归下降 `WHERE` 的 AND 树，把针对**主键别名列**（`schema->pk_indx`，其值就是 rowid 本身）的比较折叠成一个 `VAN_TRAVERSE_OPT`：
+
+   | WHERE 条件 | 下推结果 |
+   |---|---|
+   | `id = 100` | `[100, 100]`（`start_inc=1`、`end_inc=1`） |
+   | `id >= 100` | `[100, +∞)`（end 为 `NULL`） |
+   | `id > 100` | `(100, +∞)`（`start_inc=0`） |
+   | `id <= 200` | `(-∞, 200]`（start 为 `NULL`，`end_inc=1`） |
+   | `id < 200` | `(-∞, 200)`（`end_inc=0`） |
+   | `id >= 100 AND id < 200` | `[100, 200)` |
+   | `100 < id`（列在右侧） | 先经 `sel_mirror_op()` 翻成 `id > 100`，同上 |
+
+   边界收紧时取**更严格的一侧**：同一边界值上只要有一个是开区间，结果就是开区间（`id > 100 AND id >= 100` 的交集是 `id > 100`）。非整数、非正、非 rowid 别名列的条件一律**不下推**，留给回调过滤。
+
+   > **关键：下推后 WHERE 子句仍然被完整求值。** 下推只是"缩小扫描范围"，回调里照旧跑 `sql_expr_test()`。所以下推永远不可能改变结果，最多只是少扫几行 —— 这是它不需要正确性证明的原因。
+5. **一次遍历收集**（核心）：
    ```c
-   maxrid = schema->next_rowid;
-   for (rid = 1; rid < maxrid; rid++) {
-       fetch_row(sess, tb, rid, vals, &found);   /* sql_kv_get + sql_row_decode */
-       if (!found) continue;                     /* 被删除的行留下空洞 */
-       ...
-   }
+   tvret = tb->table->traverse(tb->table, VAN_TRAVERSE_FORWARD, opt,
+       sel_traverse_cb, &ctx);
    ```
-   `fetch_row()` = `sql_kv_get()` → 若 `*datap == NULL` 则 `found = 0` → 否则 `sql_row_decode()` → `sql_kv_free(data)`。
-5. **过滤**：`sql_expr_test(sess, schema, vals, stmt->where, &tv)`，**只有 `tv == TRI_TRUE` 才保留**。`TRI_FALSE` 和 `TRI_UNKNOWN` 都丢弃（SQL 语义：WHERE 只接受真）。
-6. **投影**：为通过过滤的行分配 `proj[nproj]`
+   引擎在内部合并 active / frozen / 所有 ondisk 树，按 rowid 升序回调；**墓碑在合并阶段被压制**，所以删掉的行根本不会回调（等价于过去 `get` 返回"不存在"）。`opt == NULL` 就是全表扫描。
+
+   回调 `sel_traverse_cb()` 每行的动作：`sql_row_decode()` → `sql_expr_test()` 过滤 → 扩容 `rows[]` → 投影 → 求值排序键 → `DISTINCT` 去重 → 存进 `SELROW`。出错时把错误码记进 `ctx->ret` 并返回 `SEL_STOP`（`1`）终止遍历：
+
+   > 引擎错误码全为负（`VAN_NOTFOUND -30988` 等），所以调用方能明确区分"我主动停的"（`1`）和"引擎真出错"（负数）；`ctx->ret != SQL_OK` 则优先按错误处理。
+6. **过滤**：`sql_expr_test(sess, schema, vals, stmt->where, &tv)`，**只有 `tv == TRI_TRUE` 才保留**。`TRI_FALSE` 和 `TRI_UNKNOWN` 都丢弃（SQL 语义：WHERE 只接受真）。该步在**回调内**执行。
+7. **投影**：为通过过滤的行分配 `proj[nproj]`（在回调内）
    - `select_star` → 直接 `sql_value_copy(&vals[i], &proj[i])`（省一次表达式求值，这是简化后的写法）。
    - 否则 → `sql_expr_eval(sess, schema, vals, item->expr, &tmp)` 再拷贝。
-7. **求值排序键**：对 `stmt->order_by[i]` 逐个 `sql_expr_eval` 存入 `keys[i]`。**预先求值**，排序阶段就不再碰表达式。
-8. **DISTINCT 去重**：拿当前 `proj` 与**已收集的所有行**逐个 `sql_value_cmp` 比较，`nproj` 列全相等则判为重复并丢弃。
+8. **求值排序键**：对 `stmt->order_by[i]` 逐个 `sql_expr_eval` 存入 `keys[i]`。**预先求值**，排序阶段就不再碰表达式。
+9. **DISTINCT 去重**：拿当前 `proj` 与**已收集的所有行**逐个 `sql_value_cmp` 比较，`nproj` 列全相等则判为重复并丢弃。
    > 代码注释：`DISTINCT is applied here, before the ordering.` —— 去重在排序**之前**。
-9. **排序**：
+10. **LIMIT 提前终止**（回调内，可选优化）：收满 `offset + limit` 行就返回 `SEL_STOP`，不必扫完整张表。
+
+    ```c
+    if (has_limit && stmt->norder == 0 && !stmt->distinct &&
+        offset + limit >= limit)      /* 溢出检查 */
+        ctx.stop_at = offset + limit;
+    ```
+
+    > **只在无 `ORDER BY`、无 `DISTINCT` 时才启用**，原因是：排序发生在收完行**之后**，必须看完才知道前 N 行是谁；`DISTINCT` 会丢行，无法预估要扫多少行才够。阈值是 `offset + limit` 而不是 `limit`，因为要先跳过 `OFFSET` 行。
+11. **排序**（遍历结束后）：
    ```c
    if (stmt->norder > 0 && nrows > 1) {
        sort_order = stmt->order_by;
@@ -1203,7 +1235,7 @@ SELECT id, age * 2 AS doubled FROM users WHERE age >= 25 ORDER BY id DESC LIMIT 
    }
    ```
    `selrow_cmp` 依次比较每个排序键，`desc` 时取反；**全部相等时比较 `seq`**（原始扫描序号），保证排序**稳定**。
-10. **分页**：先跳过 `OFFSET` 行，再按 `LIMIT` 截断：
+12. **分页**：先跳过 `OFFSET` 行，再按 `LIMIT` 截断：
     ```c
     for (i = 0; i < nrows; i++) {
         if (i < start) continue;              /* OFFSET */
@@ -1212,10 +1244,10 @@ SELECT id, age * 2 AS doubled FROM users WHERE age >= 25 ORDER BY id DESC LIMIT 
         printed++;
     }
     ```
-11. **输出**：
+13. **输出**：
     - `sess->resultp != NULL` → `*sess->resultp = rs`，**所有权移交调用方**。
     - 否则 → `sql_resultset_print(rs, out)` 后 `sql_resultset_free(rs)`。
-12. **清理**：释放 `rows[]` 里每一行的 `proj`/`keys`、列名数组、`vals`。
+14. **清理**：释放 `rows[]` 里每一行的 `proj`/`keys`、列名数组、`vals`。
 
 #### 阶段 C：数据结构演变一览
 
@@ -1239,7 +1271,7 @@ SELECT id, age * 2 AS doubled FROM users WHERE age >= 25 ORDER BY id DESC LIMIT 
 
    ★ 此刻所有 EX_COLUMN 都只有 lname 字符串，没有任何列下标
 
-③ SQL_VALUE[] 一行（ncols 个）       ← fetch_row(): sql_kv_get + sql_row_decode
+③ SQL_VALUE[] 一行（ncols 个）       ← sel_traverse_cb(): sql_row_decode
    [0] id  = { type=SQL_T_INT,      isnull=0, ival=1  }
    [1] ... = { ... }
    [2] age = { type=SQL_T_SMALLINT, isnull=0, ival=30 }
@@ -1263,7 +1295,16 @@ SELECT id, age * 2 AS doubled FROM users WHERE age >= 25 ORDER BY id DESC LIMIT 
    rows[][] = ⑤proj 的深拷贝
 ```
 
-**触发的 KV 操作：** `next_rowid - 1` 次 `get`（**每行一次，删过的行也照样读一次**）。这是当前最大的性能瓶颈，见 §6。
+**触发的引擎操作：** **1 次** `table->traverse()`，引擎内部归并 active / frozen / 所有 ondisk 树，对每行回调一次 SQL 层。相比改造前"rowid 从 `1` 走到 `next_rowid-1`、每行一次 `get`"，差别是：
+
+| | 改造前 | 改造后 |
+|---|---|---|
+| 引擎调用次数 | `next_rowid - 1` 次 `get` | 1 次 `traverse` |
+| 删过的行 | 照样读一次（留下空洞） | 引擎合并时由墓碑压制，**根本不会回调** |
+| `WHERE` 中的 rowid 范围 | 全表扫描后才过滤 | 下推成 `VAN_TRAVERSE_OPT`，只扫命中的键区间 |
+| `LIMIT`（无 ORDER BY / DISTINCT） | 扫完整表 | 收满 `offset + limit` 行即停 |
+
+> `UPDATE` / `DELETE` 仍走 `fetch_row()` 逐个 `get`（见 §3.4），本次未改动。
 
 ### 3.4 UPDATE / DELETE 的完整流程
 
@@ -1271,7 +1312,7 @@ SELECT id, age * 2 AS doubled FROM users WHERE age >= 25 ORDER BY id DESC LIMIT 
 
 1. **定位表** + `sql_table_ensure_open()`。
 2. **预解析 SET 目标列**：`sql_schema_findcol()` 把每个 `set_items[i].lcolname` 解析成列索引存进 `targets[]`。**这一步在扫描之外**，列名错误不必等到扫到某一行才报错。
-3. **全表扫描** `rid = 1 .. next_rowid-1`，`fetch_row()` + `WHERE` 过滤（同 SELECT 第 4、5 步）。
+3. **全表扫描** `rid = 1 .. next_rowid-1`，`fetch_row()` + `WHERE` 过滤（`fetch_row()` = `sql_kv_get` + `sql_row_decode`；这是 `SELECT` 改用 `traverse` **之前**的扫描方式，`UPDATE` / `DELETE` 仍保持原样，见 §3.3）。
 4. **逐项求值并回写**：
    ```c
    for (i = 0; i < stmt->nset; i++) {
@@ -1761,6 +1802,7 @@ SQL 层通过 `sql_catalog.c` 单向使用引擎。用到的接口：
 | `table->put(table, &key, &val, 0)` | `sql_kv_put()` / `cat_put()` | 写入 |
 | `table->get(table, &key, &val, 0)` | `sql_kv_get()` / `cat_get()` | 读取 |
 | `table->del(table, &key, 0)` | `sql_kv_del()` / `cat_del()` | 删除 |
+| `table->traverse(table, flags, opt, func, arg)` | `exec_select()` | **SELECT 的全表/范围遍历**（回调式） |
 
 **datum / 内存：**
 
@@ -1795,16 +1837,17 @@ if (ret == VAN_NOTFOUND || ret == VAN_DELETED) {
 | `INSERT`（1 行，有整数 PK） | 1 × get（查重）+ 1 × put；`next_rowid` 增长时 + 目录 2 × put | O(log N) |
 | `INSERT`（1 行，无 PK） | 1 × put；`next_rowid` 增长时 + 目录 2 × put | O(log N) |
 | `INSERT`（k 行） | 上述 × k | O(k log N) |
-| `SELECT`（无 WHERE） | `N` × get | **O(N log N)** |
-| `SELECT`（有 WHERE） | `N` × get（`WHERE` 在 SQL 层过滤，**不下推**） | **O(N log N)** |
+| `SELECT`（无 WHERE） | 1 × `traverse`（引擎内 k 路归并，每行回调一次） | **O(N log T)** |
+| `SELECT`（WHERE 是 rowid 范围） | 1 × `traverse`，只扫命中的键区间 | **O(R log T)**，`R` = 区间内行数 |
+| `SELECT`（WHERE 是非 rowid 条件） | 1 × `traverse`（全表）+ SQL 层逐行过滤 | **O(N log T)** |
 | `UPDATE` | `N` × get + `M` × put（`M` 中主键变更的再 +1 × del） | O(N log N) |
 | `DELETE` | `N` × get + `M` × del | O(N log N) |
 | 会话首次打开 | 目录 1 × get（表清单）+ `T` × get（每张表的 schema） | O(T) |
 
 **三个必须知道的事实：**
 
-1. **任何带 WHERE 的语句都是全表扫描。** 没有索引，`WHERE` 永远在 SQL 层逐行求值。
-2. **删过的行照样被读一次。** rowid 不重用，`DELETE FROM t` 之后 `SELECT` 仍然遍历 `1..N`，每个 `get` 都返回"不存在"。
+1. **任何带 WHERE 的语句都要扫完整张表，除非 WHERE 是 rowid 范围。** 没有索引；`SELECT` 会把 `WHERE` 里针对主键别名列的比较下推成键区间（见 §3.3 第 4 步），其余条件仍在 SQL 层逐行求值。
+2. **`UPDATE` / `DELETE` 仍逐个 `get`，删过的行照样被读一次。** rowid 不重用，`DELETE FROM t` 之后它们仍然遍历 `1..N`，每个 `get` 都返回"不存在"。`SELECT` 已改成 `traverse`，删掉的行由引擎在归并阶段用墓碑压制，**根本不会回调**（这也是 §3.3 与 §3.4 现在的主要差别）。
 3. **`next_rowid` 的回写是"整个 schema 重写一次"。** 每次自增都要 `sql_schema_serialize()` + 一次目录 put + 一次表清单 put。批量插入多行时，只有**最后**超过当前 `next_rowid` 的那次会触发（因为 `if (rowid >= schema->next_rowid)`），所以 `INSERT ... VALUES (...), (...), (...)` 通常只回写一次。
 
 ### 5.3 元数据与用户数据如何区分
@@ -1868,12 +1911,13 @@ k.size = strlen(key);
 
 **已知的性能/正确性隐患：**
 
-1. **全表扫描的 get 次数。** 每行一次 `get`，删过的行也读一次。
+1. **`UPDATE` / `DELETE` 仍是逐个 `get` 的全表扫描。** 每行一次 `get`，删过的行也读一次（`SELECT` 已改为一次 `traverse`，见 §3.3）。
 2. **`LIKE` 的指数回溯。** `like_match()` 对 `%` 尝试所有切分点，`'%a%a%a%a%a%a%a'` 这类模式会退化。生产化前应改成 DP 或双指针算法。
-3. **`exec_select` 全量物化。** 所有命中行的投影 + 排序键都在内存里，没有流式输出或 top-N 优化。`SELECT * FROM huge_table ORDER BY x LIMIT 10` 也会把所有行读进内存再排序。
+3. **`exec_select` 全量物化。** 所有命中行的投影 + 排序键都在内存里，没有流式输出或 top-N 优化。`SELECT * FROM huge_table ORDER BY x LIMIT 10` 也会把所有行读进内存再排序（`ORDER BY` 存在时无法用 `LIMIT` 提前终止，见 §3.3 第 10 步）。
 4. **DISTINCT 是 O(n²)。** 每行都要与已收集的所有行逐列比较。
 5. **`SQL_MAX_ROWS_DEFAULT`（1024×1024）已定义但当前未强制。** `SQL_MAX_IDENT_LEN`（128）和 `SQL_MAX_COLUMNS`（256）在 parser 与 catalog 里是强制的。
 6. **`qsort` 上下文用文件级静态变量**，语句执行不可重入（已在注释中声明）。
+7. **范围下推只覆盖 rowid 别名列。** 其它列的条件、以及 `BETWEEN` / `IN` 形式的 rowid 条件都还没下推，仍走全表扫描 + 回调过滤。
 
 ### 6.2 如果要加 JOIN / 子查询 / 聚合，需要改哪些地方？
 
@@ -1885,7 +1929,7 @@ k.size = strlen(key);
 | `sql_parse.c` | 新增 `parse_from()`；`parse_primary` 要支持**限定名** `t.col`。 |
 | 名字解析 | `sql_schema_findcol()` 现在签名是单 schema；需要改成"在多 schema 上下文中按限定名/别名查找"，并处理歧义（已有 `SQL_ERR_AMBIGUOUS` 错误码预留）。 |
 | 行表示 | `exec_select` 里的 `SQL_VALUE *vals` 是单表一行；需要扩展成"每个源表一个 `SQL_VALUE[]`"，或引入带来源标记的行结构。 |
-| 执行算法 | 新增连接算子。当前**没有游标**，最简单可行的方案是**嵌套循环**：外表全表扫描（`rowid = 1..N`），内表也全表扫描并对每行求值 `ON`。若先加上游标（见 §6.3），可做索引嵌套循环。 |
+| 执行算法 | 新增连接算子。引擎**不对外暴露游标**（`table->traverse()` 是回调式，遍历状态不外泄），最简单可行的方案是**嵌套循环**：外表用 `traverse` 全表扫描，内表也全表扫描并对每行求值 `ON`。若先加上索引（见 §6.3），可做索引嵌套循环。 |
 | 投影/排序 | `projection_name()` 与 `sql_expr_eval()` 的 `schema` 参数要变成 schema 集合。 |
 
 **建议：** 先把 `sql_expr_eval` 的 `schema` 参数抽象成一个"求值上下文"（`struct eval_ctx { 表列表, 当前各表行 }`），这是一切多表特性的共同前置改动。
