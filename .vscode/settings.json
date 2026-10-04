@@ -1,0 +1,52 @@
+{
+    "C_Cpp.intelliSenseEngine": "default",
+    "C_Cpp.errorSquiggles": "enabled",
+    "C_Cpp.workspaceSymbols": "aggressive",
+    "C_Cpp.default.includePath": [
+        "${workspaceFolder}/include",
+	"${workspaceFolder}/include_auto",
+                "C:/mingw64/include",
+                "C:/mingw64/x86_64-w64-mingw32/include",
+                "C:/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include"
+    ],
+    "C_Cpp.default.defines": [
+        "_GNU_SOURCE",
+        "HAVE_STRING_H",
+        "HAVE_STDINT_H",
+        "HAVE_INTTYPES_H",
+        "HAVE_SYS_TYPES_H",
+        "HAVE_UNISTD_H",
+        "HAVE_FCNTL_H"
+    ],
+    "C_Cpp.default.cStandard": "c11",
+    "C_Cpp.default.cppStandard": "c++17",
+    "C_Cpp.default.intelliSenseMode": "windows-gcc-x64",
+    "files.associations": {
+        "*.h": "c",
+        "*.c": "c"
+    },
+        "files.exclude": {
+        "**/*.stackdump": true,
+	"**/*.un~": true,
+        "**/*.swp": true,
+        "**/*.swo": true,
+        "**/.*.swp": true,   
+        "**/*~": true,    
+        "**/*.o": true,
+        "**/*.exe": true,
+        "**/*.out": true,
+        "**/*.a": true,      
+        "**/*.so": true,    
+        "**/*.dll": true,   
+        "**/*.dylib": true  
+    },
+    "editor.cursorStyle": "line",
+    "editor.cursorBlinking": "smooth",
+    "editor.cursorColor": "#FF6B6B",  
+    "workbench.colorTheme": "Dark+",
+    "editor.autoClosingComments": "never",
+    "github.copilot.advanced.idleTimeout": 2000,
+    "editor.autoClosingBrackets": "never",
+    "editor.autoClosingQuotes": "never"
+
+}
