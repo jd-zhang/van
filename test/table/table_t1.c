@@ -1044,3 +1044,232 @@ int table_t1_4() {
 
 	return ((failcnt > 0) ? (-1) : (0));
 }
+
+/*
+ * table_t1_5*: a get of a key that is not in the table must report
+ * VAN_NOTFOUND, whatever trees the table currently holds.
+ *
+ * The bug this guards against lived in _van_table_op_get(): once the
+ * active and the frozen tree had both missed, it handed its 'ret' to
+ * VAN_MUTEX_LOCK(), and the macro overwrote the VAN_NOTFOUND with the
+ * result of pthread_mutex_lock().  A table that had no on-disk tree yet
+ * then reported a missing key as a successful get with an empty value.
+ *
+ * The background threads stay off (VAN_TABLE_SKIP_THREAD_START), so every
+ * tree transition below is the one the test asks for and the layout under
+ * test is exactly the one the name of the case says.
+ */
+#define TB_T1_5_NKEYS	200
+#define TB_T1_5_NAME	"test1_5"
+#define TB_T1_5_MISSING	"no_such_key_was_ever_put_here"
+
+typedef enum {
+	TB_T1_5_ACTIVE = 0,		/* active only			*/
+	TB_T1_5_ACTIVE_FROZEN,		/* active + frozen		*/
+	TB_T1_5_ACTIVE_FROZEN_ODT,	/* active + frozen + ondisk	*/
+	TB_T1_5_ACTIVE_ODT		/* active + ondisk		*/
+} tb_t1_5_layout;
+
+static int tb_t1_5_open(VAN_STORE **storep, VAN_TABLE **tablep) {
+	VAN_STORE *store;
+	VAN_TABLE *table;
+	int ret;
+
+	system("rm -fr test1_5*");
+	system("rm -fr vanlog.*");
+
+	ret = van_test_store_create(&store);
+	CHK_RET(ret, "van_test_store_create");
+	ret = store->open(store, ".", 0);
+	CHK_RET(ret, "store->open");
+	ret = van_table_create(store, &table);
+	CHK_RET(ret, "van_table_create");
+	/*
+	 * Keep the threshold big so that nothing dumps on its own: the
+	 * layout is built by the explicit dump_inmem / freeze calls.
+	 */
+	table->set_inmem_threshold(table, GIGABYTE);
+	ret = table->open(table, TB_T1_5_NAME, VAN_TABLE_SKIP_THREAD_START);
+	CHK_RET(ret, "table->open");
+
+	*storep = store;
+	*tablep = table;
+
+	return (0);
+}
+
+/*
+ * Move the active tree to frozen *without* dumping it, which is what
+ * leaves the table holding an active tree and a frozen one at once.
+ *
+ * _van_table_freeze() cannot be used for that: it also starts a dump,
+ * which turns the frozen tree into an on-disk tree right away.
+ */
+static int tb_t1_5_freeze(VAN_TABLE *table) {
+	INMEM_TREE *imtree;
+	int ret;
+
+	imtree = table->active;
+	ret = imtree->freeze(imtree);
+	CHK_RET(ret, "inmemtree->freeze");
+
+	table->frozen = imtree;
+	ret = van_inmemtree_create(table, &table->active);
+	CHK_RET(ret, "van_inmemtree_create");
+	table->active->threshold = table->inmem_threshold;
+
+	return (0);
+}
+
+/* Put td->records[off .. off + n) into the table. */
+static int tb_t1_5_put(VAN_TABLE *table, TESTDATA *td, size_t off,
+    size_t n) {
+	TESTDATA part;
+	int ret;
+
+	TESTDATA_SLICE(&part, td, off, n);
+	ret = populate_table(table, &part);
+	CHK_RET(ret, "populate_table");
+
+	return (0);
+}
+
+/*
+ * The key the missing-key check looks for must not be one of the
+ * generated ones, otherwise it would ask for a key that is really there.
+ */
+static int tb_t1_5_absent(TESTDATA *td, const char *key, size_t klen) {
+	size_t i;
+
+	for (i = 0; i < td->count; i++)
+		if (td->records[i].ksize == klen &&
+		    memcmp(td->records[i].key, key, klen) == 0)
+			return (0);
+
+	return (1);
+}
+
+static void tb_t1_5_checkmissing(VAN_TABLE *table, TESTDATA *td) {
+	VAN_DATUM key, val;
+	int ret;
+
+	TEST_ASSERT(tb_t1_5_absent(td, TB_T1_5_MISSING,
+	    sizeof(TB_T1_5_MISSING)));
+
+	memset(&key, 0, sizeof(key));
+	key.data = (void *)TB_T1_5_MISSING;
+	key.size = sizeof(TB_T1_5_MISSING);
+	key.ulen = sizeof(TB_T1_5_MISSING);
+	key.flags = 0;
+
+	memset(&val, 0, sizeof(val));
+	val.data = NULL;
+	val.size = 0;
+	val.ulen = 0;
+	val.flags = VAN_MALLOC;
+
+	ret = table->get(table, &key, &val, 0);
+	if (val.data != NULL)
+		(void)_van_datum_copyfree(&val);
+	TEST_ASSERT2(ret == VAN_NOTFOUND,
+	    "get of a missing key returned %d, expected VAN_NOTFOUND (%d)\n",
+	    ret, VAN_NOTFOUND);
+}
+
+static int tb_t1_5_run(tb_t1_5_layout layout) {
+	VAN_STORE *store;
+	VAN_TABLE *table;
+	TESTDATA td;
+	size_t third;
+	int ret;
+
+	store = NULL;
+	table = NULL;
+
+	ret = tb_t1_5_open(&store, &table);
+	CHK_RET(ret, "tb_t1_5_open");
+
+	TESTDATA_INIT(&td, TB_T1_5_NKEYS);
+	ret = generate_string_testdata(&td, 8, 20, 8, 20);
+	CHK_RET(ret, "generate_string_testdata");
+
+	third = TB_T1_5_NKEYS / 3;
+
+	switch (layout) {
+	case TB_T1_5_ACTIVE:
+		/* Everything stays in the active tree. */
+		ret = tb_t1_5_put(table, &td, 0, td.count);
+		CHK_RET(ret, "put");
+		break;
+	case TB_T1_5_ACTIVE_FROZEN:
+		ret = tb_t1_5_put(table, &td, 0, third);
+		CHK_RET(ret, "put");
+		ret = tb_t1_5_freeze(table);
+		CHK_RET(ret, "freeze");
+		ret = tb_t1_5_put(table, &td, third, td.count - third);
+		CHK_RET(ret, "put");
+		break;
+	case TB_T1_5_ACTIVE_FROZEN_ODT:
+		/*
+		 * dump_inmem() freezes the *active* tree and dumps that,
+		 * so the on-disk tree has to be built before the tree
+		 * that is meant to stay frozen.
+		 */
+		ret = tb_t1_5_put(table, &td, 0, third);
+		CHK_RET(ret, "put");
+		ret = table->dump_inmem(table);
+		CHK_RET(ret, "table->dump_inmem");
+		ret = tb_t1_5_put(table, &td, third, third);
+		CHK_RET(ret, "put");
+		ret = tb_t1_5_freeze(table);
+		CHK_RET(ret, "freeze");
+		ret = tb_t1_5_put(table, &td, third * 2,
+		    td.count - third * 2);
+		CHK_RET(ret, "put");
+		break;
+	case TB_T1_5_ACTIVE_ODT:
+		ret = tb_t1_5_put(table, &td, 0, third);
+		CHK_RET(ret, "put");
+		/* dump_inmem() sets table->frozen back to NULL. */
+		ret = table->dump_inmem(table);
+		CHK_RET(ret, "table->dump_inmem");
+		ret = tb_t1_5_put(table, &td, third, td.count - third);
+		CHK_RET(ret, "put");
+		break;
+	}
+
+	fprintf(stderr, "--- layout: odt_top %lu, frozen %s ---\n",
+	    (unsigned long)table->odt_top,
+	    table->frozen != NULL ? "yes" : "no");
+
+	tb_t1_5_checkmissing(table, &td);
+
+	/* ... and every key that is there must still come back. */
+	ret = verify_table_data(table, &td);
+	CHK_RET(ret, "verify_table_data");
+
+	(void)free_string_testdata(&td);
+
+	ret = table->close(table, 0);
+	CHK_RET(ret, "table->close");
+	ret = store->close(store);
+	CHK_RET(ret, "store->close");
+
+	return (0);
+}
+
+int table_t1_5a() {
+	return (tb_t1_5_run(TB_T1_5_ACTIVE));
+}
+
+int table_t1_5b() {
+	return (tb_t1_5_run(TB_T1_5_ACTIVE_FROZEN));
+}
+
+int table_t1_5c() {
+	return (tb_t1_5_run(TB_T1_5_ACTIVE_FROZEN_ODT));
+}
+
+int table_t1_5d() {
+	return (tb_t1_5_run(TB_T1_5_ACTIVE_ODT));
+}

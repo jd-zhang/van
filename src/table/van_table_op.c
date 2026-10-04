@@ -196,7 +196,15 @@ int _van_table_op_put(VAN_OPERATION *tbop, VAN_DATUM *key,
 
 int _van_table_op_get(VAN_OPERATION *tbop, VAN_DATUM *key,
     VAN_DATUM *data, flags_t flags) {
-	int ret;
+	/*
+	 * 'ret' carries the result of the search, 'mtx_ret' only the
+	 * result of the mutex calls.  They have to be separate: the
+	 * VAN_MUTEX_* macros assign to whatever variable they are given,
+	 * so handing them 'ret' overwrites the VAN_NOTFOUND that the
+	 * in-memory searches below produced and turns a missing key into
+	 * a successful get with an empty value.
+	 */
+	int ret, mtx_ret;
 	VAN_TABLE *table;
 	INMEM_TREE *active, *frozen;
 	ONDISK_TREE *odtree;
@@ -205,6 +213,7 @@ int _van_table_op_get(VAN_OPERATION *tbop, VAN_DATUM *key,
 	VAN_TABLE_ODT_ITEM *citem;
 
 	ret = 0;
+	mtx_ret = 0;
 	table = tbop->table;
 	active = table->active;
 	/*
@@ -247,15 +256,27 @@ int _van_table_op_get(VAN_OPERATION *tbop, VAN_DATUM *key,
 	 * bigger than current cursor, we just search down and down.
 	 * When we returnt the last tree, we just return the result.
 	 */
-	VAN_MUTEX_LOCK(table, odt_mtx, ret);
+	VAN_MUTEX_LOCK(table, odt_mtx, mtx_ret);
+	if (mtx_ret != 0) {
+		ret = mtx_ret;
+		goto err;
+	}
 	odt_top = table->odt_top;
-	VAN_MUTEX_UNLOCK(table, odt_mtx, ret);
+	VAN_MUTEX_UNLOCK(table, odt_mtx, mtx_ret);
+	if (mtx_ret != 0 && ret == 0) {
+		ret = mtx_ret;
+		goto err;
+	}
 	cur_indx = (int)odt_top;
 
 	while (cur_indx >= 0) {
 		gonext = 0;
 		citem = &table->odt_items[cur_indx];
-		VAN_MUTEX_LOCK(citem, mutex, ret);
+		VAN_MUTEX_LOCK(citem, mutex, mtx_ret);
+		if (mtx_ret != 0) {
+			ret = mtx_ret;
+			goto err;
+		}
 		/*
 		 * First check the table_ticks, and skip to next
 		 * if it is generated later than the operation.
@@ -291,9 +312,17 @@ int _van_table_op_get(VAN_OPERATION *tbop, VAN_DATUM *key,
 				VAN_ASSERT(citem->ticks <= citem->merged_ticks);
 				if (changed) {
 					cur_indx = citem->merged_indx;
-					VAN_MUTEX_UNLOCK(citem, mutex, ret);
+					VAN_MUTEX_UNLOCK(citem, mutex, mtx_ret);
+					if (mtx_ret != 0 && ret == 0) {
+						ret = mtx_ret;
+						goto err;
+					}
 					citem = &table->odt_items[cur_indx];
-					VAN_MUTEX_LOCK(citem, mutex, ret);
+					VAN_MUTEX_LOCK(citem, mutex, mtx_ret);
+					if (mtx_ret != 0) {
+						ret = mtx_ret;
+						goto err;
+					}
 				}
 				odtree = citem->trees[1];
 				 /* The item may have been changed. */
@@ -303,7 +332,11 @@ int _van_table_op_get(VAN_OPERATION *tbop, VAN_DATUM *key,
 		}
 unlock_item:
 	if (gonext) {
-		VAN_MUTEX_UNLOCK(citem, mutex, ret);
+		VAN_MUTEX_UNLOCK(citem, mutex, mtx_ret);
+		if (mtx_ret != 0 && ret == 0) {
+			ret = mtx_ret;
+			goto err;
+		}
 		continue;
 	}
 
@@ -317,7 +350,11 @@ unlock_item:
 	 */
 	VAN_ASSERT(odtree != NULL);
 	atomic_fetch_add(&odtree->refcount, 1);
-	VAN_MUTEX_UNLOCK(citem, mutex, ret);
+	VAN_MUTEX_UNLOCK(citem, mutex, mtx_ret);
+	if (mtx_ret != 0 && ret == 0) {
+		ret = mtx_ret;
+		goto err;
+	}
 
 	ret = odtree->getraw(odtree, key, data, flags);
 	atomic_fetch_sub(&odtree->refcount, 1);
@@ -328,8 +365,15 @@ unlock_item:
 		break;
 
 	cur_indx--;
-}
+	}
 
+err:
+	/*
+	 * Nothing to undo: the jumps above leave the search while no mutex
+	 * is held, and a mutex that failed to lock is not held either.
+	 * A lock failure outranks the search result, so it replaces 'ret'
+	 * above; a plain search result is returned as it is.
+	 */
 ret:
 	return (ret);
 }

@@ -6,11 +6,11 @@
                 "${workspaceFolder}/include",
                 "${workspaceFolder}/include_auto",
 		          "${workspaceFolder}/test/include",
-    "D:/cygwin64/usr/include",
-    "D:/cygwin64/usr/include/sys",
-                "C:/mingw64/include",
-                "C:/mingw64/x86_64-w64-mingw32/include",
-                "C:/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include"
+    "C:/cygwin64/usr/include",
+    "C:/cygwin64/usr/include/sys",
+                "C:/msys64/mingw64/include",
+                "C:/msys64/mingw64/x86_64-w64-mingw32/include",
+                "C:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include"
            ],
             "defines": [
                 "_GNU_SOURCE",
@@ -21,7 +21,7 @@
                 "HAVE_UNISTD_H",
                 "HAVE_FCNTL_H"
             ],
-            "compilerPath": "C:/mingw64/bin/gcc.exe",
+            "compilerPath": "C:/msys64/usr/bin/gcc.exe",
             "cStandard": "c11",
             "cppStandard": "c++17",
             "intelliSenseMode": "windows-gcc-x64"

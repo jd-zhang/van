@@ -24,6 +24,10 @@ extern int table_t1_1f();
 extern int table_t1_2();
 extern int table_t1_3();
 extern int table_t1_4();
+extern int table_t1_5a();
+extern int table_t1_5b();
+extern int table_t1_5c();
+extern int table_t1_5d();
 extern int table_t2_1();
 extern int table_t2_2();
 extern int table_t2_3();
@@ -70,6 +74,10 @@ static struct {
 	{"table_t1_2", (test_func_t)table_t1_2},
 	{"table_t1_3", (test_func_t)table_t1_3},
 	{"table_t1_4", (test_func_t)table_t1_4},
+	{"table_t1_5a", (test_func_t)table_t1_5a},
+	{"table_t1_5b", (test_func_t)table_t1_5b},
+	{"table_t1_5c", (test_func_t)table_t1_5c},
+	{"table_t1_5d", (test_func_t)table_t1_5d},
 	{"table_t2_1", (test_func_t)table_t2_1},
 	{"table_t2_2", (test_func_t)table_t2_2},
 	{"table_t2_3", (test_func_t)table_t2_3},
