@@ -1,0 +1,11 @@
+[kvstore]
+host = "0.0.0.0"
+port = 8080
+data_dir = "./data"
+table_name = "kvstore"
+cache_size = "1G"
+inmem_threshold = "200M"
+
+[http]
+read_timeout = 30
+write_timeout = 30
