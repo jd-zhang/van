@@ -91,13 +91,84 @@ static int tb2_setup(VAN_STORE **storep, VAN_TABLE **tablep,
 	return (0);
 }
 
+static int tb2_count_cb(void *arg, const VAN_DATUM *k, const VAN_DATUM *v) {
+	(*(size_t *)arg)++;
+	return (0);
+}
+
+typedef struct {
+	TESTDATA *td;
+	size_t    n;
+} tb2_snap_t;
+
+/*
+ * Copy one visited row into the snapshot.  The datum buffers only live
+ * for the duration of the callback, so both sides are duplicated; that
+ * is also what free_string_testdata() expects to release.
+ */
+static int tb2_collect_cb(void *arg, const VAN_DATUM *k, const VAN_DATUM *v) {
+	tb2_snap_t *s;
+	RECORD *r;
+
+	s = (tb2_snap_t *)arg;
+	if (s->n >= s->td->count)
+		return (-1);
+	r = &s->td->records[s->n];
+	r->key = strndup(k->data, k->size);
+	r->ksize = k->size;
+	r->value = strndup(v->data, v->size);
+	r->vsize = v->size;
+	TEST_ASSERT(r->key != NULL && r->value != NULL);
+	s->n++;
+	return (0);
+}
+
+/*
+ * Close the table and the store, then check the two things that only a
+ * fresh open can tell:
+ *
+ *   - every record is still readable.  odtpaths are turned into ondisk
+ *     trees only when the table is opened, so an odlist that lost a
+ *     tree shows up here as missing data.  The table is walked twice
+ *     before it is closed to build the expected set, since the cases
+ *     here build their data by hand instead of using a TESTDATA.
+ *
+ *   - the file list the WAL ends with matches the files on disk.
+ *     That one cannot catch a wrong odlist on its own: the WAL record
+ *     is built from the same odtpaths, so both are wrong the same way.
+ */
 static int tb2_teardown(VAN_TABLE *table, VAN_STORE *store) {
+	TESTDATA td;
+	tb2_snap_t snap;
+	size_t n;
 	int ret;
+
+	memset(&td, 0, sizeof(td));
+	n = 0;
+	ret = table->traverse(table, VAN_TRAVERSE_FORWARD, NULL,
+	    tb2_count_cb, &n);
+	CHK_RET(ret, "traverse (snapshot count)");
+
+	if (n > 0) {
+		TESTDATA_INIT(&td, n);
+		snap.td = &td;
+		snap.n = 0;
+		ret = table->traverse(table, VAN_TRAVERSE_FORWARD, NULL,
+		    tb2_collect_cb, &snap);
+		CHK_RET(ret, "traverse (snapshot collect)");
+	}
 
 	ret = table->close(table, 0);
 	CHK_RET(ret, "table->close");
 	ret = store->close(store);
 	CHK_RET(ret, "store->close");
+
+	if (n > 0) {
+		ret = verify_table_after_reopen(".", tb2_tbname, &td);
+		CHK_RET(ret, "verify_table_after_reopen");
+		(void)free_string_testdata(&td);
+	}
+
 	/*
 	 * Now that everything is closed, check that what the WAL says
 	 * about the odlist matches the odlist on disk, and that every

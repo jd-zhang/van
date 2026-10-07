@@ -164,12 +164,19 @@ int table_t1_1() {
 		ret = pthread_join(threads[i], &rptr);
 	}
 
-	(void)free_string_testdata(&td);
-
 	ret = table->close(table, 0);
 	CHK_RET(ret, "table->close");
 	ret = store->close(store);
 	CHK_RET(ret, "store->close");
+
+	/*
+	 * Reopen and read everything back: odtpaths only take effect on
+	 * the next open, so this is what catches an odlist that lost a
+	 * tree.  keep td alive until this is done.
+	 */
+	ret = verify_table_after_reopen(".", "test1", &td);
+	CHK_RET(ret, "verify_table_after_reopen");
+	(void)free_string_testdata(&td);
 
 	ret = van_test_store_create(&store);
 	CHK_RET(ret, "van_store_create");
@@ -222,12 +229,21 @@ int table_t1_1b() {
 	ret = populate_table(table, &td);
 	CHK_RET(ret, "populate_table");
 
-	(void)free_string_testdata(&td);
-
 	ret = table->close(table, 0);
 	CHK_RET(ret, "table->close");
 	ret = store->close(store);
 	CHK_RET(ret, "store->close");
+
+	/*
+	 * Reopen and read everything back: odtpaths only take effect on
+	 * the next open, so this is what catches an odlist that lost a
+	 * tree.  verify_logfiles_from_scratch cannot see that, the WAL
+	 * record is built from the same odtpaths and is wrong the same
+	 * way.  td has to stay alive until this is done.
+	 */
+	ret = verify_table_after_reopen(".", "test1", &td);
+	CHK_RET(ret, "verify_table_after_reopen");
+	(void)free_string_testdata(&td);
 
 	ret = verify_logfiles_from_scratch(".", "test1");
 	CHK_RET(ret, "verify_logfiles_from_scratch");
@@ -306,12 +322,21 @@ int table_t1_1c() {
 	ret = verify_table_data(table, &td);
 	CHK_RET(ret, "verify_table_data");
 
-	(void)free_string_testdata(&td);
-
 	ret = table->close(table, 0);
 	CHK_RET(ret, "table->close");
 	ret = store->close(store);
 	CHK_RET(ret, "store->close");
+
+	/*
+	 * Reopen and read everything back: odtpaths only take effect on
+	 * the next open, so this is what catches an odlist that lost a
+	 * tree.  verify_logfiles_from_scratch cannot see that, the WAL
+	 * record is built from the same odtpaths and is wrong the same
+	 * way.  td has to stay alive until this is done.
+	 */
+	ret = verify_table_after_reopen(".", "test1", &td);
+	CHK_RET(ret, "verify_table_after_reopen");
+	(void)free_string_testdata(&td);
 
 	ret = verify_logfiles_from_scratch(".", "test1");
 	CHK_RET(ret, "verify_logfiles_from_scratch");
@@ -498,12 +523,21 @@ int table_t1_1e() {
 	    &td.records[td.count - 1]);
 	CHK_RET(ret, "verify_table_cursor_border_full(VAN_LAST)");
 
-	(void)free_string_testdata(&td);
-
 	ret = table->close(table, 0);
 	CHK_RET(ret, "table->close");
 	ret = store->close(store);
 	CHK_RET(ret, "store->close");
+
+	/*
+	 * Reopen and read everything back: odtpaths only take effect on
+	 * the next open, so this is what catches an odlist that lost a
+	 * tree.  verify_logfiles_from_scratch cannot see that, the WAL
+	 * record is built from the same odtpaths and is wrong the same
+	 * way.  td has to stay alive until this is done.
+	 */
+	ret = verify_table_after_reopen(".", "test1", &td);
+	CHK_RET(ret, "verify_table_after_reopen");
+	(void)free_string_testdata(&td);
 
 	ret = verify_logfiles_from_scratch(".", "test1");
 	CHK_RET(ret, "verify_logfiles_from_scratch");
@@ -658,12 +692,21 @@ int table_t1_1f() {
 	ret = tbl_neg_one(table, &td, VAN_LAST, TBL_NEG_BORDERV,
 	    "VAN_LAST, wrong value");
 
-	(void)free_string_testdata(&td);
-
 	ret = table->close(table, 0);
 	CHK_RET(ret, "table->close");
 	ret = store->close(store);
 	CHK_RET(ret, "store->close");
+
+	/*
+	 * Reopen and read everything back: odtpaths only take effect on
+	 * the next open, so this is what catches an odlist that lost a
+	 * tree.  verify_logfiles_from_scratch cannot see that, the WAL
+	 * record is built from the same odtpaths and is wrong the same
+	 * way.  td has to stay alive until this is done.
+	 */
+	ret = verify_table_after_reopen(".", "test1", &td);
+	CHK_RET(ret, "verify_table_after_reopen");
+	(void)free_string_testdata(&td);
 
 	ret = verify_logfiles_from_scratch(".", "test1");
 	CHK_RET(ret, "verify_logfiles_from_scratch");
@@ -913,6 +956,18 @@ int table_t1_3() {
 	ret = store->close(store);
 	CHK_RET(ret, "store->close");
 
+	/*
+	 * Reopen and read everything back.  odtpaths only take effect
+	 * on the next open - that is the only place a path from the
+	 * odlist is turned into an ondisk tree - so this is what
+	 * catches a broken odlist: a tree missing from it is real data
+	 * loss.  verify_logfiles_from_scratch cannot see it, because
+	 * the WAL record is built from the same odtpaths and is wrong
+	 * the same way.
+	 */
+	ret = verify_table_after_reopen(".", "test1", &td);
+	CHK_RET(ret, "verify_table_after_reopen");
+
 	ret = verify_logfiles_from_scratch(".", "test1");
 	CHK_RET(ret, "verify_logfiles_from_scratch");
 
@@ -1077,6 +1132,18 @@ int table_t1_4() {
 	CHK_RET(ret, "table->close");
 	ret = store->close(store);
 	CHK_RET(ret, "store->close");
+
+	/*
+	 * Reopen and read everything back.  odtpaths only take effect
+	 * on the next open - that is the only place a path from the
+	 * odlist is turned into an ondisk tree - so this is what
+	 * catches a broken odlist: a tree missing from it is real data
+	 * loss.  verify_logfiles_from_scratch cannot see it, because
+	 * the WAL record is built from the same odtpaths and is wrong
+	 * the same way.
+	 */
+	ret = verify_table_after_reopen(".", "test1", &td);
+	CHK_RET(ret, "verify_table_after_reopen");
 
 	ret = verify_logfiles_from_scratch(".", "test1");
 	CHK_RET(ret, "verify_logfiles_from_scratch");
@@ -1289,14 +1356,21 @@ static int tb_t1_5_run(tb_t1_5_layout layout) {
 	ret = verify_table_data(table, &td);
 	CHK_RET(ret, "verify_table_data");
 
-	(void)free_string_testdata(&td);
-
 	ret = table->close(table, 0);
 	CHK_RET(ret, "table->close");
 	ret = store->close(store);
 	CHK_RET(ret, "store->close");
 
-	/* These cases use their own table name. */
+	/*
+	 * These cases use their own table name.  Reopening also closes
+	 * the loop on the layout each case built: whatever was still in
+	 * memory is dumped by table->close(), so a fresh open has to
+	 * return every key again.
+	 */
+	ret = verify_table_after_reopen(".", TB_T1_5_NAME, &td);
+	CHK_RET(ret, "verify_table_after_reopen");
+	(void)free_string_testdata(&td);
+
 	ret = verify_logfiles_from_scratch(".", TB_T1_5_NAME);
 	CHK_RET(ret, "verify_logfiles_from_scratch");
 

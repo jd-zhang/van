@@ -74,7 +74,8 @@ static int tb3_setup(VAN_STORE **storep, VAN_TABLE **tablep,
 	return (0);
 }
 
-static int tb3_teardown(VAN_TABLE *table, VAN_STORE *store) {
+static int tb3_teardown(VAN_TABLE *table, VAN_STORE *store,
+    TESTDATA *reopen_td) {
 	int ret;
 
 	ret = table->close(table, 0);
@@ -88,6 +89,17 @@ static int tb3_teardown(VAN_TABLE *table, VAN_STORE *store) {
 	 */
 	ret = verify_logfiles_from_scratch(".", tb3_tbname);
 	CHK_RET(ret, "verify_logfiles_from_scratch");
+	/*
+	 * Reopen from scratch and make sure the data the case expects is
+	 * still readable.  t3_1x passes the full static set; t3_2x passes
+	 * only phase 1 (r1c), because phase 2 is filled by a racing thread
+	 * and what of it reaches disk is not deterministic -- but phase 1
+	 * was fully committed before the scan, so it must survive.
+	 */
+	if (reopen_td != NULL) {
+		ret = verify_table_after_reopen(".", tb3_tbname, reopen_td);
+		CHK_RET(ret, "verify_table_after_reopen");
+	}
 	return (0);
 }
 
@@ -385,7 +397,7 @@ static int tb3_static_full(int backward, const char *what) {
 	cmp_exact(&got, &sorted, backward, what);
 
 	coll_free(&got);
-	ret = tb3_teardown(table, store);
+	ret = tb3_teardown(table, store, &sorted);
 	CHK_RET(ret, "teardown");
 	(void)free_string_testdata(&sorted);
 	return (0);
@@ -452,7 +464,7 @@ static int tb3_static_range(int backward, int lo_incl, int hi_incl,
 
 	coll_free(&got);
 	testdata_free_shallow(&expect);
-	ret = tb3_teardown(table, store);
+	ret = tb3_teardown(table, store, &sorted);
 	CHK_RET(ret, "teardown");
 	(void)free_string_testdata(&sorted);
 	return (0);
@@ -647,7 +659,7 @@ static int tb3_concurrent(int backward, int have_range, int lo_incl,
 	}
 
 	coll_free(&got);
-	ret = tb3_teardown(table, store);
+	ret = tb3_teardown(table, store, &r1c);
 	CHK_RET(ret, "teardown");
 	(void)free_string_testdata(&r1c);
 	(void)free_string_testdata(&allc);

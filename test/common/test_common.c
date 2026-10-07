@@ -1837,6 +1837,88 @@ int verify_table_after_reopen(const char *data_dir,
 	return (0);
 }
 
+/*
+ * Walk the table once to count the rows it holds and once more to copy
+ * them, so that a test which built its data by hand still has an
+ * expected set to compare a fresh open against.
+ */
+typedef struct {
+	TESTDATA *td;
+	size_t    n;
+} walk_snap_t;
+
+static int walk_count_cb(void *arg, const VAN_DATUM *k, const VAN_DATUM *v) {
+	(*(size_t *)arg)++;
+	return (0);
+}
+
+/*
+ * The datum buffers only live for the duration of the callback, so both
+ * sides are duplicated - which is also what free_string_testdata()
+ * expects to release.
+ */
+static int walk_collect_cb(void *arg, const VAN_DATUM *k,
+    const VAN_DATUM *v) {
+	walk_snap_t *s;
+	RECORD *r;
+
+	s = (walk_snap_t *)arg;
+	if (s->n >= s->td->count)
+		return (-1);
+	r = &s->td->records[s->n];
+	r->key = strndup(k->data, k->size);
+	r->ksize = k->size;
+	r->value = strndup(v->data, v->size);
+	r->vsize = v->size;
+	TEST_ASSERT(r->key != NULL && r->value != NULL);
+	s->n++;
+	return (0);
+}
+
+/*
+ * verify_table_after_reopen_walk --
+ *	Close is not enough on its own: this walks 'table' to capture
+ *	what it currently holds, and checks after a fresh open that
+ *	every one of those rows is still readable.
+ *
+ *	Built for the traverse tests, which generate their data by hand
+ *	or fill it from a second thread and therefore have no TESTDATA
+ *	of their own to hand to verify_table_after_reopen().  The caller
+ *	has to have joined every writer before calling this, otherwise
+ *	the snapshot is a moving target.
+ *
+ *	An empty table is fine: there is nothing to check, and the open
+ *	itself still has to work.
+ */
+int verify_table_after_reopen_walk(VAN_TABLE *table, const char *data_dir,
+    const char *table_name) {
+	TESTDATA td;
+	walk_snap_t snap;
+	size_t n;
+	int ret;
+
+	memset(&td, 0, sizeof(td));
+	n = 0;
+	ret = table->traverse(table, VAN_TRAVERSE_FORWARD, NULL,
+	    walk_count_cb, &n);
+	CHK_RET(ret, "traverse (snapshot count)");
+
+	if (n > 0) {
+		TESTDATA_INIT(&td, n);
+		snap.td = &td;
+		snap.n = 0;
+		ret = table->traverse(table, VAN_TRAVERSE_FORWARD, NULL,
+		    walk_collect_cb, &snap);
+		CHK_RET(ret, "traverse (snapshot collect)");
+	}
+
+	ret = verify_table_after_reopen(data_dir, table_name, &td);
+	if (n > 0)
+		(void)free_string_testdata(&td);
+
+	return (ret);
+}
+
 int verify_logfiles_from_scratch(const char *data_dir,
     const char *table_name) {
 	VAN_STORE *store;
