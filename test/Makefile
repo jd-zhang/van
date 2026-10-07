@@ -6,7 +6,7 @@ INT_CPPFLAGS=
 LDFLAGS=	-g
 CFLAGS=	-Wall $(CPPFLAGS) -g
 CXXFLAGS=	$(CPPFLAGS) -g
-CLIBS=	../libvan.a -lpthread -lm
+CLIBS=	../libvan.so -lpthread -lm
 CXXLIBS=	-lpthread 
 
 

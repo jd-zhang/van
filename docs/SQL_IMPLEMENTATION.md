@@ -2078,11 +2078,11 @@ A	src/sql/sql_*.c          （9 个）
 
 ```make
 # The SQL layer comes with its own command line shell.
-sqlcli: libvan.a
+sqlcli: libvan.so
 	cd cli && $(MAKE)
 ```
 
-**② `VAN_OBJS` 追加 9 个 SQL 目标文件** —— 让 `libvan.a` 包含 SQL 层
+**② `VAN_OBJS` 追加 9 个 SQL 目标文件** —— 让 `libvan.so` 包含 SQL 层
 
 ```make
 -	 van_table_path.o txn.o
@@ -2102,7 +2102,7 @@ SQL_OBJS=	sql_ast.o sql_catalog.o sql_exec.o sql_lex.o sql_parse.o \
 
 ```make
  clean:
- 	cd test && make clean && rm -f libvan.a
+ 	cd test && make clean && rm -f libvan.so
 +	cd cli && make clean
  	rm -fr *.o
  	rm -fr *.a
@@ -2151,29 +2151,29 @@ $ git diff --name-only --diff-filter=M f0f65d2^ f0f65d2 -- src include include_a
 
 > 换句话说：**引擎不知道自己上面跑着一个 SQL 层**。这个解耦正是 §0.3 所说"`sql_catalog.c` 是唯一触碰 `VAN_TABLE` 的模块"带来的直接收益。
 
-**对既有测试的影响：** `test/` 目录未被修改。SQL 目标文件被加入 `libvan.a`，对既有用例而言只是多了符号，不影响原有行为。
+**对既有测试的影响：** `test/` 目录未被修改。SQL 目标文件被加入 `libvan.so`，对既有用例而言只是多了符号，不影响原有行为。
 
 ### 7.5 编译系统：`cli/Makefile`（新增）的取舍
 
 ```make
 # Every vanilla object lives in the root of the tree, link them straight
-# into the shell so that it does not need the shared libvan.a at run time.
+# into the shell so that it does not need the shared libvan.so at run time.
 VAN_OBJS= $(sort $(wildcard ../*.o))
 CLIBS=	-lpthread -lm
 ```
 
-**为什么直接链根目录的 `.o`，而不是链 `libvan.a`？**
+**为什么直接链根目录的 `.o`，而不是链 `libvan.so`？**
 
-因为根 `Makefile` 里 `libvan.a` 实际上是这样生成的：
+因为根 `Makefile` 里 `libvan.so` 实际上是这样生成的：
 
 ```make
-libvan.a: $(VAN_OBJS)
+libvan.so: $(VAN_OBJS)
 	$(CC) -shared -o $@ $(VAN_OBJS) $(CLIBS)
 ```
 
-**它是用 `-shared` 造出来的共享库，只是名字叫 `.a`**。链它会导致 `vansql` 运行时依赖这个共享对象，需要处理 `-rpath` 或库搜索路径，部署时容易踩坑。直接链 `.o` 得到的是一个**自包含的可执行文件**，拷到哪都能跑。
+**它是用 `-shared` 造出来的共享库**。链它会导致 `vansql` 运行时依赖这个共享对象，需要处理 `-rpath` 或库搜索路径，部署时容易踩坑。直接链 `.o` 得到的是一个**自包含的可执行文件**，拷到哪都能跑。
 
-代价是 `vansql` 必须等根目录的 `.o` 先编好（由 `sqlcli: libvan.a` 这个依赖保证顺序），且可执行文件体积更大。对一个命令行 shell 来说这个交换是划算的。
+代价是 `vansql` 必须等根目录的 `.o` 先编好（由 `sqlcli: libvan.so` 这个依赖保证顺序），且可执行文件体积更大。对一个命令行 shell 来说这个交换是划算的。
 
 另外 `CLIBS` 里比根 `Makefile` 多了 `-lm` —— SQL 层用到了 `fmod()`（`sql_exec.c` 的 `OP_MOD`），需要数学库。
 
@@ -2181,7 +2181,7 @@ libvan.a: $(VAN_OBJS)
 
 | 阶段 | 变化 |
 |---|---|
-| 构建 | 根目录新增 9 个 `sql_*.o`；`libvan.a` 体积变大；新增 `cli/vansql.o` 与 `cli/vansql` |
+| 构建 | 根目录新增 9 个 `sql_*.o`；`libvan.so` 体积变大；新增 `cli/vansql.o` 与 `cli/vansql` |
 | 运行时（数据目录） | 多出一个 **目录表** `__van_sql_catalog`（元数据）；每张 SQL 表对应一个同名物理表 |
 | 清理 | `make clean` 现会级联清理 `cli/` |
 

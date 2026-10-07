@@ -15,7 +15,7 @@ inc=""
 clib=""
 
 inc="-I$loc -I$loc/include -I$loc/include_auto"
-clib="$loc/libvan.a"
+clib="$loc/libvan.so"
 
 ADD_LIBS="-lpthread -lm"
 

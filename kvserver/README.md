@@ -22,7 +22,7 @@
     engine/kvstore.c               ← C：kv_open / kv_get / kv_put / kv_del
         │
         ▼
-    VanDB 引擎 ../libvan.a          ← C：LSM-Tree，dump / merge / WAL
+    VanDB 引擎 ../libvan.so          ← C：LSM-Tree，dump / merge / WAL
 ```
 
 ---
@@ -157,16 +157,16 @@ deactivate
 
 | 项 | 值 |
 |---|---|
-| 静态库 | `../libvan.a`（相对 `kvserver/`，即仓库根目录） |
+| 共享库 | `../libvan.so`（相对 `kvserver/`，即仓库根目录） |
 | 头文件 | `../include`、`../include_auto` |
 | 链接 | `-lpthread -lm` |
 
-> **注意**：`libvan.a` 虽然叫 `.a`，实际是用 `-shared` 生成的 **ELF 共享库**。
+> **注意**：引擎库是用 `-shared` 生成的 **ELF 共享库**（扩展名为 `.so`）。
 > 因此 `_kvstore.so` 运行时必须能找到它。Makefile 已经用绝对路径把它记进
 > `DT_NEEDED`，并额外加了 `-Wl,-rpath,<仓库根目录>`，所以正常编译后无需设置
 > `LD_LIBRARY_PATH`。
 
-`libvan.a` 不存在时，`make` 会自动到上一层目录去构建它。
+`libvan.so` 不存在时，`make` 会自动到上一层目录去构建它。
 
 ### 检查环境
 
@@ -178,7 +178,7 @@ python3 --version        # 必须 >= 3.11，否则没有 tomllib
 swig -version            # 实测 3.0.12
 gcc --version            # 实测 8.5.0
 make --version           # 实测 GNU Make 4.2.1
-ls -la ../libvan.a       # 引擎库必须存在
+ls -la ../libvan.so       # 引擎库必须存在
 python3 -c "import flask, tomllib; print(flask.__version__)"
 ```
 
@@ -197,7 +197,7 @@ kvserver 计划提供一个环境检查脚本，用于一次性验证系统是�
 - Python 版本 >= 3.11
 - SWIG 是否安装
 - GCC 是否安装
-- `libvan.a` 是否存在
+- `libvan.so` 是否存在
 - Flask 是否安装
 
 **当前版本尚未提供该脚本**，暂时请用上面的命令手工检查。
@@ -289,7 +289,7 @@ make clean
 | `fatal error: kvstore.h: No such file or directory`（编译 `kvstore_wrap.c` 时） | 缺 `-Iengine`。Makefile 已带，若手工编译需自己加 |
 | `unknown type name 'VAN_DATUM'` | `engine/kvstore.c` 必须 `#include "van_int.h"`（`VAN_DATUM` 的 typedef 在 `van_declare.h`，由 `van_int.h` 引入） |
 | `_kvstore.so` 能编译但 `import kvstore` 报 `ModuleNotFoundError: No module named '_kvstore'` | `.so` 没生成成功，或不在 `kvstore.py` 同一目录 |
-| 运行时 `libvan.a: cannot open shared object file` | rpath 没生效，设置 `LD_LIBRARY_PATH=<仓库根目录>` 后重试 |
+| 运行时 `libvan.so: cannot open shared object file` | rpath 没生效，设置 `LD_LIBRARY_PATH=<仓库根目录>` 后重试 |
 | `make: warning: Clock skew detected` | 文件时间戳来自其他机器（rsync 常见），无害；`make clean && make` 可消除 |
 
 ---

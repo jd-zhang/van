@@ -15,12 +15,12 @@ CXXLIBS=	-lpthread -L/usr/local/lib
 #CXXLIBS=	-lpthread -L/usr/local/lib -ltcmalloc_minimal
 
 
-all: libvan.a
+all: libvan.so
 test: all
-	cp -f libvan.a test && cd test && make
+	cp -f libvan.so test && cd test && make
 
 # The SQL layer comes with its own command line shell.
-sqlcli: libvan.a
+sqlcli: libvan.so
 	cd cli && $(MAKE)
 # Libraries.
 VAN_OBJS=\
@@ -49,14 +49,14 @@ VAN_OBJS=\
 SQL_OBJS=	sql_ast.o sql_catalog.o sql_exec.o sql_lex.o sql_parse.o \
 	sql_row.o sql_session.o sql_type.o sql_value.o
 
-libvan.a: $(VAN_OBJS) 
+libvan.so: $(VAN_OBJS) 
 	$(CC) -shared -o $@ $(VAN_OBJS)  $(CLIBS)
 
 clean:
-	cd test && make clean && rm -f libvan.a
+	cd test && make clean && rm -f libvan.so
 	cd cli && make clean
 	rm -fr *.o
-	rm -fr *.a
+	rm -fr *.so
 
 # Object files.
 # src/common

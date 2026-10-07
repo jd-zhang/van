@@ -4,7 +4,7 @@ LDFLAGS= -g -Wall $(OUTCFLAGS)
 CPPFLAGS= -I../include -I../include_auto -D_REENTRANT -D_GNU_SOURCE
 
 # Every vanilla object lives in the root of the tree, link them straight
-# into the shell so that it does not need the shared libvan.a at run time.
+# into the shell so that it does not need the shared libvan.so at run time.
 VAN_OBJS= $(sort $(wildcard ../*.o))
 CLIBS=	-lpthread -lm
 
@@ -19,8 +19,8 @@ vansql.o: vansql.c
 linenoise.o: linenoise.c linenoise.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ linenoise.c
 
-../libvan.a:
-	cd .. && $(MAKE) libvan.a
+../libvan.so:
+	cd .. && $(MAKE) libvan.so
 
 clean:
 	rm -f vansql.o vansql.exe vansql linenoise.o

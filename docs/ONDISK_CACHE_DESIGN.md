@@ -360,7 +360,7 @@ if (ret == 0) {
 
 ### 5.5 验证
 
-`make libvan.a` 全量构建零错误零警告（两个既有警告已消除）；`make sqlcli` + `smoke.sql` 输出与改造前一致。
+`make libvan.so` 全量构建零错误零警告（两个既有警告已消除）；`make sqlcli` + `smoke.sql` 输出与改造前一致。
 
 > 注意：`ondisk_blksize` 真正生效的**功能验证**（设置一个非默认块大小并确认写入文件的 meta）留到第五步测试用例 1，本步只验证了默认值下的行为不变。
 
@@ -379,7 +379,7 @@ if (ret == 0) {
 | `src/store/van_store.c` | `cache_size` 默认值改为 `OD_DEF_CACHESIZE` |
 | `docs/ONDISK_CACHE_DESIGN.md` | 本文档（随设计/实现持续更新） |
 
-**验证**：`make libvan.a` 全量构建**零错误零警告**（含原有两处警告已消除）；`make sqlcli` + `smoke.sql` 冒烟测试输出与改造前一致，无回归。
+**验证**：`make libvan.so` 全量构建**零错误零警告**（含原有两处警告已消除）；`make sqlcli` + `smoke.sql` 冒烟测试输出与改造前一致，无回归。
 
 ---
 
