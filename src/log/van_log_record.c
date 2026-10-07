@@ -17,6 +17,7 @@
 #include "van.h"
 
 #include "van_log.h"
+#include "van_rec.h"
 
 int _van_put_logrecord(VAN_STORE *store, VAN_TABLE *table, VAN_TXN *txnp,
     VAN_LSN *ret_lsnp, uint32 flags, uint32 rectype, uint32 size,
@@ -125,6 +126,115 @@ err:
 	return (ret);
 }
 
+
+/*
+ * _van_odlist_pack_names --
+ *	Serialize a file name list into one VAN_DATUM blob: the
+ *	concatenation of "uint32 len + len bytes" for every name, where
+ *	len includes the trailing '\0' so a replay gets a ready C string.
+ *
+ *	An empty (or NULL) list produces an empty blob, i.e. data stays
+ *	NULL and size stays 0; that is fine for the writer, which then
+ *	only stores the length word for that field.
+ *
+ *	The caller owns blob->data and has to free it.
+ */
+static int _van_odlist_pack_names(VAN_STRING_ARRAY *names,
+    VAN_DATUM *blob) {
+	uint64 total;
+	size_t i, len;
+	uint32 ulen;
+	char *buf, *wp;
+	int ret;
+
+	blob->data = NULL;
+	blob->size = 0;
+	blob->ulen = 0;
+	blob->flags = 0;
+
+	if (names == NULL || names->size == 0)
+		return (0);
+
+	/*
+	 * First pass: the total size.  Accumulate in 64 bits so that an
+	 * oversized list is reported instead of silently wrapping around.
+	 */
+	total = 0;
+	for (i = 0; i < names->size; i++) {
+		if (names->array[i] == NULL)
+			return (VAN_INVALID);
+		len = strlen(names->array[i]) + 1;	/* keep the '\0' */
+		/* Defensive: odlist paths are built in VAN_MAXPATHLEN
+		 * buffers, a longer name cannot be a real one. */
+		if (len > VAN_MAXPATHLEN)
+			return (VAN_BUFFER_SMALL);
+		total += (uint64)sizeof(uint32) + (uint64)len;
+	}
+	if (total > 0xFFFFFFFFu)
+		return (VAN_OVERFLOW);
+
+	ret = _van_malloc(NULL, (size_t)total, &buf);
+	CHK_ERR(ret);
+
+	wp = buf;
+	for (i = 0; i < names->size; i++) {
+		ulen = (uint32)(strlen(names->array[i]) + 1);
+		memcpy(wp, &ulen, sizeof(ulen));
+		wp += sizeof(ulen);
+		memcpy(wp, names->array[i], (size_t)ulen);
+		wp += ulen;
+	}
+
+	blob->data = buf;
+	blob->size = (size_t)total;
+
+err:
+	return (ret);
+}
+
+int _van_odlist_update_logrecord(VAN_STORE *store, VAN_TABLE *table,
+    VAN_STRING_ARRAY *new_files, VAN_STRING_ARRAY *del_files) {
+	VAN_DATUM newblob, delblob;
+	VAN_LSN lsn;
+	uint32 size, nfiles, ndels;
+	int ret;
+
+	memset(&newblob, 0, sizeof(newblob));
+	memset(&delblob, 0, sizeof(delblob));
+	INIT_LSN(&lsn);
+	ret = 0;
+
+	if (store == NULL || store->log_handle == NULL || table == NULL)
+		return (VAN_INVALID);
+
+	nfiles = (new_files == NULL) ? 0 : (uint32)new_files->size;
+	ndels = (del_files == NULL) ? 0 : (uint32)del_files->size;
+
+	ret = _van_odlist_pack_names(new_files, &newblob);
+	CHK_ERR(ret);
+	ret = _van_odlist_pack_names(del_files, &delblob);
+	CHK_ERR(ret);
+
+	/*
+	 * The spec consumes a vararg for every LOGREC_DATUM and none for
+	 * LOGREC_TABLE (the tabid comes from 'table'), so the varargs are
+	 * nfiles, ndels and then the two blobs.
+	 */
+	size = _van_calc_logrec_size(_odlist_update_recspec,
+	    &newblob, &delblob);
+
+	ret = _van_put_logrecord(store, table, NULL, &lsn, 0,
+	    VAN_ODLIST_UPDATE, size, _odlist_update_recspec,
+	    nfiles, ndels, &newblob, &delblob);
+
+err:
+	if (newblob.data != NULL)
+		_van_free(NULL, newblob.data);
+	if (delblob.data != NULL)
+		_van_free(NULL, delblob.data);
+
+	return (ret);
+}
 
 int _van_read_logrecord(VAN_STORE *store, VAN_TABLE **tablepp, void *td,
     void* data, VAN_LOG_RECSPEC *spec, uint32 size, void **argp) {

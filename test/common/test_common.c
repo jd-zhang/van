@@ -1676,3 +1676,262 @@ int free_string_testdata(TESTDATA *td) {
 	return (0);
 }
 
+/*
+ * ---------- odlist / ondisktree file consistency ----------
+ *
+ * verify_logfiles_from_scratch() replays the VAN_ODLIST_UPDATE records
+ * of a store's WAL and compares the result with the odlist file that is
+ * actually on disk.
+ *
+ * The records use "direction C": each one carries the *full* file list
+ * after a dump or a merge, so replaying is simply "the last record
+ * wins" and the expected list is well defined even when the odlist file
+ * is stale or missing.
+ */
+
+/* The rectype, the first field of VAN_LOGREC_COMMON. */
+static int vlf_rectype(const VAN_DATUM *rec) {
+	uint32 type;
+
+	memcpy(&type, (char *)rec->data + VAN_LOGREC_HDRSIZE, sizeof(type));
+	return ((int)type);
+}
+
+/*
+ * Append the new_files list of one VAN_ODLIST_UPDATE record to 'out'.
+ *
+ * body:	tabid, nfiles, ndels, new blob, del blob
+ * blob:	the concatenation of "uint32 len + len bytes", where len
+ *		includes the trailing '\0'.
+ */
+static int vlf_new_files(const VAN_DATUM *rec, VAN_STRING_ARRAY *out) {
+	char *p, *q;
+	uint32 tabid, nfiles, ndels, blen, nlen;
+	size_t i, left;
+	int ret;
+
+	p = (char *)rec->data + VAN_LOGREC_HDRSIZE + VAN_LOGREC_COMSIZE;
+	memcpy(&tabid, p, sizeof(tabid));
+	p += sizeof(tabid);
+	memcpy(&nfiles, p, sizeof(nfiles));
+	p += sizeof(nfiles);
+	memcpy(&ndels, p, sizeof(ndels));
+	p += sizeof(ndels);
+
+	/* The new file list blob. */
+	memcpy(&blen, p, sizeof(blen));
+	p += sizeof(blen);
+	q = p;
+	left = (size_t)blen;
+	for (i = 0; i < (size_t)nfiles; i++) {
+		TEST_ASSERT2(left >= sizeof(nlen),
+		    "odlist record: new list truncated at %lu\n",
+		    (unsigned long)i);
+		memcpy(&nlen, q, sizeof(nlen));
+		q += sizeof(nlen);
+		left -= sizeof(nlen);
+		TEST_ASSERT2(left >= (size_t)nlen,
+		    "odlist record: new name %lu truncated\n",
+		    (unsigned long)i);
+		ret = _van_strarray_add(out, q);
+		CHK_RET(ret, "_van_strarray_add");
+		q += nlen;
+		left -= nlen;
+	}
+	TEST_ASSERT2(left == 0,
+	    "odlist record: %lu trailing bytes in the new list\n",
+	    (unsigned long)left);
+
+	return (0);
+}
+
+/* Read <data_dir>/<table_name>.odlist, one file name per line. */
+static int vlf_read_odlist(const char *data_dir, const char *table_name,
+    VAN_STRING_ARRAY *out) {
+	char path[VAN_MAXPATHLEN], line[VAN_MAXPATHLEN];
+	FILE *f;
+	size_t len;
+	int ret, num;
+
+	num = snprintf(path, sizeof(path), "%s/%s.odlist", data_dir,
+	    table_name);
+	TEST_ASSERT2(num >= 0 && num < (int)sizeof(path),
+	    "odlist path does not fit: %s/%s.odlist\n", data_dir,
+	    table_name);
+
+	f = NULL;
+	ret = _van_file_fopen(path, "r", &f);
+	if (ret != 0) {
+		/*
+		 * No odlist at all: the table never dumped, so the
+		 * expected list is empty.
+		 */
+		if (ret == ENOENT || ret == VAN_NOTFOUND)
+			return (0);
+		return (ret);
+	}
+
+	while (_van_file_freadline(f, line, VAN_MAXPATHLEN) == 0) {
+		len = strlen(line);
+		while (len > 0 &&
+		    (line[len - 1] == '\n' || line[len - 1] == '\r'))
+			line[--len] = '\0';
+		if (len == 0)
+			continue;
+		ret = _van_strarray_add(out, line);
+		if (ret != 0) {
+			(void)_van_file_fclose(f);
+			return (ret);
+		}
+	}
+
+	return (_van_file_fclose(f));
+}
+
+static int vlf_file_exists(const char *path) {
+	struct stat st;
+
+	return (stat(path, &st) == 0);
+}
+
+/*
+ * Reopen a store and one of its tables from scratch and verify that every
+ * expected record is still readable.
+ *
+ * This tells "the data is gone" apart from "the odlist still lists trees
+ * that should have been dropped": if every record survives a fresh open,
+ * the file list the WAL ends with is the one that matters and whatever
+ * else the odlist lists is a leftover whose removal did not happen.  A
+ * failure here, on the other hand, would mean real data loss.
+ */
+int verify_table_after_reopen(const char *data_dir,
+    const char *table_name, TESTDATA *td) {
+	VAN_STORE *store;
+	VAN_TABLE *table;
+	int ret;
+
+	store = NULL;
+	table = NULL;
+
+	ret = van_test_store_create(&store);
+	CHK_RET(ret, "van_store_create");
+	ret = store->open(store, data_dir, 0);
+	CHK_RET(ret, "store->open");
+	ret = van_table_create(store, &table);
+	CHK_RET(ret, "van_table_create");
+	/*
+	 * No background threads: this is about what is on disk right now,
+	 * a dump or a merge started here would change it.
+	 */
+	ret = table->open(table, table_name, VAN_TABLE_SKIP_THREAD_START);
+	CHK_RET(ret, "table->open");
+
+	ret = verify_table_data(table, td);
+	CHK_RET(ret, "verify_table_data (after reopen)");
+
+	ret = table->close(table, 0);
+	CHK_RET(ret, "table->close (after reopen)");
+	ret = store->close(store);
+	CHK_RET(ret, "store->close (after reopen)");
+
+	return (0);
+}
+
+int verify_logfiles_from_scratch(const char *data_dir,
+    const char *table_name) {
+	VAN_STORE *store;
+	VAN_LOG *logp;
+	VAN_LOG_CURSOR *lgc;
+	VAN_STRING_ARRAY *replayed, *ondisk;
+	VAN_DATUM rec;
+	VAN_LSN lsn;
+	size_t i;
+	int ret, found;
+
+	store = NULL;
+	lgc = NULL;
+	replayed = NULL;
+	ondisk = NULL;
+	found = 0;
+
+	/*
+	 * Open the store only.  Opening the table would read the odlist
+	 * and open the trees, which is exactly what has to be derived
+	 * from the log instead.
+	 */
+	ret = van_store_create(&store);
+	CHK_RET(ret, "van_store_create");
+	ret = store->open(store, data_dir, 0);
+	CHK_RET(ret, "store->open");
+
+	ret = _van_strarray_alloc(&replayed, 0);
+	CHK_RET(ret, "_van_strarray_alloc(replayed)");
+	ret = _van_strarray_alloc(&ondisk, 0);
+	CHK_RET(ret, "_van_strarray_alloc(ondisk)");
+
+	/* Replay: every record replaces the whole list, last one wins. */
+	logp = store->log_handle;
+	ret = logp->cursor(logp, &lgc);
+	CHK_RET(ret, "logp->cursor");
+
+	memset(&rec, 0, sizeof(rec));
+	ret = lgc->get(lgc, &lsn, &rec, VAN_FIRST);
+	while (ret == 0) {
+		if (vlf_rectype(&rec) == VAN_ODLIST_UPDATE) {
+			found++;
+			(void)_van_strarray_free(replayed);
+			replayed = NULL;
+			ret = _van_strarray_alloc(&replayed, 0);
+			CHK_RET(ret, "_van_strarray_alloc(replayed)");
+			ret = vlf_new_files(&rec, replayed);
+			CHK_RET(ret, "vlf_new_files");
+		}
+		_van_free(NULL, rec.data);
+		memset(&rec, 0, sizeof(rec));
+		ret = lgc->get(lgc, &lsn, &rec, VAN_NEXT);
+	}
+	if (ret != VAN_NOTFOUND)
+		CHK_RET(ret, "lgc->get");
+	if (rec.data != NULL)
+		_van_free(NULL, rec.data);
+
+	/* What is actually on disk. */
+	ret = vlf_read_odlist(data_dir, table_name, ondisk);
+	CHK_RET(ret, "vlf_read_odlist");
+
+	fprintf(stderr,
+	    "verify_logfiles_from_scratch: %d odlist record(s), "
+	    "replayed %lu file(s), on disk %lu file(s)\n",
+	    found, (unsigned long)replayed->size,
+	    (unsigned long)ondisk->size);
+
+	TEST_ASSERT2(replayed->size == ondisk->size,
+	    "replayed %lu file(s) but the odlist has %lu\n",
+	    (unsigned long)replayed->size, (unsigned long)ondisk->size);
+
+	for (i = 0; i < ondisk->size; i++) {
+		TEST_ASSERT2(strcmp(replayed->array[i],
+		    ondisk->array[i]) == 0,
+		    "file %lu differs: replayed %s, odlist %s\n",
+		    (unsigned long)i, replayed->array[i],
+		    ondisk->array[i]);
+
+		/* Every listed tree has to exist and verify. */
+		TEST_ASSERT2(vlf_file_exists(ondisk->array[i]),
+		    "ondisktree file is missing: %s\n", ondisk->array[i]);
+		ret = _van_ondisktree_verify(ondisk->array[i]);
+		CHK_RET(ret, "_van_ondisktree_verify");
+	}
+
+	(void)lgc->close(lgc);
+	lgc = NULL;
+	(void)_van_strarray_free(replayed);
+	replayed = NULL;
+	(void)_van_strarray_free(ondisk);
+	ondisk = NULL;
+	ret = store->close(store);
+	CHK_RET(ret, "store->close");
+
+	return (0);
+}
+

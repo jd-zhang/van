@@ -520,35 +520,69 @@ int _van_table_traverse(VAN_TABLE *table, flags_t flags,
 	}
 
 	/*
-	 * Snapshot the ondisk tree count.  Anything dumped from here on
-	 * is published with odt_top++ and is therefore not part of this
-	 * scan.
+	 * At most every ondisk tree plus active and frozen.  Allocate
+	 * for the worst case up front: odtpath_capacity is the length
+	 * of the odt_items array, so odt_top can never exceed it.
 	 */
-	VAN_MUTEX_LOCK(table, odt_mtx, ret);
-	CHK_ERR(ret);
-	odt_top = table->odt_top;
-	VAN_MUTEX_UNLOCK(table, odt_mtx, ret1);
-	SET_RET(ret1, ret);
-	CHK_ERR(ret);
-
-	/*
-	 * At most every ondisk tree plus active and frozen.  odt_top is
-	 * fixed from here, so no growth is ever needed.
-	 */
-	capacity = odt_top + 2;
+	capacity = table->odtpath_capacity + 2;
 	ret = _van_calloc(NULL, capacity, sizeof(*tv.srcs), &tv.srcs);
 	CHK_ERR(ret);
 	ret = _van_calloc(NULL, capacity, sizeof(*tv.heap), &heap);
 	CHK_ERR(ret);
 	tv.heap = heap;
 
-	/* Sources are added newest first, index 0 has the highest priority. */
 	active = table->active;
+
+	/*
+	 * frozen and the ondisk count have to come from one instant.
+	 *
+	 * A dump publishes its tree into odt_items[odt_top], bumps
+	 * odt_top and only then clears table->frozen, all under odt_mtx
+	 * (see _van_table_dump_frozen, van_table.c:1125-1139).  Taking
+	 * both inside that lock therefore sees either "still frozen,
+	 * not yet published" or "published, no longer frozen", never
+	 * the gap between the two.
+	 *
+	 * It used to be the other way round - odt_top was snapshotted
+	 * before frozen was read - so a dump completing in between
+	 * hid its tree from this scan entirely: frozen was already
+	 * NULL and odt_top did not cover the slot the tree went into,
+	 * and those records never came back.
+	 *
+	 * Only the pointers are taken here, the references are taken
+	 * below: attaching has to happen after active, so that active
+	 * keeps index 0.  A frozen tree cannot go away in between
+	 * regardless - the scan registered itself as an operation
+	 * above, and a frozen tree is only reclaimed once its
+	 * dumped_ticks is older than the oldest live operation.
+	 */
+	VAN_MUTEX_LOCK(table, odt_mtx, ret);
+	CHK_ERR(ret);
+	frozen = table->frozen;
+	odt_top = table->odt_top;
+	VAN_MUTEX_UNLOCK(table, odt_mtx, ret1);
+	SET_RET(ret1, ret);
+	CHK_ERR(ret);
+
+	/*
+	 * A freeze landing between the two reads above leaves both
+	 * pointing at the same tree: it was the active one when active
+	 * was sampled and has become frozen by the time frozen was
+	 * read.  Attaching it twice would make the merge walk it
+	 * through two sources - harmless, because every source sitting
+	 * on a key is advanced together so a key is still reported
+	 * once, but it doubles the cursor work for nothing.  Drop
+	 * active and keep frozen, which is the older of the two views
+	 * and therefore the one that belongs later in the ordering.
+	 */
+	if (active != NULL && active == frozen)
+		active = NULL;
+
+	/* Sources are added newest first, index 0 has the highest priority. */
 	if (active != NULL) {
 		ret = trav_add_inmem(&tv, active);
 		CHK_ERR(ret);
 	}
-	frozen = table->frozen;
 	if (frozen != NULL) {
 		ret = trav_add_inmem(&tv, frozen);
 		CHK_ERR(ret);

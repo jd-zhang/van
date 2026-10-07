@@ -395,6 +395,12 @@ void *_van_table_merge_job_run(void *arg) {
 	    trees[0], trees[job->cnt - 1], restree);
 	/* TODO: check error ret */
 	CHK_ERR(ret);
+	/*
+	 * WAL before the data it protects: log what the odlist is about
+	 * to become plus the files we are about to drop.  If the record
+	 * cannot be written we bail out and leave the odlist untouched,
+	 * so the on-disk state stays the one the log can still redo.
+	 */
 	ret = _van_table_write_odt_paths(table);
 	/* TODO: check error ret */
 	CHK_ERR(ret);

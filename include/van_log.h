@@ -81,6 +81,12 @@ extern "C" {
 #define VAN_OP_ABORT		1
 #define VAN_OP_COMMIT		2
 
+/*
+ * odlist update.  The record families use a step of 20: inmemtree
+ * 1..2, store 21..22, txn 41..43, so the odlist family starts at 61.
+ */
+#define VAN_ODLIST_UPDATE	61
+
 struct _van_logfile_header {
 	uint32 version;
 	uint32 logsize;
@@ -169,6 +175,21 @@ struct _van_log_cursor {
 	int (*get)(VAN_LOG_CURSOR *, VAN_LSN *, VAN_DATUM *, flags_t);
 	int (*close)(VAN_LOG_CURSOR *);
 };
+
+/*
+ * _van_odlist_update_logrecord --
+ *	Write a VAN_ODLIST_UPDATE record: the full new odlist content
+ *	plus the ondisk files that are about to be removed.
+ *
+ *	It has to run *before* the odlist file is replaced: a crash in
+ *	between then leaves the old odlist on disk and this record in
+ *	the log, which recovery can redo from the record.  Writing it
+ *	the other way round would lose the new content.
+ *
+ *	Either list may be NULL or empty.
+ */
+extern int _van_odlist_update_logrecord(VAN_STORE *store, VAN_TABLE *table,
+    VAN_STRING_ARRAY *new_files, VAN_STRING_ARRAY *del_files);
 
 #ifdef __cplusplus
 }

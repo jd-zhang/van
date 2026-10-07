@@ -58,6 +58,27 @@ VAN_LOG_RECSPEC _txn_end_recspec[] = {
 };
 
 /*
+ * src/table/van_table.logspec
+ *
+ * The two file name lists are variable length, so they are carried as
+ * two DATUM blobs instead of as one field per name (a recspec is a
+ * static array, it cannot express a variable number of fields).  See
+ * _odlist_update_args in van_rec.h for the encoding of a blob.
+ *
+ * _van_calc_logrec_size() below is generic: it walks the spec and only
+ * consumes a vararg for every LOGREC_DATUM, so this spec needs no
+ * change there.
+ */
+VAN_LOG_RECSPEC _odlist_update_recspec[] = {
+	{ LOGREC_TABLE,	offsetof(_odlist_update_args, tabid), "tabid", { 'l', 'u', 0, 0 } },
+	{ LOGREC_ARG,	offsetof(_odlist_update_args, nfiles), "nfiles", { 'l', 'u', 0, 0 } },
+	{ LOGREC_ARG,	offsetof(_odlist_update_args, ndels), "ndels", { 'l', 'u', 0, 0 } },
+	{ LOGREC_DATUM,	offsetof(_odlist_update_args, new_files), "new_files", { 's', 0, 0, 0 } },
+	{ LOGREC_DATUM,	offsetof(_odlist_update_args, del_files), "del_files", { 's', 0, 0, 0 } },
+	{ LOGREC_Done, 0, NULL, { 0, 0, 0, 0 } }
+};
+
+/*
  * _van_calc_logrec_size --
  *	Compute the size of a log record, i.e. common header + record
  *	body. The varargs must be in the same order as _van_put_logrecord

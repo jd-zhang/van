@@ -58,12 +58,19 @@ static int del_str(VAN_TABLE *t, const char *k) {
 	return (t->del(t, &kd, 0));
 }
 
+/*
+ * The table name of the running case, kept so that tb2_teardown() can
+ * verify the odlist without every case having to pass it again.
+ */
+static const char *tb2_tbname = NULL;
+
 static int tb2_setup(VAN_STORE **storep, VAN_TABLE **tablep,
     const char *name) {
 	VAN_STORE *store;
 	VAN_TABLE *table;
 	int ret;
 
+	tb2_tbname = name;
 	system("rm -fr test1*");
 	system("rm -fr vanlog.*");
 	ret = van_test_store_create(&store);
@@ -91,6 +98,13 @@ static int tb2_teardown(VAN_TABLE *table, VAN_STORE *store) {
 	CHK_RET(ret, "table->close");
 	ret = store->close(store);
 	CHK_RET(ret, "store->close");
+	/*
+	 * Now that everything is closed, check that what the WAL says
+	 * about the odlist matches the odlist on disk, and that every
+	 * listed ondisktree file is really there.
+	 */
+	ret = verify_logfiles_from_scratch(".", tb2_tbname);
+	CHK_RET(ret, "verify_logfiles_from_scratch");
 	return (0);
 }
 

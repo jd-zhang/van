@@ -134,6 +134,9 @@ extern int _van_ondisktree_ret(ONDISK_TREECURSOR *cursor,
 extern int _van_ondisktree_search(ONDISK_TREECURSOR *cursor,
     VAN_DATUM *key, flags_t flags);
 
+/* src/ondisktree/ondisktree_verify.c */
+extern int _van_ondisktree_verify(const char *file_path);
+
 #ifdef __cplusplus
 }
 #endif

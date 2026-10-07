@@ -17,11 +17,24 @@
 
 extern int log_t1_1();
 extern int log_t1_2();
+extern int log_t1_3();
 int main(int argc, char *argv[]) {
 	int ret;
 	ret = 0;
 
 	srand((unsigned int)time(NULL));
+
+	if (argc < 2) {
+		fprintf(stderr, "Usage: %s <case|list>\n", argv[0]);
+		return (1);
+	}
+
+	if (strcmp(argv[1], "list") == 0) {
+		fprintf(stderr, "log_t1_1\n");
+		fprintf(stderr, "log_t1_2\n");
+		fprintf(stderr, "log_t1_3\n");
+		return (0);
+	}
 
 	if (strcmp(argv[1], "log_t1_1") == 0) {
 		fprintf(stderr, "============ log_t1_1() ===========\n");
@@ -31,8 +44,12 @@ int main(int argc, char *argv[]) {
 		fprintf(stderr, "============ log_t1_2() ===========\n");
 		ret = log_t1_2();
 		fprintf(stderr, "\n");
+	} else if (strcmp(argv[1], "log_t1_3") == 0) {
+		fprintf(stderr, "============ log_t1_3() ===========\n");
+		ret = log_t1_3();
+		fprintf(stderr, "\n");
 	} else {
-		fprintf(stderr, "Unknown test case: %s\n", argv[1]);
+		fprintf(stderr, "no such test: %s\n", argv[1]);
 		ret = -1;
 	}
 

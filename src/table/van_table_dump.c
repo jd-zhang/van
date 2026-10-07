@@ -103,6 +103,12 @@ void *_van_table_frozen_dump_thread(void *arg) {
 	CHK_ERR(ret);
 	ret = _van_table_add_odtpath(table, odtree);
 	CHK_ERR(ret);
+	/*
+	 * WAL before the data it protects: log the odlist content the
+	 * new tree has just been added to.  If the record cannot be
+	 * written we bail out and leave the odlist untouched, so the
+	 * on-disk state stays the one the log can still redo.
+	 */
 	ret = _van_table_write_odt_paths(table);
 	CHK_ERR(ret);
 

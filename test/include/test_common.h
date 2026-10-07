@@ -297,6 +297,27 @@ extern int generate_string_testdata2(TESTDATA *td, char *kpref, char *vpref,
     int start);
 extern int free_string_testdata(TESTDATA *td);
 
+/*
+ * Replay the VAN_ODLIST_UPDATE records of a store's WAL and compare the
+ * result against the odlist file that is on disk, then check that every
+ * listed ondisktree file exists and verifies.
+ *
+ * It opens its own store (and closes it again), so it has to be called
+ * after the test's own store has been closed - i.e. "from scratch",
+ * which is what the name refers to.
+ */
+extern int verify_logfiles_from_scratch(const char *data_dir,
+    const char *table_name);
+
+/*
+ * Reopen the store and the table and verify that every expected record is
+ * still readable.  Meant to tell data loss apart from ondisk files that
+ * should have been dropped but were not - see the comment above the
+ * implementation in test_common.c.
+ */
+extern int verify_table_after_reopen(const char *data_dir,
+    const char *table_name, TESTDATA *td);
+
 /* Other headers */
 #include "flags_common.h"
 #include "van_flags_common.h"

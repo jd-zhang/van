@@ -40,12 +40,19 @@
 
 /* ---------- setup / teardown (same pattern as table_t2.c) ---------- */
 
+/*
+ * The table name of the running case, kept so that tb3_teardown() can
+ * verify the odlist without every case having to pass it again.
+ */
+static const char *tb3_tbname = NULL;
+
 static int tb3_setup(VAN_STORE **storep, VAN_TABLE **tablep,
     const char *name) {
 	VAN_STORE *store;
 	VAN_TABLE *table;
 	int ret;
 
+	tb3_tbname = name;
 	system("rm -fr test1*");
 	system("rm -fr vanlog.*");
 	ret = van_test_store_create(&store);
@@ -74,6 +81,13 @@ static int tb3_teardown(VAN_TABLE *table, VAN_STORE *store) {
 	CHK_RET(ret, "table->close");
 	ret = store->close(store);
 	CHK_RET(ret, "store->close");
+	/*
+	 * Now that everything is closed, check that what the WAL says
+	 * about the odlist matches the odlist on disk, and that every
+	 * listed ondisktree file is really there.
+	 */
+	ret = verify_logfiles_from_scratch(".", tb3_tbname);
+	CHK_RET(ret, "verify_logfiles_from_scratch");
 	return (0);
 }
 

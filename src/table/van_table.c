@@ -547,6 +547,15 @@ int _van_table_write_odt_paths(VAN_TABLE *table) {
 	CHK_ERR(ret);
 
 	for (i = 0; i < table->odtpath_cnt; i++) {
+		/*
+		 * A merge frees the paths it replaces and leaves holes
+		 * behind, so a slot below odtpath_cnt can be NULL.
+		 * Writing one out would put a literal "(null)" line into
+		 * the odlist, and the next open would then try to open a
+		 * file called "(null)"; skip it instead.
+		 */
+		if (table->odtpaths[i] == NULL)
+			continue;
 		ret = _van_file_fwriteline(f, table->odtpaths[i], 0);
 		CHK_ERR(ret);
 	}
@@ -680,13 +689,41 @@ int _van_table_new_odfilename(VAN_TABLE *table, char *buf, size_t buflen) {
 }
 
 int _van_table_add_odtpath(VAN_TABLE *table, ONDISK_TREE *odtree) {
+	VAN_STRING_ARRAY *new_files;
 	int ret, locked, ret1;
-	size_t indx;
+	size_t i, indx;
 
+	new_files = NULL;
 	locked = 0;
 	VAN_MUTEX_LOCK(table, odtpath_mtx, ret);
 	CHK_ERR(ret);
 	locked = 1;
+
+	/*
+	 * WAL before the change: the record carries the whole list as it
+	 * will look once the new tree has been appended, so that a replay
+	 * can simply overwrite the odlist with it.  An append drops
+	 * nothing, hence there is no delete list.
+	 *
+	 * The list is built and the record is written while odtpath_mtx
+	 * is held, so nobody can change the list underneath us; if the
+	 * record fails we leave the in-memory list untouched.
+	 */
+	ret = _van_strarray_alloc(&new_files, 0);
+	if (ret != 0)
+		goto err;
+	for (i = 0; i < table->odtpath_cnt; i++) {
+		ret = _van_strarray_add(new_files, table->odtpaths[i]);
+		if (ret != 0)
+			goto err;
+	}
+	ret = _van_strarray_add(new_files, odtree->file_path);
+	if (ret != 0)
+		goto err;
+	ret = _van_odlist_update_logrecord(table->store, table,
+	    new_files, NULL);
+	if (ret != 0)
+		goto err;
 
 	indx = table->odtpath_cnt;
 	ret = _van_strdup(NULL, odtree->file_path, &table->odtpaths[indx]);
@@ -697,22 +734,25 @@ err:
 		VAN_MUTEX_UNLOCK(table, odtpath_mtx, ret1);
 		SET_RET(ret1, ret);
 	}
+	if (new_files != NULL)
+		(void)_van_strarray_free(new_files);
 	return (ret);
 }
 
 int _van_table_replace_odtpath(VAN_TABLE *table, ONDISK_TREE *odlow,
     ONDISK_TREE *odhigh, ONDISK_TREE *odnew) {
+	VAN_STRING_ARRAY *new_files, *del_files;
 	int ret, ret1, i, locked;
 	const char *pathlow, *pathhigh, *pathnew;
 	size_t idxlow, idxhigh, idxtop, ni, nj;
 
+	new_files = NULL;
+	del_files = NULL;
 	ret = 0;
 	ret1 = 0;
 	locked = 0;
 	idxlow = -1;
 	idxhigh = -1;
-	VAN_ASSERT(table->odtpath_cnt > 0);
-	idxtop = table->odtpath_cnt - 1;
 	pathlow = odlow->file_path;
 	pathhigh = odhigh->file_path;
 	pathnew = odnew->file_path;
@@ -720,6 +760,8 @@ int _van_table_replace_odtpath(VAN_TABLE *table, ONDISK_TREE *odlow,
 	VAN_MUTEX_LOCK(table, odtpath_mtx, ret);
 	CHK_ERR(ret);
 	locked = 1;
+	VAN_ASSERT(table->odtpath_cnt > 0);
+	idxtop = table->odtpath_cnt - 1;
 
 	/* Find the low index */
 	for (i = 0; i <= idxtop; i++) {
@@ -741,30 +783,92 @@ int _van_table_replace_odtpath(VAN_TABLE *table, ONDISK_TREE *odlow,
 	}
 	VAN_ASSERT(idxhigh != -1);
 
+	/*
+	 * WAL before the change: the record carries the whole list as it
+	 * will look after the replacement - everything before idxlow,
+	 * then the new file, then everything after idxhigh - plus the
+	 * files that are about to be dropped, so a replay can overwrite
+	 * the odlist and then remove them.
+	 *
+	 * Built and written under odtpath_mtx; on failure the in-memory
+	 * list is left alone.
+	 */
+	ret = _van_strarray_alloc(&new_files, 0);
+	if (ret != 0)
+		goto err;
+	ret = _van_strarray_alloc(&del_files, 0);
+	if (ret != 0)
+		goto err;
+	for (i = 0; i < (int)idxlow; i++) {
+		ret = _van_strarray_add(new_files, table->odtpaths[i]);
+		if (ret != 0)
+			goto err;
+	}
+	ret = _van_strarray_add(new_files, pathnew);
+	if (ret != 0)
+		goto err;
+	for (i = (int)idxhigh + 1; i <= (int)idxtop; i++) {
+		ret = _van_strarray_add(new_files, table->odtpaths[i]);
+		if (ret != 0)
+			goto err;
+	}
+	for (i = (int)idxlow; i <= (int)idxhigh; i++) {
+		ret = _van_strarray_add(del_files, table->odtpaths[i]);
+		if (ret != 0)
+			goto err;
+	}
+	ret = _van_odlist_update_logrecord(table->store, table,
+	    new_files, del_files);
+	if (ret != 0)
+		goto err;
+
 	for (i = idxlow; i <= idxhigh; i++) {
 		_van_free(NULL, table->odtpaths[i]);
 		table->odtpaths[i] = NULL;
 	}
 	ret = _van_strdup(NULL, pathnew, &table->odtpaths[idxlow]);
 	CHK_ERR(ret);
-	/* Do movement */
-	if (idxhigh != idxlow && idxhigh != idxtop) {
-		ni = idxlow + 1;
-		nj = idxhigh + 1;
-		for (i = nj; i <= idxtop; i++) {
-			table->odtpaths[ni] = table->odtpaths[nj];
-			table->odtpaths[nj] = NULL;
+	/*
+	 * Compact.  Slots idxlow..idxhigh are gone (idxlow now holds the
+	 * new file, the rest are empty), so slide every non-empty slot
+	 * down towards the bottom of the array.
+	 *
+	 * This has to be a full compaction rather than the old single
+	 * block move from idxhigh+1 onto idxlow+1: earlier merges can
+	 * leave holes behind, and a block move only shifts those holes
+	 * around, it never closes them.  The old code also skipped the
+	 * move entirely when idxhigh == idxtop, which stranded whatever
+	 * holes were already there.
+	 *
+	 * ni is the next slot to fill, nj scans for the next non-empty
+	 * one; while they are equal nothing has to move.  Once nj runs
+	 * past idxtop, ni is the number of live paths.
+	 */
+	ni = 0;
+	nj = 0;
+	while (nj <= idxtop) {
+		if (table->odtpaths[nj] != NULL) {
+			if (ni != nj) {
+				table->odtpaths[ni] = table->odtpaths[nj];
+				table->odtpaths[nj] = NULL;
+			}
 			ni++;
-			nj++;
 		}
+		nj++;
 	}
-	table->odtpath_cnt = idxtop + 1 + idxlow - idxhigh;
+
+	/* ni is what survived the compaction, not arithmetic on idxtop. */
+	table->odtpath_cnt = ni;
 
 err:
 	if (locked) {
 		VAN_MUTEX_UNLOCK(table, odtpath_mtx, ret1);
 		SET_RET(ret1, ret);
 	}
+	if (new_files != NULL)
+		(void)_van_strarray_free(new_files);
+	if (del_files != NULL)
+		(void)_van_strarray_free(del_files);
 	return (ret);
 }
 

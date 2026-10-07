@@ -63,12 +63,32 @@ typedef struct _inmemtree_del_args {
 	VAN_DATUM key;
 } _inmemtree_del_args;
 
+/*
+ * src/table/van_table.logspec: odlist_update --
+ *	tabid, nfiles, ndels, new_files, del_files
+ *
+ * The two file name lists have a variable length, so they cannot be
+ * plain fields of this struct; they travel as two VAN_DATUM blobs.
+ * Every blob is the concatenation of its file names, each name encoded
+ * as "uint32 len + len bytes" where len *includes* the trailing '\0',
+ * so that a replay can hand the bytes out as a C string directly.
+ * nfiles / ndels say how many names each blob holds.
+ */
+typedef struct _odlist_update_args {
+	uint32	tabid;
+	uint32	nfiles;
+	uint32	ndels;
+	VAN_DATUM new_files;
+	VAN_DATUM del_files;
+} _odlist_update_args;
+
 /* Record specs */
 extern VAN_LOG_RECSPEC _inmemtree_put_recspec[];
 extern VAN_LOG_RECSPEC _inmemtree_del_recspec[];
 extern VAN_LOG_RECSPEC _txn_ckpt_recspec[];
 extern VAN_LOG_RECSPEC _txn_begin_recspec[];
 extern VAN_LOG_RECSPEC _txn_end_recspec[];
+extern VAN_LOG_RECSPEC _odlist_update_recspec[];
 
 /*
  * Compute the total size (common header + record body) of a log record.

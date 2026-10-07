@@ -179,6 +179,9 @@ int table_t1_1() {
 	ret = store->close(store);
 	CHK_RET(ret, "store->close");
 
+	ret = verify_logfiles_from_scratch(".", "test1");
+	CHK_RET(ret, "verify_logfiles_from_scratch");
+
 	return (ret);
 
 }
@@ -225,6 +228,9 @@ int table_t1_1b() {
 	CHK_RET(ret, "table->close");
 	ret = store->close(store);
 	CHK_RET(ret, "store->close");
+
+	ret = verify_logfiles_from_scratch(".", "test1");
+	CHK_RET(ret, "verify_logfiles_from_scratch");
 
 	return (ret);
 
@@ -306,6 +312,9 @@ int table_t1_1c() {
 	CHK_RET(ret, "table->close");
 	ret = store->close(store);
 	CHK_RET(ret, "store->close");
+
+	ret = verify_logfiles_from_scratch(".", "test1");
+	CHK_RET(ret, "verify_logfiles_from_scratch");
 
 	return (ret);
 }
@@ -389,12 +398,29 @@ int table_t1_1d() {
 	CHK_RET(ret, "verify_table_data");
 	*/
 
-	(void)free_string_testdata(&td);
-
 	ret = table->close(table, 0);
 	CHK_RET(ret, "table->close");
 	ret = store->close(store);
 	CHK_RET(ret, "store->close");
+
+	/*
+	 * Dump and merge run concurrently here, so the odlist that ends up
+	 * on disk can lag behind the WAL.  Reopen and check the data
+	 * itself: if every record is still readable, the list the WAL ends
+	 * with is the good one and whatever else the odlist lists is a
+	 * merged-away tree whose removal did not happen.  A failure here
+	 * would instead mean real data loss, which is far worse.
+	 *
+	 * Closing the reopened table rewrites the odlist, so the
+	 * consistency check below sees the state after that rewrite.
+	 */
+	ret = verify_table_after_reopen(".", "test1", &td);
+	CHK_RET(ret, "verify_table_after_reopen");
+
+	(void)free_string_testdata(&td);
+
+	ret = verify_logfiles_from_scratch(".", "test1");
+	CHK_RET(ret, "verify_logfiles_from_scratch");
 
 	return (ret);
 }
@@ -478,6 +504,9 @@ int table_t1_1e() {
 	CHK_RET(ret, "table->close");
 	ret = store->close(store);
 	CHK_RET(ret, "store->close");
+
+	ret = verify_logfiles_from_scratch(".", "test1");
+	CHK_RET(ret, "verify_logfiles_from_scratch");
 
 	return (ret);
 }
@@ -636,6 +665,9 @@ int table_t1_1f() {
 	ret = store->close(store);
 	CHK_RET(ret, "store->close");
 
+	ret = verify_logfiles_from_scratch(".", "test1");
+	CHK_RET(ret, "verify_logfiles_from_scratch");
+
 	return (ret);
 }
 
@@ -735,6 +767,9 @@ int table_t1_2() {
 	CHK_RET(ret, "table->close");
 	ret = store->close(store);
 	CHK_RET(ret, "store->close");
+
+	ret = verify_logfiles_from_scratch(".", "test1");
+	CHK_RET(ret, "verify_logfiles_from_scratch");
 
 	return (ret);
 
@@ -877,6 +912,9 @@ int table_t1_3() {
 	CHK_RET(ret, "table->close");
 	ret = store->close(store);
 	CHK_RET(ret, "store->close");
+
+	ret = verify_logfiles_from_scratch(".", "test1");
+	CHK_RET(ret, "verify_logfiles_from_scratch");
 
 	(void)free_string_testdata(&td);
 
@@ -1039,6 +1077,9 @@ int table_t1_4() {
 	CHK_RET(ret, "table->close");
 	ret = store->close(store);
 	CHK_RET(ret, "store->close");
+
+	ret = verify_logfiles_from_scratch(".", "test1");
+	CHK_RET(ret, "verify_logfiles_from_scratch");
 
 	(void)free_string_testdata(&td);
 
@@ -1254,6 +1295,10 @@ static int tb_t1_5_run(tb_t1_5_layout layout) {
 	CHK_RET(ret, "table->close");
 	ret = store->close(store);
 	CHK_RET(ret, "store->close");
+
+	/* These cases use their own table name. */
+	ret = verify_logfiles_from_scratch(".", TB_T1_5_NAME);
+	CHK_RET(ret, "verify_logfiles_from_scratch");
 
 	return (0);
 }

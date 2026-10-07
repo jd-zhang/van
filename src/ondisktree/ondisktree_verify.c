@@ -13,3 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include "van_int.h"
+#include "van.h"
+
+/*
+ * _van_ondisktree_verify --
+ *	Check that an on-disk tree file is complete and self consistent.
+ *
+ *	Stub for now: the on-disk format carries no checksum and no
+ *	structure that can be validated without reading the whole tree,
+ *	so there is nothing to check here beyond what the caller has
+ *	already done (the file exists).  The entry point exists so the
+ *	tests can call the same function a real implementation would
+ *	provide, so filling it in later needs no test change.
+ */
+int _van_ondisktree_verify(const char *file_path) {
+	int ret;
+
+	ret = 0;
+	if (file_path == NULL)
+		return (VAN_INVALID);
+
+	return (ret);
+}
